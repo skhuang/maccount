@@ -80,7 +80,7 @@ CREATE TABLE bindings (
 
 - 兩步 OAuth 皆用 `state` 防 CSRF，存 session、回呼時驗證並一次性使用。
 - session cookie：`HttpOnly; Secure; SameSite=Lax`（整頁 GET 回呼適用），內容經簽章防竄改、有過期時間。
-- 最小授權範圍：GitHub `read:user`；NYCU 取 `openid`/`profile`（依 NYCU 實際 scope 命名調整）。
+- 最小授權範圍：GitHub `read:user`；NYCU 取 `profile`（純 OAuth2，非 OIDC；`/api/profile/` 回傳 `username` + `email`）。姓名等屬敏感 scope（`name`），需另向 NYCU 申請核准。
 - 所有 secret 只存在 Workers Secrets，前端永遠取不到。
 - 管理端點一律先驗 NYCU 登入 + 白名單。
 
@@ -103,7 +103,7 @@ CREATE TABLE bindings (
 
 ## 11. 待確認 / 開放問題
 
-- NYCU OAuth 的實際端點與 scope/claims 格式（取回的帳號欄位名稱）—— 實作前需向 NYCU 取得。
+- ~~NYCU OAuth 的實際端點與 scope/claims 格式~~ —— 已確認：純 OAuth2（非 OIDC），scope `profile`，使用者資料端點 `https://id.nycu.edu.tw/api/profile/`，回傳 `username` + `email`，對應表主鍵取 `username`。（依官方文件 https://id.nycu.edu.tw/docs/ ）
 
 ## 12. 技術決定
 

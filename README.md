@@ -34,14 +34,18 @@ npx wrangler deploy
   - **Client type：Confidential**（token 交換在 Worker 後端用 client_secret 完成）
   - **Authorization grant type：Authorization Code**
   - **Redirect URL：`<worker>/auth/nycu/callback`** —— 必須完全吻合（scheme/網域/路徑，**無結尾斜線**）。本機開發若要測可另加 `http://localhost:8787/auth/nycu/callback`。
-  - 取得 `client_id` / `client_secret`，以及實際的 authorize / token / userinfo 端點與 scope；確認 userinfo 回傳的帳號欄位名稱（若與 `src/oauth/nycu.ts` 的 `username ?? sub ?? id` 預設不同，改 `fetchNycuUser` 的映射）。
+  - 取得 `client_id` / `client_secret`。
+  - NYCU 是**純 OAuth2（非 OpenID Connect）**，端點與 scope 已依官方文件填好（見下表），通常不需更動：
+    - authorize：`https://id.nycu.edu.tw/o/authorize/`、token：`/o/token/`、使用者資料：`/api/profile/`
+    - scope：`profile`（非敏感，回傳 `username` + `email`）。`name`（姓名）、`status` 等屬**敏感資料、需向 NYCU 申請核准**。
+    - `/api/profile/` 回傳 `username`（= NYCU 帳號，即對應表主鍵）與 `email`；`src/oauth/nycu.ts` 的 `fetchNycuUser` 已對應 `username`。若日後加 `name` scope 取真實姓名，於該處調整映射。
 - **GitHub**（Settings → Developer settings → OAuth Apps → New）：
   - **Authorization callback URL：`<worker>/auth/github/callback`**
   - 取得 Client ID / Client secret。
 
 ### 4. 設定 vars 與 secrets
 編輯 `wrangler.toml` 的 `[vars]`：`PUBLIC_BASE_URL = "<worker>"`、`FRONTEND_DONE_URL = "https://skhuang.github.io/maccount/done.html"`、`GITHUB_CLIENT_ID`、`NYCU_CLIENT_ID`、`ADMIN_IDS`（以逗號分隔的 NYCU 帳號）。
-NYCU 端點（`NYCU_AUTHORIZE_URL`、`NYCU_TOKEN_URL`、`NYCU_USERINFO_URL`、`NYCU_SCOPE`）已預填 `id.nycu.edu.tw` 的值，若步驟 3 取得的端點不同再修改。
+NYCU 端點（`NYCU_AUTHORIZE_URL`、`NYCU_TOKEN_URL`、`NYCU_USERINFO_URL = /api/profile/`、`NYCU_SCOPE = profile`）已依官方文件填好，一般不需更動。
 secrets 用指令設定（不進版控）：
 ```bash
 npx wrangler secret put SESSION_SECRET        # 隨機長字串
