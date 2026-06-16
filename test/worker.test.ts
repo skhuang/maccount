@@ -140,4 +140,35 @@ describe("/admin auth gate", () => {
     expect(res.headers.get("Content-Type")).toContain("text/csv");
     expect(await res.text()).toContain("nycu_id,nycu_name");
   });
+
+  it("denies CSV export to an anonymous request", async () => {
+    const res = await call("/admin/export.csv");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/auth/nycu/start?purpose=admin");
+  });
+
+  it("denies CSV export to a non-admin (bind) session", async () => {
+    const session = await signSession(
+      { exp: Date.now() + 60000, purpose: "bind", nycu: { id: "0856001", name: "王" } },
+      SECRET,
+    );
+    const res = await call("/admin/export.csv", { headers: cookie(session) });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/auth/nycu/start?purpose=admin");
+  });
+
+  it("denies delete to an anonymous request and does not mutate", async () => {
+    await env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, created_at, updated_at) VALUES ('0856001','王',1,'octo','t','t')",
+    ).run();
+    const body = new URLSearchParams({ nycu_id: "0856001" });
+    const res = await call("/admin/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+    });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/auth/nycu/start?purpose=admin");
+    expect(await listBindings(env.DB)).toHaveLength(1);
+  });
 });
