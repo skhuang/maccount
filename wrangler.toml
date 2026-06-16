@@ -6,7 +6,7 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "maccount"
-database_id = "<filled-after-d1-create>"
+database_id = "e42cb79c-1753-4311-ab13-610ac717f602"
 
 [vars]
 PUBLIC_BASE_URL = "https://maccount-api.<subdomain>.workers.dev"
