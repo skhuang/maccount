@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-Hant">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>綁定結果</title>
+<body style="font-family:system-ui;max-width:640px;margin:3rem auto;padding:0 1rem;line-height:1.6">
+  <h1 id="title">處理中…</h1>
+  <p id="msg"></p>
+  <p><a href="./">回首頁</a></p>
+  <script>
+    const q = new URLSearchParams(location.search);
+    const status = q.get("status");
+    const reason = q.get("reason");
+    const title = document.getElementById("title");
+    const msg = document.getElementById("msg");
+    if (status === "ok") {
+      title.textContent = "✅ 綁定成功";
+      msg.textContent = "你的 NYCU 與 GitHub 帳號已建立對應。";
+    } else {
+      title.textContent = "⚠️ 綁定未完成";
+      msg.textContent =
+        reason === "github_already_bound"
+          ? "這個 GitHub 帳號已被其他 NYCU 帳號綁定，請聯絡管理員。"
+          : "發生錯誤，請回首頁重試。";
+    }
+  </script>
+</body>
+</html>
