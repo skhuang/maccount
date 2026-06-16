@@ -102,5 +102,9 @@ CREATE TABLE bindings (
 
 ## 11. 待確認 / 開放問題
 
-- NYCU OAuth 的實際端點與 scope/claims 格式（取回的帳號欄位名稱）。
-- Worker 實作語言：Cloudflare 原生為 JS/TS（`workerd` 不直接跑 Go）；確認接受 TS，或評估 Go→WASM 方案。
+- NYCU OAuth 的實際端點與 scope/claims 格式（取回的帳號欄位名稱）—— 實作前需向 NYCU 取得。
+
+## 12. 技術決定
+
+- **Worker 實作語言：TypeScript**（Cloudflare 原生 V8 isolate）。
+- 部署工具：Wrangler。D1 以 SQL migration 管理 schema。
