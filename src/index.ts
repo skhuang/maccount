@@ -59,6 +59,9 @@ async function nycuCallback(req: Request, env: Env, url: URL): Promise<Response>
   const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
+  // NYCU returned an OAuth error (e.g. invalid_scope, access_denied) instead of a code.
+  const oauthError = url.searchParams.get("error");
+  if (oauthError) return redirectDone(env, "err", `nycu_${oauthError}`);
   if (!session || !session.nstate || session.nstate !== state || !code) {
     return new Response("Invalid NYCU callback", { status: 400 });
   }
@@ -95,6 +98,9 @@ async function githubCallback(req: Request, env: Env, url: URL): Promise<Respons
   const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
+  // GitHub returned an OAuth error (e.g. access_denied) instead of a code.
+  const oauthError = url.searchParams.get("error");
+  if (oauthError) return redirectDone(env, "err", `github_${oauthError}`);
   if (!session || !session.nycu || !session.gstate || session.gstate !== state || !code) {
     return new Response("Invalid GitHub callback", { status: 400 });
   }

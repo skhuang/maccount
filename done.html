@@ -18,10 +18,13 @@
       msg.textContent = "你的 NYCU 與 GitHub 帳號已建立對應。";
     } else {
       title.textContent = "⚠️ 綁定未完成";
-      msg.textContent =
-        reason === "github_already_bound"
-          ? "這個 GitHub 帳號已被其他 NYCU 帳號綁定，請聯絡管理員。"
-          : "發生錯誤，請回首頁重試。";
+      if (reason === "github_already_bound") {
+        msg.textContent = "這個 GitHub 帳號已被其他 NYCU 帳號綁定，請聯絡管理員。";
+      } else if (reason) {
+        msg.textContent = "授權未完成（" + reason + "），請回首頁重試。";
+      } else {
+        msg.textContent = "發生錯誤，請回首頁重試。";
+      }
     }
   </script>
 </body>

@@ -49,6 +49,24 @@ describe("/auth/nycu/start", () => {
   });
 });
 
+describe("OAuth provider error on callback", () => {
+  it("surfaces a NYCU error to the done page", async () => {
+    const res = await call("/auth/nycu/callback?error=invalid_scope&state=x");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe(
+      "https://skhuang.github.io/maccount/done.html?status=err&reason=nycu_invalid_scope",
+    );
+  });
+
+  it("surfaces a GitHub error to the done page", async () => {
+    const res = await call("/auth/github/callback?error=access_denied&state=x");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe(
+      "https://skhuang.github.io/maccount/done.html?status=err&reason=github_access_denied",
+    );
+  });
+});
+
 describe("/auth/github/callback (bind happy path)", () => {
   it("upserts a binding and redirects to done?status=ok", async () => {
     vi.stubGlobal(
