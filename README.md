@@ -1,5 +1,7 @@
 # maccount — NYCU ↔ GitHub 帳號對應服務
 
+> 用 Claude Code CLI 開發：`cd` 到本專案後執行 `claude`，會自動讀入 `CLAUDE.md` 取得專案脈絡。
+
 前端（靜態）部署於 `skhuang.github.io/maccount`；後端為 Cloudflare Worker (TypeScript) + D1。
 設計與計畫見 `docs/superpowers/`。
 
