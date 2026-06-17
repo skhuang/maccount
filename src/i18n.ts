@@ -31,6 +31,7 @@ export interface Strings {
   no_grades: string;
   privacy_note: string;
   admin_link: string;
+  logout: string;
   join_org_prompt: string;
   join_org_link: string;
   flash_bound_ok: string;
@@ -65,6 +66,7 @@ export const T: Record<Lang, Strings> = {
     no_grades: "目前沒有成績資料。送出程式並完成評分後，結果會顯示在這裡。",
     privacy_note: "僅顯示分數與判定結果（AC/WA/TLE…）。測資內容不對外公開。",
     admin_link: "🔧 管理功能（綁定名單、匯出 CSV / roster）",
+    logout: "登出（換帳號）",
     join_org_prompt: "尚未加入課程 GitHub 組織?（需先用你綁定的 GitHub 登入;已加入可忽略）",
     join_org_link: "接受邀請加入課程組織 →",
     flash_bound_ok: "GitHub 綁定成功。",
@@ -97,6 +99,7 @@ export const T: Record<Lang, Strings> = {
     no_grades: "No grades yet. Results appear here after you submit and it is graded.",
     privacy_note: "Only the score and verdict (AC/WA/TLE…) are shown; test data is never disclosed.",
     admin_link: "🔧 Admin (bindings list, export CSV / roster)",
+    logout: "Sign out (switch account)",
     join_org_prompt: "Not in the course GitHub org yet? (sign in with your linked GitHub first; ignore if already joined)",
     join_org_link: "Accept the invite to join the course org →",
     flash_bound_ok: "GitHub bound successfully.",

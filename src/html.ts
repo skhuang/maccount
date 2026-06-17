@@ -13,6 +13,30 @@ function htmlLang(lang: Lang): string {
   return lang === "en" ? "en" : "zh-Hant";
 }
 
+// Render a stored updated_at (epoch seconds/ms, or an ISO string) as a readable
+// Asia/Taipei timestamp "YYYY/MM/DD HH:MM". Falls back to the raw value.
+export function fmtTime(raw: string | null | undefined): string {
+  if (raw == null || String(raw).trim() === "") return "-";
+  const s = String(raw).trim();
+  const num = Number(s);
+  let d: Date;
+  if (Number.isFinite(num) && num > 0) {
+    d = new Date(num * (num < 1e12 ? 1000 : 1)); // seconds vs ms
+  } else {
+    d = new Date(s);
+  }
+  if (isNaN(d.getTime())) return s;
+  try {
+    return new Intl.DateTimeFormat("zh-TW", {
+      timeZone: "Asia/Taipei",
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hour12: false,
+    }).format(d);
+  } catch {
+    return d.toISOString().slice(0, 16).replace("T", " ");
+  }
+}
+
 export function adminPage(lang: Lang, rows: BindingRow[]): string {
   const t = T[lang];
   const trs = rows
@@ -63,7 +87,7 @@ export function dashboardPage(
   <td>${h(g.problem_id)}</td>
   <td>${h(g.verdict ?? "-")}</td>
   <td>${g.score == null ? "-" : h(g.score)} / ${g.max_score == null ? "-" : h(g.max_score)}</td>
-  <td>${h(g.updated_at)}</td>
+  <td>${h(fmtTime(g.updated_at))}</td>
 </tr>`,
     )
     .join("\n");
@@ -96,6 +120,7 @@ ${rows}
 <title>${t.acct_title}</title>
 <body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
 ${langToggle("/me", lang)}
+<p style="text-align:right;font-size:.9em"><a href="/logout">${t.logout}</a></p>
 <h1>${t.acct_heading}</h1>
 ${flashHtml}
 <p>${t.student_id}：<b>${h(nycu.id)}</b>${nycu.name ? `（${h(nycu.name)}）` : ""}</p>

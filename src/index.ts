@@ -33,6 +33,7 @@ export default {
       if (p === "/auth/nycu/callback") return await nycuCallback(req, env, url);
       if (p === "/auth/github/start") return await startGithub(req, env);
       if (p === "/auth/github/callback") return await githubCallback(req, env, url);
+      if (p === "/logout") return logout(env);
       if (p === "/me" && req.method === "GET") return await mePage(req, env, url);
       if (p === "/api/grades/ingest" && req.method === "POST")
         return await gradesIngest(req, env);
@@ -162,6 +163,14 @@ async function githubCallback(req: Request, env: Env, url: URL): Promise<Respons
   }
   // Stay logged in; back to the dashboard with a success flash.
   return redirect("/me?bound=1");
+}
+
+// Clear the maccount session and bounce to the landing page so the user can log
+// in as a different account. (NYCU/GitHub SSO may still auto-reuse their own
+// session — switching those needs their logout / an incognito window.)
+function logout(env: Env): Response {
+  const landing = new URL(".", env.FRONTEND_DONE_URL).toString();
+  return redirect(landing, clearCookie());
 }
 
 // ── dashboard (/me) ───────────────────────────────────────────────────────
