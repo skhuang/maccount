@@ -371,6 +371,45 @@ describe("/admin/roster.csv", () => {
   });
 });
 
+describe("/api/grades (token-auth pull for 程式作業自動批改)", () => {
+  beforeEach(async () => {
+    await env.DB.batch([
+      env.DB.prepare(
+        "INSERT INTO grades (student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('AT9336','lab01-stack','AC',100,100,'t1')",
+      ),
+      env.DB.prepare(
+        "INSERT INTO grades (student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('B002','lab01-stack','WA',30,100,'t2')",
+      ),
+      env.DB.prepare(
+        "INSERT INTO grades (student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('AT9336','lab02-queue','TLE',0,100,'t3')",
+      ),
+    ]);
+  });
+
+  it("returns grades for the given problem with the token", async () => {
+    const res = await call("/api/grades?problem_id=lab01-stack", {
+      headers: { Authorization: "Bearer ingest-secret" },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      ok: boolean;
+      grades: { student_id: string; problem_id: string }[];
+    };
+    expect(body.ok).toBe(true);
+    expect(body.grades.map((g) => g.student_id).sort()).toEqual(["AT9336", "B002"]);
+    expect(body.grades.every((g) => g.problem_id === "lab01-stack")).toBe(true);
+  });
+
+  it("401 without a valid token", async () => {
+    expect((await call("/api/grades?problem_id=lab01-stack")).status).toBe(401);
+  });
+
+  it("400 without problem_id", async () => {
+    const res = await call("/api/grades", { headers: { Authorization: "Bearer ingest-secret" } });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("/api/roster (token-auth pull for the OJ roster-sync timer)", () => {
   beforeEach(async () => {
     await env.DB.prepare(
