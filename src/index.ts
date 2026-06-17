@@ -153,7 +153,9 @@ async function githubCallback(req: Request, env: Env, url: URL): Promise<Respons
   // binding (the dsjudge invite_org backfill covers any miss).
   if (env.COURSE_ORG && env.ORG_INVITE_TOKEN) {
     try {
-      await inviteOrgMember(env.COURSE_ORG, gh.login, env.ORG_INVITE_TOKEN);
+      const m = await inviteOrgMember(env.COURSE_ORG, gh.login, env.ORG_INVITE_TOKEN);
+      // Visible in `wrangler tail`: state is "pending" (invite sent) or "active".
+      console.log(`org invite: ${gh.login} -> ${m.state ?? "?"} (${env.COURSE_ORG})`);
     } catch (e) {
       console.error("org invite failed:", (e as Error).message);
     }
