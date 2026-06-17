@@ -21,6 +21,10 @@ export interface Env {
   // invite link (orgs/<org>/invitation); empty = hide it. Set in wrangler.toml
   // [vars] (not a secret).
   COURSE_ORG: string;
+  // Org-scoped GitHub token (Members: write). When set (with COURSE_ORG), a
+  // student is auto-invited to the org right after binding GitHub, so the /me
+  // link is immediately actionable. `wrangler secret put ORG_INVITE_TOKEN`.
+  ORG_INVITE_TOKEN: string;
 }
 
 export function nycuConfig(env: Env): NycuConfig {

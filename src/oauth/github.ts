@@ -45,3 +45,25 @@ export async function fetchGithubUser(
   }
   return { id: data.id, login: data.login };
 }
+
+// Invite/add a user to the course org. Returns the membership `state` ("pending"
+// = invitation sent, accepted once at github.com/orgs/<org>/invitation; "active"
+// = already a member). Needs an org-scoped token (Members: write).
+export async function inviteOrgMember(
+  org: string, username: string, token: string,
+  fetcher: typeof fetch = fetch,
+): Promise<{ state?: string }> {
+  const res = await fetcher(`https://api.github.com/orgs/${org}/memberships/${username}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "Content-Type": "application/json",
+      "User-Agent": "maccount",
+    },
+    body: JSON.stringify({ role: "member" }),
+  });
+  if (!res.ok) throw new Error(`org invite failed: ${res.status}`);
+  return (await res.json()) as { state?: string };
+}

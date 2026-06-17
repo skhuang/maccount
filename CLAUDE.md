@@ -17,7 +17,7 @@
 
 ### 流程（單一 NYCU 登入 → 儀表板）
 入口頁 → `/auth/nycu/start` → NYCU 登入 → `/auth/nycu/callback`（驗 state、換 token、取 `username`、設定登入 session）→ **`/me` 儀表板**。在 `/me` 可：
-- **綁定 GitHub**：`/auth/github/start`（需登入）→ GitHub 授權 → `/auth/github/callback`（驗 gstate、upsert D1）→ 回 `/me?bound=1`（衝突 → `/me?error=github_already_bound`）。
+- **綁定 GitHub**：`/auth/github/start`（需登入）→ GitHub 授權 → `/auth/github/callback`（驗 gstate、upsert D1）→（若設 `COURSE_ORG`+`ORG_INVITE_TOKEN`）**綁定後 best-effort 自動邀請進 org**（`inviteOrgMember`,失敗不影響綁定)→ 回 `/me?bound=1`(衝突 → `/me?error=github_already_bound`)。`ORG_INVITE_TOKEN` 是 org 範圍 token,用 `wrangler secret put` 設(失敗的補網由 dsjudge `invite_org` 負責)。
 - **查成績**：列出自己的 OJ 結果（只顯示分數+判定）。
 - **管理功能**：`nycu_id ∈ ADMIN_IDS` 時 `/me` 顯示連到 `/admin` 的連結。
 

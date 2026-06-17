@@ -23,6 +23,7 @@ const testEnv: Env = {
   NYCU_CLIENT_SECRET: "n_secret",
   GRADES_INGEST_TOKEN: "ingest-secret",
   COURSE_ORG: "nycu-cs-course-ds",
+  ORG_INVITE_TOKEN: "org-tok",
 };
 
 beforeAll(async () => {
@@ -95,6 +96,7 @@ describe("OAuth provider error on callback", () => {
 
 describe("/auth/github/callback (bind happy path)", () => {
   it("upserts a binding and redirects to /me?bound=1", async () => {
+    const orgInvited: string[] = [];
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
@@ -106,6 +108,12 @@ describe("/auth/github/callback (bind happy path)", () => {
         }
         if (url.includes("api.github.com/user")) {
           return new Response(JSON.stringify({ id: 999, login: "octo" }), {
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        if (url.includes("/memberships/")) { // auto org-invite after bind
+          orgInvited.push(url);
+          return new Response(JSON.stringify({ state: "pending" }), {
             headers: { "Content-Type": "application/json" },
           });
         }
@@ -122,6 +130,25 @@ describe("/auth/github/callback (bind happy path)", () => {
     const rows = await listBindings(env.DB);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ nycu_id: "0856001", github_id: 999, github_login: "octo" });
+    // auto-invited octo to the org
+    expect(orgInvited.some((u) => u.includes("/orgs/nycu-cs-course-ds/memberships/octo"))).toBe(true);
+  });
+
+  it("binding still succeeds if the org invite fails", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("access_token"))
+        return new Response(JSON.stringify({ access_token: "t" }), { headers: { "Content-Type": "application/json" } });
+      if (url.includes("/memberships/")) return new Response("nope", { status: 500 });
+      return new Response(JSON.stringify({ id: 888, login: "mona" }), { headers: { "Content-Type": "application/json" } });
+    }));
+    const session = await signSession(
+      { exp: Date.now() + 60000, nycu: { id: "0856002", name: "李" }, gstate: "GS" },
+      SECRET,
+    );
+    const res = await call("/auth/github/callback?code=abc&state=GS", { headers: cookie(session) });
+    expect(res.headers.get("Location")).toBe("/me?bound=1"); // invite failure ignored
+    expect((await listBindings(env.DB)).some((r) => r.github_login === "mona")).toBe(true);
   });
 
   it("redirects with status=err when github already bound to another nycu", async () => {
