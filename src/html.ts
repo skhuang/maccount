@@ -33,16 +33,19 @@ ${trs}
 </body></html>`;
 }
 
-// Student self-service page: their NYCU↔GitHub binding + their OJ results.
-// Shows verdict + score ONLY (iron rule 2) — never any test data.
-export function studentPage(
+// Logged-in dashboard: NYCU↔GitHub binding (+ bind action), OJ results, and an
+// admin link when the user is an admin. Grades show verdict + score ONLY (iron
+// rule 2) — never any test data.
+export function dashboardPage(
   nycu: { id: string; name: string },
   binding: BindingRow | null,
   grades: GradeRow[],
+  admin: boolean,
+  flash: { kind: "ok" | "err"; text: string } | null,
 ): string {
   const gh = binding?.github_login
-    ? `<b>${h(binding.github_login)}</b>`
-    : `<span style="color:#b00">尚未綁定</span> — <a href="/auth/nycu/start?purpose=bind">前往綁定 GitHub →</a>`;
+    ? `已綁定 <b>${h(binding.github_login)}</b> — <a href="/auth/github/start">重新綁定</a>`
+    : `<span style="color:#b00">尚未綁定</span> — <a href="/auth/github/start"><b>綁定 GitHub →</b></a>`;
 
   const rows = grades
     .map(
@@ -63,13 +66,27 @@ ${rows}
 </tbody></table>`
     : `<p style="color:#666">目前沒有成績資料。送出程式並完成評分後，結果會顯示在這裡。</p>`;
 
+  const flashHtml = flash
+    ? `<p style="padding:.5rem .8rem;border-radius:6px;background:${
+        flash.kind === "ok" ? "#d4edda" : "#f8d7da"
+      }">${h(flash.text)}</p>`
+    : "";
+
+  const adminHtml = admin
+    ? `<p style="margin-top:1.5rem"><a href="/admin"><b>🔧 管理功能</b></a>（綁定名單、匯出 CSV / roster）</p>`
+    : "";
+
   return `<!doctype html><html lang="zh-Hant"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>我的成績</title>
+<title>我的帳號</title>
 <body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
-<h1>我的成績</h1>
-<p>學號：<b>${h(nycu.id)}</b>${nycu.name ? `（${h(nycu.name)}）` : ""}　|　GitHub：${gh}</p>
+<h1>我的帳號</h1>
+${flashHtml}
+<p>學號：<b>${h(nycu.id)}</b>${nycu.name ? `（${h(nycu.name)}）` : ""}</p>
+<p>GitHub：${gh}</p>
+<h2>我的成績</h2>
 ${table}
-<p style="color:#888;font-size:.9em;margin-top:1.5rem">僅顯示分數與判定結果（AC/WA/TLE…）。測資內容不對外公開。</p>
+<p style="color:#888;font-size:.9em">僅顯示分數與判定結果（AC/WA/TLE…）。測資內容不對外公開。</p>
+${adminHtml}
 </body></html>`;
 }

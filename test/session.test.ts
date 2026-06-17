@@ -6,7 +6,7 @@ const SECRET = "test-secret";
 
 describe("session", () => {
   it("round-trips a signed session", async () => {
-    const data: SessionData = { exp: Date.now() + 60000, purpose: "bind", nstate: "abc" };
+    const data: SessionData = { exp: Date.now() + 60000, nstate: "abc" };
     const token = await signSession(data, SECRET);
     const out = await verifySession(token, SECRET, Date.now());
     expect(out).toEqual(data);
