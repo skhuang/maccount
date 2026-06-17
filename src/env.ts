@@ -25,6 +25,10 @@ export interface Env {
   // student is auto-invited to the org right after binding GitHub, so the /me
   // link is immediately actionable. `wrangler secret put ORG_INVITE_TOKEN`.
   ORG_INVITE_TOKEN: string;
+  // Org team slug for TA/staff (matches dsjudge's OJ_PROVISION_TEAM). When set
+  // (with COURSE_ORG + ORG_INVITE_TOKEN), adding/removing a staff member in
+  // /admin also syncs them to this org team (+ org). wrangler.toml [vars].
+  STAFF_TEAM: string;
 }
 
 export function nycuConfig(env: Env): NycuConfig {

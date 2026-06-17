@@ -53,6 +53,9 @@ export interface Strings {
   staff_add: string;
   staff_remove: string;
   staff_remove_confirm: string;
+  staff_sync_ok: string;
+  staff_sync_nobinding: string;
+  staff_sync_error: string;
 }
 
 export const T: Record<Lang, Strings> = {
@@ -95,6 +98,9 @@ export const T: Record<Lang, Strings> = {
     staff_add: "新增助教",
     staff_remove: "移除",
     staff_remove_confirm: "確定移除此助教？",
+    staff_sync_ok: "已同步到 GitHub org 與 staff team。",
+    staff_sync_nobinding: "此助教尚未綁定 GitHub；請他先到 /me 綁定，再加入一次以同步。",
+    staff_sync_error: "GitHub org/team 同步失敗（請檢查 ORG_INVITE_TOKEN 權限與 STAFF_TEAM）。",
   },
   en: {
     acct_title: "My Account",
@@ -135,6 +141,9 @@ export const T: Record<Lang, Strings> = {
     staff_add: "Add staff",
     staff_remove: "Remove",
     staff_remove_confirm: "Remove this staff member?",
+    staff_sync_ok: "Synced to the GitHub org and staff team.",
+    staff_sync_nobinding: "This TA hasn't bound GitHub yet; have them bind at /me, then add again to sync.",
+    staff_sync_error: "GitHub org/team sync failed (check ORG_INVITE_TOKEN permissions and STAFF_TEAM).",
   },
 };
 
