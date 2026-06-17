@@ -24,3 +24,15 @@ export function toCsv(rows: BindingRow[]): string {
   }
   return lines.join("\n") + "\n";
 }
+
+// dsjudge roster.csv shape: `github_login,student_id` (student_id == nycu_id ==
+// 學號). Only verified bindings that actually have a GitHub login are emitted;
+// this file is what app/roster.py on the OJ host reads.
+export function toRosterCsv(rows: BindingRow[]): string {
+  const lines = ["github_login,student_id"];
+  for (const r of rows) {
+    if (!r.github_login) continue;
+    lines.push([r.github_login, r.nycu_id].map(esc).join(","));
+  }
+  return lines.join("\n") + "\n";
+}

@@ -22,21 +22,27 @@
 
 | 檔 | 責任 |
 |---|---|
-| `index.ts` | 路由 + handler（startNycu / nycuCallback / githubCallback / admin*） |
-| `session.ts` | HMAC-SHA256 簽章 session cookie（`SessionData`、sign/verify、cookie 讀寫） |
+| `index.ts` | 路由 + handler（startNycu / nycuCallback / githubCallback / **mePage** / **gradesIngest** / admin*） |
+| `session.ts` | HMAC-SHA256 簽章 session cookie（`SessionData`、sign/verify、cookie 讀寫；`student` 旗標 = 學生登入 /me） |
 | `util.ts` | `randomState()`（CSRF state） |
-| `env.ts` | `Env` 型別、`nycuConfig()`、`isAdmin()` |
-| `oauth/nycu.ts` | NYCU authorize URL / token 交換 / `fetchNycuUser`（取 `username`） |
+| `env.ts` | `Env` 型別、`nycuConfig()`、`isAdmin()`；新增 `GRADES_INGEST_TOKEN` |
+| `oauth/nycu.ts` | NYCU authorize URL / token 交換 / `fetchNycuUser`（取 `username` = 學號 = student_id） |
 | `oauth/github.ts` | GitHub authorize URL / token 交換 / 取 user(id+login) |
-| `db/bindings.ts` | D1 存取：`upsertBinding`（含一 GitHub 只綁一 NYCU 的衝突保護）/ list / delete |
-| `csv.ts` | `BindingRow` 型別 + CSV 匯出 |
-| `html.ts` | 管理後台 HTML（已做 XSS 跳脫） |
+| `db/bindings.ts` | D1：`upsertBinding`（一 GitHub 只綁一 NYCU）/ list / delete / `getBinding` |
+| `db/grades.ts` | D1：OJ 成績鏡像 `grades`（**score+verdict only**）— `upsertGrades` / `listGradesFor` |
+| `csv.ts` | `BindingRow` + `toCsv`（完整綁定）+ `toRosterCsv`（`github_login,student_id`） |
+| `html.ts` | 管理後台 + **學生 `/me` 成績頁** HTML（已做 XSS 跳脫） |
+
+### 端點（新增）
+- `GET /me` — 學生用 NYCU 登入（`?purpose=me`）後查自己的綁定 + OJ 成績（只顯示分數與判定）。
+- `POST /api/grades/ingest` — 受信任的 OJ runner 推送成績；`Authorization: Bearer <GRADES_INGEST_TOKEN>`，body 為 `[{student_id,problem_id,verdict,score,max_score,updated_at}]`，upsert 進 `grades`。**只存分數+判定，其餘欄位忽略**（OJ 鐵則 2：學生只看分數+verdict，測資不外洩）。
+- `GET /admin/roster.csv` — 匯出 `github_login,student_id` 給 dsjudge P4 的 `roster.csv`（即 maccount 取代 Classroom 匯出成為權威來源）。
 
 ## 常用指令
 
 ```bash
 npm install
-npm test            # vitest，全部測試（目前 35 passed）
+npm test            # vitest，全部測試（目前 47 passed）
 npx tsc --noEmit    # 型別檢查
 npm run dev         # wrangler dev（本機，預設埠 8787）
 npx wrangler deploy # 部署 Worker（vars 變更也要重新 deploy 才生效）

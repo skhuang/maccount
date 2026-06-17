@@ -14,6 +14,9 @@ export interface Env {
   NYCU_SCOPE: string;
   NYCU_CLIENT_ID: string;
   NYCU_CLIENT_SECRET: string;
+  // Shared secret the trusted OJ runner presents to POST /api/grades/ingest.
+  // Set via `wrangler secret put GRADES_INGEST_TOKEN` (never in wrangler.toml).
+  GRADES_INGEST_TOKEN: string;
 }
 
 export function nycuConfig(env: Env): NycuConfig {

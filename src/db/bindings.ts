@@ -49,3 +49,12 @@ export async function listBindings(db: D1Database): Promise<BindingRow[]> {
 export async function deleteBinding(db: D1Database, nycu_id: string): Promise<void> {
   await db.prepare("DELETE FROM bindings WHERE nycu_id = ?").bind(nycu_id).run();
 }
+
+export async function getBinding(db: D1Database, nycu_id: string): Promise<BindingRow | null> {
+  return await db
+    .prepare(
+      "SELECT nycu_id, nycu_name, github_id, github_login, created_at, updated_at FROM bindings WHERE nycu_id = ?",
+    )
+    .bind(nycu_id)
+    .first<BindingRow>();
+}

@@ -21,6 +21,7 @@ const testEnv: Env = {
   NYCU_SCOPE: "openid profile",
   NYCU_CLIENT_ID: "n_id",
   NYCU_CLIENT_SECRET: "n_secret",
+  GRADES_INGEST_TOKEN: "ingest-secret",
 };
 
 beforeAll(async () => {
@@ -28,6 +29,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   await env.DB.prepare("DELETE FROM bindings").run();
+  await env.DB.prepare("DELETE FROM grades").run();
 });
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -188,5 +190,110 @@ describe("/admin auth gate", () => {
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("/auth/nycu/start?purpose=admin");
     expect(await listBindings(env.DB)).toHaveLength(1);
+  });
+});
+
+describe("/me student status", () => {
+  it("redirects anonymous users to NYCU login (purpose=me)", async () => {
+    const res = await call("/me");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/auth/nycu/start?purpose=me");
+  });
+
+  it("rejects a non-student (bind) session", async () => {
+    const session = await signSession(
+      { exp: Date.now() + 60000, purpose: "bind", nycu: { id: "314561004", name: "甲" } },
+      SECRET,
+    );
+    const res = await call("/me", { headers: cookie(session) });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/auth/nycu/start?purpose=me");
+  });
+
+  it("shows only the logged-in student's own grades", async () => {
+    await env.DB.batch([
+      env.DB.prepare(
+        "INSERT INTO grades (student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('314561004','lab01-stack','AC',100,100,'t1')",
+      ),
+      env.DB.prepare(
+        "INSERT INTO grades (student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('999999999','lab01-stack','WA',0,100,'t2')",
+      ),
+    ]);
+    const session = await signSession(
+      { exp: Date.now() + 60000, student: true, nycu: { id: "314561004", name: "甲" } },
+      SECRET,
+    );
+    const res = await call("/me", { headers: cookie(session) });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("lab01-stack");
+    expect(body).toContain("AC");
+    expect(body).not.toContain("999999999"); // never another student's row
+  });
+});
+
+describe("/api/grades/ingest", () => {
+  const rows = [
+    { student_id: "314561004", problem_id: "lab01-stack", verdict: "AC", score: 100, max_score: 100, updated_at: "t1" },
+  ];
+
+  it("rejects a missing/wrong token with 401 and writes nothing", async () => {
+    const res = await call("/api/grades/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer nope" },
+      body: JSON.stringify(rows),
+    });
+    expect(res.status).toBe(401);
+    const { results } = await env.DB.prepare("SELECT * FROM grades").all();
+    expect(results).toHaveLength(0);
+  });
+
+  it("upserts grades with the right token", async () => {
+    const res = await call("/api/grades/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer ingest-secret" },
+      body: JSON.stringify(rows),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, upserted: 1 });
+    const row = await env.DB.prepare("SELECT * FROM grades WHERE student_id='314561004'").first();
+    expect(row).toMatchObject({ problem_id: "lab01-stack", verdict: "AC", score: 100 });
+  });
+
+  it("ignores extra fields (no test data ever stored)", async () => {
+    await call("/api/grades/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer ingest-secret" },
+      body: JSON.stringify([{ ...rows[0], expected_output: "SECRET", diff: "LEAK", stdin: "X" }]),
+    });
+    const cols = await env.DB.prepare("SELECT * FROM grades LIMIT 1").first();
+    expect(Object.keys(cols ?? {})).toEqual([
+      "student_id", "problem_id", "verdict", "score", "max_score", "updated_at",
+    ]);
+  });
+});
+
+describe("/admin/roster.csv", () => {
+  it("emits github_login,student_id for admins (only bound rows)", async () => {
+    await env.DB.batch([
+      env.DB.prepare(
+        "INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, created_at, updated_at) VALUES ('314561004','甲',1,'alice','t','t')",
+      ),
+    ]);
+    const session = await signSession(
+      { exp: Date.now() + 60000, admin: true, nycu: { id: "admin1", name: "Admin" } },
+      SECRET,
+    );
+    const res = await call("/admin/roster.csv", { headers: cookie(session) });
+    expect(res.headers.get("Content-Type")).toContain("text/csv");
+    const body = await res.text();
+    expect(body).toContain("github_login,student_id");
+    expect(body).toContain("alice,314561004");
+  });
+
+  it("denies roster export to anonymous", async () => {
+    const res = await call("/admin/roster.csv");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/auth/nycu/start?purpose=admin");
   });
 });
