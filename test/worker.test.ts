@@ -297,3 +297,29 @@ describe("/admin/roster.csv", () => {
     expect(res.headers.get("Location")).toBe("/auth/nycu/start?purpose=admin");
   });
 });
+
+describe("/api/roster (token-auth pull for the OJ roster-sync timer)", () => {
+  beforeEach(async () => {
+    await env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, created_at, updated_at) VALUES ('AT9336','師',1,'skhuang','t','t')",
+    ).run();
+  });
+
+  it("returns github_login,student_id CSV with the right token", async () => {
+    const res = await call("/api/roster", {
+      headers: { Authorization: "Bearer ingest-secret" },
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toContain("text/csv");
+    const body = await res.text();
+    expect(body).toContain("github_login,student_id");
+    expect(body).toContain("skhuang,AT9336");
+  });
+
+  it("401 without a valid token (no NYCU session needed)", async () => {
+    expect((await call("/api/roster")).status).toBe(401);
+    expect(
+      (await call("/api/roster", { headers: { Authorization: "Bearer nope" } })).status,
+    ).toBe(401);
+  });
+});
