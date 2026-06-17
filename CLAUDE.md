@@ -42,6 +42,7 @@
 ### 端點（新增）
 - `GET /me` — 登入後的**儀表板**：自己的綁定（+綁定 GitHub 按鈕）、OJ 成績（只顯示分數與判定）、admin 連結（若是 admin）、以及（若 `COURSE_ORG` 有設）一條「加入課程 org」邀請連結 `https://github.com/orgs/<org>/invitation`（學生接受一次,之後 P4 的 repo 授權即時、免 email）。`COURSE_ORG` 放 `wrangler.toml [vars]`（非機密）。
 - `GET /auth/github/start` — 從 `/me` 發動 GitHub 綁定（需登入 session）。
+- `GET /logout` — 清掉 maccount session cookie 並導回入口頁（方便換帳號登入；NYCU/GitHub 自身 SSO 仍可能沿用,要換需各自登出或用無痕視窗）。`/me` 右上有「登出」連結。成績的更新時間以 `fmtTime` 顯示為可讀的 Asia/Taipei `YYYY/MM/DD HH:MM`(而非原始 epoch)。
 - `POST /api/grades/ingest` — 受信任的 OJ runner 推送成績；`Authorization: Bearer <GRADES_INGEST_TOKEN>`，body 為 `[{student_id,problem_id,verdict,score,max_score,updated_at}]`，upsert 進 `grades`。**只存分數+判定，其餘欄位忽略**（OJ 鐵則 2：學生只看分數+verdict，測資不外洩）。
 - `GET /admin/roster.csv` — 匯出 `github_login,student_id` 給 dsjudge P4 的 `roster.csv`（即 maccount 取代 Classroom 匯出成為權威來源）。需 admin NYCU 登入。
 - `GET /api/roster` — 同樣的 `github_login,student_id`，但用 `Authorization: Bearer <GRADES_INGEST_TOKEN>`（無需 NYCU session），供 OJ 主機的 roster-sync 定時器自動拉取。

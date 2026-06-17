@@ -260,6 +260,14 @@ describe("/me dashboard", () => {
     expect(body).not.toContain("管理功能"); // 314561004 is not in ADMIN_IDS
     // org-join CTA from COURSE_ORG
     expect(body).toContain("https://github.com/orgs/nycu-cs-course-ds/invitation");
+    expect(body).toContain('href="/logout"'); // logout link
+  });
+
+  it("logout clears the session cookie and redirects to the landing page", async () => {
+    const res = await call("/logout");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("https://skhuang.github.io/maccount/");
+    expect(res.headers.get("Set-Cookie")).toContain("Max-Age=0"); // cleared
   });
 
   it("hides the org-join link when COURSE_ORG is unset", async () => {
