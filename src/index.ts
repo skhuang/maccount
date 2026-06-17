@@ -20,6 +20,7 @@ import {
 import { upsertGrades, listGradesFor, GradeInput } from "./db/grades";
 import { toCsv, toRosterCsv } from "./csv";
 import { adminPage, dashboardPage } from "./html";
+import { pickLang, langCookie } from "./i18n";
 
 const TTL_MS = 15 * 60 * 1000;
 
@@ -36,7 +37,7 @@ export default {
       if (p === "/api/grades/ingest" && req.method === "POST")
         return await gradesIngest(req, env);
       if (p === "/api/roster" && req.method === "GET") return await apiRoster(req, env);
-      if (p === "/admin" && req.method === "GET") return await adminList(req, env);
+      if (p === "/admin" && req.method === "GET") return await adminList(req, env, url);
       if (p === "/admin/export.csv") return await adminExport(req, env);
       if (p === "/admin/roster.csv") return await adminRoster(req, env);
       if (p === "/admin/delete" && req.method === "POST") return await adminDelete(req, env);
@@ -53,20 +54,24 @@ export default {
   },
 };
 
-function redirect(location: string, cookie?: string): Response {
-  const headers: Record<string, string> = { Location: location };
-  if (cookie) headers["Set-Cookie"] = cookie;
+function redirect(location: string, cookie?: string | string[]): Response {
+  const headers = new Headers({ Location: location });
+  if (cookie) for (const c of Array.isArray(cookie) ? cookie : [cookie]) headers.append("Set-Cookie", c);
   return new Response(null, { status: 302, headers });
 }
 
 // Single entry point: log in with NYCU. The landing dashboard (/me) is where a
 // user then binds GitHub, sees grades, or (if admin) reaches admin functions.
-async function startNycu(req: Request, env: Env, _url: URL): Promise<Response> {
+async function startNycu(req: Request, env: Env, url: URL): Promise<Response> {
   const nstate = randomState();
   const session: SessionData = { exp: Date.now() + TTL_MS, nstate };
   const token = await signSession(session, env.SESSION_SECRET);
   const redirectUri = `${env.PUBLIC_BASE_URL}/auth/nycu/callback`;
-  return redirect(nycuAuthorizeUrl(nycuConfig(env), redirectUri, nstate), setCookie(token));
+  // Carry a language choice from the static landing page through the OAuth flow.
+  const cookies = [setCookie(token)];
+  const lang = url.searchParams.get("lang");
+  if (lang === "en" || lang === "zh") cookies.push(langCookie(lang));
+  return redirect(nycuAuthorizeUrl(nycuConfig(env), redirectUri, nstate), cookies);
 }
 
 async function nycuCallback(req: Request, env: Env, url: URL): Promise<Response> {
@@ -157,17 +162,18 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
   const s = await requireLogin(req, env);
   if (s instanceof Response) return s;
   const studentId = s.nycu!.id; // == 學號
+  const lang = pickLang(url, req.headers.get("Cookie"));
   const [binding, grades] = await Promise.all([
     getBinding(env.DB, studentId),
     listGradesFor(env.DB, studentId),
   ]);
-  const flash = url.searchParams.get("bound") === "1"
-    ? { kind: "ok" as const, text: "GitHub 綁定成功。" }
-    : url.searchParams.get("error")
-      ? { kind: "err" as const, text: `操作未完成：${url.searchParams.get("error")}` }
-      : null;
-  return new Response(dashboardPage(s.nycu!, binding, grades, isAdmin(env, studentId), flash), {
-    headers: { "Content-Type": "text/html; charset=utf-8" },
+  const flash = {
+    bound: url.searchParams.get("bound") === "1",
+    error: url.searchParams.get("error"),
+  };
+  const html = dashboardPage(lang, s.nycu!, binding, grades, isAdmin(env, studentId), flash);
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
   });
 }
 
@@ -242,12 +248,13 @@ async function requireAdmin(req: Request, env: Env): Promise<SessionData | Respo
   return session;
 }
 
-async function adminList(req: Request, env: Env): Promise<Response> {
+async function adminList(req: Request, env: Env, url: URL): Promise<Response> {
   const s = await requireAdmin(req, env);
   if (s instanceof Response) return s;
+  const lang = pickLang(url, req.headers.get("Cookie"));
   const rows = await listBindings(env.DB);
-  return new Response(adminPage(rows), {
-    headers: { "Content-Type": "text/html; charset=utf-8" },
+  return new Response(adminPage(lang, rows), {
+    headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
   });
 }
 

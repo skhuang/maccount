@@ -262,6 +262,28 @@ describe("/me dashboard", () => {
     const res = await call("/me?bound=1", { headers: cookie(session) });
     expect(await res.text()).toContain("綁定成功");
   });
+
+  it("renders English and sets a lang cookie with ?lang=en", async () => {
+    const session = await signSession(
+      { exp: Date.now() + 60000, nycu: { id: "314561004", name: "甲" } },
+      SECRET,
+    );
+    const res = await call("/me?lang=en", { headers: cookie(session) });
+    const body = await res.text();
+    expect(body).toContain("My Account");
+    expect(body).toContain("Bind GitHub");
+    expect(body).not.toContain("我的帳號");
+    expect(res.headers.get("Set-Cookie")).toContain("lang=en");
+  });
+
+  it("honors a lang=en cookie when there is no ?lang", async () => {
+    const session = await signSession(
+      { exp: Date.now() + 60000, nycu: { id: "314561004", name: "甲" } },
+      SECRET,
+    );
+    const res = await call("/me", { headers: { Cookie: `${SESSION_COOKIE}=${session}; lang=en` } });
+    expect(await res.text()).toContain("My Account");
+  });
 });
 
 describe("/auth/github/start (bind from the dashboard)", () => {
