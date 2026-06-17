@@ -10,9 +10,16 @@ import {
 import { randomState } from "./util";
 import { nycuAuthorizeUrl, exchangeNycuCode, fetchNycuUser } from "./oauth/nycu";
 import { githubAuthorizeUrl, exchangeGithubCode, fetchGithubUser } from "./oauth/github";
-import { upsertBinding, listBindings, deleteBinding, GithubConflictError } from "./db/bindings";
-import { toCsv } from "./csv";
-import { adminPage } from "./html";
+import {
+  upsertBinding,
+  listBindings,
+  deleteBinding,
+  getBinding,
+  GithubConflictError,
+} from "./db/bindings";
+import { upsertGrades, listGradesFor, GradeInput } from "./db/grades";
+import { toCsv, toRosterCsv } from "./csv";
+import { adminPage, studentPage } from "./html";
 
 const TTL_MS = 15 * 60 * 1000;
 
@@ -24,8 +31,12 @@ export default {
       if (p === "/auth/nycu/start") return await startNycu(req, env, url);
       if (p === "/auth/nycu/callback") return await nycuCallback(req, env, url);
       if (p === "/auth/github/callback") return await githubCallback(req, env, url);
+      if (p === "/me" && req.method === "GET") return await mePage(req, env);
+      if (p === "/api/grades/ingest" && req.method === "POST")
+        return await gradesIngest(req, env);
       if (p === "/admin" && req.method === "GET") return await adminList(req, env);
       if (p === "/admin/export.csv") return await adminExport(req, env);
+      if (p === "/admin/roster.csv") return await adminRoster(req, env);
       if (p === "/admin/delete" && req.method === "POST") return await adminDelete(req, env);
       return new Response("Not found", { status: 404 });
     } catch (e) {
@@ -46,8 +57,13 @@ function redirect(location: string, cookie?: string): Response {
   return new Response(null, { status: 302, headers });
 }
 
+function parsePurpose(url: URL): "admin" | "me" | "bind" {
+  const p = url.searchParams.get("purpose");
+  return p === "admin" ? "admin" : p === "me" ? "me" : "bind";
+}
+
 async function startNycu(req: Request, env: Env, url: URL): Promise<Response> {
-  const purpose = url.searchParams.get("purpose") === "admin" ? "admin" : "bind";
+  const purpose = parsePurpose(url);
   const nstate = randomState();
   const session: SessionData = { exp: Date.now() + TTL_MS, purpose, nstate };
   const token = await signSession(session, env.SESSION_SECRET);
@@ -74,6 +90,12 @@ async function nycuCallback(req: Request, env: Env, url: URL): Promise<Response>
     if (!isAdmin(env, user.id)) return new Response("Not authorized as admin", { status: 403 });
     const adminSession: SessionData = { exp: Date.now() + TTL_MS, admin: true, nycu: user };
     return redirect("/admin", setCookie(await signSession(adminSession, env.SESSION_SECRET)));
+  }
+
+  if (session.purpose === "me") {
+    // Student logging in to view their own OJ status — no GitHub step needed.
+    const meSession: SessionData = { exp: Date.now() + TTL_MS, student: true, nycu: user };
+    return redirect("/me", setCookie(await signSession(meSession, env.SESSION_SECRET)));
   }
 
   const gstate = randomState();
@@ -127,6 +149,76 @@ async function githubCallback(req: Request, env: Env, url: URL): Promise<Respons
   return redirectDone(env, "ok");
 }
 
+// ── student status (/me) ────────────────────────────────────────────────
+async function requireStudent(req: Request, env: Env): Promise<SessionData | Response> {
+  const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
+  if (!session || !session.student || !session.nycu) {
+    return redirect("/auth/nycu/start?purpose=me");
+  }
+  return session;
+}
+
+async function mePage(req: Request, env: Env): Promise<Response> {
+  const s = await requireStudent(req, env);
+  if (s instanceof Response) return s;
+  const studentId = s.nycu!.id; // == 學號
+  const [binding, grades] = await Promise.all([
+    getBinding(env.DB, studentId),
+    listGradesFor(env.DB, studentId),
+  ]);
+  return new Response(studentPage(s.nycu!, binding, grades), {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+// ── grades ingest (trusted OJ runner → D1) ────────────────────────────────
+// Constant-time token compare (length leak on a random token is acceptable).
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length || a.length === 0) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+const MAX_INGEST_ROWS = 10000;
+
+async function gradesIngest(req: Request, env: Env): Promise<Response> {
+  const auth = req.headers.get("Authorization") ?? "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  if (!env.GRADES_INGEST_TOKEN || !safeEqual(token, env.GRADES_INGEST_TOKEN)) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+  const body = (await req.json().catch(() => null)) as unknown;
+  const arr = Array.isArray(body)
+    ? body
+    : body && Array.isArray((body as { grades?: unknown[] }).grades)
+      ? (body as { grades: unknown[] }).grades
+      : null;
+  if (!arr) return new Response("Bad request", { status: 400 });
+  if (arr.length > MAX_INGEST_ROWS) {
+    return new Response("Too many rows", { status: 413 });
+  }
+
+  const rows: GradeInput[] = [];
+  for (const x of arr as Record<string, unknown>[]) {
+    if (!x || typeof x.student_id !== "string" || typeof x.problem_id !== "string") continue;
+    if (!x.student_id || !x.problem_id) continue;
+    rows.push({
+      student_id: x.student_id,
+      problem_id: x.problem_id,
+      // score + verdict ONLY — any other fields in the payload are ignored.
+      verdict: String(x.verdict ?? ""),
+      score: Number(x.score ?? 0),
+      max_score: Number(x.max_score ?? 0),
+      updated_at: String(x.updated_at ?? new Date(Date.now()).toISOString()),
+    });
+  }
+  const upserted = await upsertGrades(env.DB, rows);
+  return new Response(JSON.stringify({ ok: true, upserted }), {
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 async function requireAdmin(req: Request, env: Env): Promise<SessionData | Response> {
   const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
   if (!session || !session.admin || !session.nycu || !isAdmin(env, session.nycu.id)) {
@@ -152,6 +244,18 @@ async function adminExport(req: Request, env: Env): Promise<Response> {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": 'attachment; filename="bindings.csv"',
+    },
+  });
+}
+
+async function adminRoster(req: Request, env: Env): Promise<Response> {
+  const s = await requireAdmin(req, env);
+  if (s instanceof Response) return s;
+  const rows = await listBindings(env.DB);
+  return new Response(toRosterCsv(rows), {
+    headers: {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": 'attachment; filename="roster.csv"',
     },
   });
 }

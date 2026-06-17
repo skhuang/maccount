@@ -1,10 +1,11 @@
 export interface SessionData {
   exp: number;
-  purpose?: "bind" | "admin";
+  purpose?: "bind" | "admin" | "me";
   nstate?: string;
   gstate?: string;
   nycu?: { id: string; name: string };
   admin?: boolean;
+  student?: boolean; // a logged-in student viewing /me (their own OJ status)
 }
 
 export const SESSION_COOKIE = "maccount_session";

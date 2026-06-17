@@ -53,6 +53,7 @@ secrets 用指令設定（不進版控）：
 npx wrangler secret put SESSION_SECRET        # 隨機長字串
 npx wrangler secret put GITHUB_CLIENT_SECRET
 npx wrangler secret put NYCU_CLIENT_SECRET
+npx wrangler secret put GRADES_INGEST_TOKEN   # 隨機長字串；OJ runner 推成績時帶在 Authorization: Bearer
 ```
 
 ### 5. 重新部署讓設定生效
@@ -66,6 +67,13 @@ npx wrangler deploy
 ### 6. 啟用 GitHub Pages
 repo Settings → Pages → 由 `main` 分支根目錄發佈 → 服務在 `https://skhuang.github.io/maccount/`。
 
+> **新增資料表**：學生成績鏡像 `grades` 在 `migrations/0002_grades.sql`。部署新版前先套用：
+> `npx wrangler d1 migrations apply maccount --remote`。
+
 ## 使用
-- 學生：開 `https://skhuang.github.io/maccount/` → 開始綁定。
-- 管理員（`ADMIN_IDS` 內的 NYCU 帳號）：開 `https://<worker>/admin` → 用 NYCU 登入 → 看名單 / 匯出 CSV / 刪除綁定。
+- 學生：開 `https://skhuang.github.io/maccount/` → 開始綁定；綁定後可「查詢我的上傳/評分狀態」(`/me`，NYCU 登入後只顯示自己的分數與判定)。
+- 管理員（`ADMIN_IDS` 內的 NYCU 帳號）：開 `https://<worker>/admin` → 用 NYCU 登入 → 看名單 / 匯出 CSV / 匯出 `roster.csv`（`github_login,student_id`，給 dsjudge P4）/ 刪除綁定。
+
+## OJ 成績整合（與 dsjudge）
+- **roster**：`maccount` 是 `github_login ↔ 學號` 的權威來源（兩邊都驗證過）。`/admin/roster.csv` 直接產生 dsjudge `app/roster.py` 讀的 `roster.csv`，取代原本的 GitHub Classroom 匯出。
+- **成績狀態**：OJ runner（dsjudge，主機端）把每位學生的 `(student_id, problem_id, verdict, score, max_score, updated_at)` POST 到 `POST /api/grades/ingest`（帶 `GRADES_INGEST_TOKEN`）。**只傳分數+判定**，學生在 `/me` 看到的也只有這些（測資永不外流）。`student_id` = NYCU `username` = 學號，所以登入即對應。

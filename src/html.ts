@@ -1,4 +1,5 @@
 import type { BindingRow } from "./csv";
+import type { GradeRow } from "./db/grades";
 
 function h(v: unknown): string {
   return String(v ?? "").replace(
@@ -23,11 +24,52 @@ export function adminPage(rows: BindingRow[]): string {
 <title>maccount 管理</title>
 <body style="font-family:system-ui;max-width:900px;margin:2rem auto">
 <h1>綁定名單 (${rows.length})</h1>
-<p><a href="/admin/export.csv">⬇ 匯出 CSV</a></p>
+<p><a href="/admin/export.csv">⬇ 匯出 CSV（完整綁定）</a>　|　<a href="/admin/roster.csv">⬇ 匯出 roster.csv（github_login,student_id）</a></p>
 <table border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>NYCU id</th><th>姓名</th><th>GitHub</th><th>GitHub id</th><th>更新時間</th><th></th></tr></thead>
 <tbody>
 ${trs}
 </tbody></table>
+</body></html>`;
+}
+
+// Student self-service page: their NYCU↔GitHub binding + their OJ results.
+// Shows verdict + score ONLY (iron rule 2) — never any test data.
+export function studentPage(
+  nycu: { id: string; name: string },
+  binding: BindingRow | null,
+  grades: GradeRow[],
+): string {
+  const gh = binding?.github_login
+    ? `<b>${h(binding.github_login)}</b>`
+    : `<span style="color:#b00">尚未綁定</span> — <a href="/auth/nycu/start?purpose=bind">前往綁定 GitHub →</a>`;
+
+  const rows = grades
+    .map(
+      (g) => `<tr>
+  <td>${h(g.problem_id)}</td>
+  <td>${h(g.verdict ?? "-")}</td>
+  <td>${g.score == null ? "-" : h(g.score)} / ${g.max_score == null ? "-" : h(g.max_score)}</td>
+  <td>${h(g.updated_at)}</td>
+</tr>`,
+    )
+    .join("\n");
+
+  const table = grades.length
+    ? `<table border="1" cellpadding="6" cellspacing="0">
+<thead><tr><th>題目</th><th>結果</th><th>分數</th><th>更新時間</th></tr></thead>
+<tbody>
+${rows}
+</tbody></table>`
+    : `<p style="color:#666">目前沒有成績資料。送出程式並完成評分後，結果會顯示在這裡。</p>`;
+
+  return `<!doctype html><html lang="zh-Hant"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的成績</title>
+<body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
+<h1>我的成績</h1>
+<p>學號：<b>${h(nycu.id)}</b>${nycu.name ? `（${h(nycu.name)}）` : ""}　|　GitHub：${gh}</p>
+${table}
+<p style="color:#888;font-size:.9em;margin-top:1.5rem">僅顯示分數與判定結果（AC/WA/TLE…）。測資內容不對外公開。</p>
 </body></html>`;
 }
