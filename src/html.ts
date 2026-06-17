@@ -37,19 +37,54 @@ export function fmtTime(raw: string | null | undefined): string {
   }
 }
 
-export function adminPage(lang: Lang, rows: BindingRow[]): string {
+interface StaffLite {
+  nycu_id: string;
+  added_by: string | null;
+}
+
+export function adminPage(
+  lang: Lang,
+  rows: BindingRow[],
+  opts: { isOwner: boolean; staff: StaffLite[] } = { isOwner: false, staff: [] },
+): string {
   const t = T[lang];
+  const { isOwner, staff } = opts;
   const trs = rows
     .map(
       (r) => `<tr>
   <td>${h(r.nycu_id)}</td><td>${h(r.nycu_name)}</td>
   <td>${h(r.github_login)}</td><td>${h(r.github_id)}</td>
-  <td>${h(r.updated_at)}</td>
+  <td>${h(fmtTime(r.updated_at))}</td>${
+    isOwner
+      ? `
   <td><form method="post" action="/admin/delete" onsubmit="return confirm('${t.confirm_delete}')">
-    <input type="hidden" name="nycu_id" value="${h(r.nycu_id)}"><button type="submit">${t.delete}</button></form></td>
+    <input type="hidden" name="nycu_id" value="${h(r.nycu_id)}"><button type="submit">${t.delete}</button></form></td>`
+      : ""
+  }
 </tr>`,
     )
     .join("\n");
+
+  // Staff/TA management — owner only.
+  const staffRows = staff
+    .map(
+      (s) => `<tr><td>${h(s.nycu_id)}</td><td>${h(s.added_by)}</td>
+  <td><form method="post" action="/admin/staff/remove" onsubmit="return confirm('${t.staff_remove_confirm}')">
+    <input type="hidden" name="nycu_id" value="${h(s.nycu_id)}"><button type="submit">${t.staff_remove}</button></form></td></tr>`,
+    )
+    .join("\n");
+  const staffSection = isOwner
+    ? `<h2>${t.staff_heading}</h2>
+<p style="color:#777;font-size:.9em">${t.staff_note}</p>
+<table border="1" cellpadding="6" cellspacing="0">
+<thead><tr><th>NYCU id</th><th>${t.staff_added_by}</th><th></th></tr></thead>
+<tbody>${staffRows}</tbody></table>
+<form method="post" action="/admin/staff/add" style="margin-top:8px">
+  <input name="nycu_id" placeholder="${t.staff_id_placeholder}" required>
+  <button type="submit">${t.staff_add}</button>
+</form>`
+    : "";
+
   return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">
 <title>${t.admin_title}</title>
 <body style="font-family:system-ui;max-width:900px;margin:2rem auto">
@@ -57,10 +92,11 @@ ${langToggle("/admin", lang)}
 <h1>${t.admin_bindings.replace("{n}", String(rows.length))}</h1>
 <p><a href="/admin/export.csv">${t.export_full}</a>　|　<a href="/admin/roster.csv">${t.export_roster}</a></p>
 <table border="1" cellpadding="6" cellspacing="0">
-<thead><tr><th>NYCU id</th><th>${t.th_name}</th><th>GitHub</th><th>${t.th_github_id}</th><th>${t.th_updated}</th><th>${t.th_actions}</th></tr></thead>
+<thead><tr><th>NYCU id</th><th>${t.th_name}</th><th>GitHub</th><th>${t.th_github_id}</th><th>${t.th_updated}</th>${isOwner ? `<th>${t.th_actions}</th>` : ""}</tr></thead>
 <tbody>
 ${trs}
 </tbody></table>
+${staffSection}
 </body></html>`;
 }
 
