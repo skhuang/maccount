@@ -46,3 +46,15 @@ export async function listGradesFor(db: D1Database, student_id: string): Promise
     .all<GradeRow>();
   return results ?? [];
 }
+
+// All grades for one problem — for the OJ→Moodle "程式作業自動批改" pull.
+export async function listGradesForProblem(db: D1Database, problem_id: string): Promise<GradeRow[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT student_id, problem_id, verdict, score, max_score, updated_at
+       FROM grades WHERE problem_id = ? ORDER BY student_id`,
+    )
+    .bind(problem_id)
+    .all<GradeRow>();
+  return results ?? [];
+}

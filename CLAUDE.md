@@ -45,6 +45,7 @@
 - `POST /api/grades/ingest` — 受信任的 OJ runner 推送成績；`Authorization: Bearer <GRADES_INGEST_TOKEN>`，body 為 `[{student_id,problem_id,verdict,score,max_score,updated_at}]`，upsert 進 `grades`。**只存分數+判定，其餘欄位忽略**（OJ 鐵則 2：學生只看分數+verdict，測資不外洩）。
 - `GET /admin/roster.csv` — 匯出 `github_login,student_id` 給 dsjudge P4 的 `roster.csv`（即 maccount 取代 Classroom 匯出成為權威來源）。需 admin NYCU 登入。
 - `GET /api/roster` — 同樣的 `github_login,student_id`，但用 `Authorization: Bearer <GRADES_INGEST_TOKEN>`（無需 NYCU session），供 OJ 主機的 roster-sync 定時器自動拉取。
+- `GET /api/grades?problem_id=<id>` — 該題所有學生的 `{student_id,problem_id,verdict,score,max_score,updated_at}`（Bearer token）。供 seminar-moodle 的「程式作業自動批改」拉取後填進 Moodle 評分表。只回分數+判定。
 
 ## 常用指令
 

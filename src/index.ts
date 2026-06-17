@@ -17,7 +17,7 @@ import {
   getBinding,
   GithubConflictError,
 } from "./db/bindings";
-import { upsertGrades, listGradesFor, GradeInput } from "./db/grades";
+import { upsertGrades, listGradesFor, listGradesForProblem, GradeInput } from "./db/grades";
 import { toCsv, toRosterCsv } from "./csv";
 import { adminPage, dashboardPage } from "./html";
 import { pickLang, langCookie } from "./i18n";
@@ -37,6 +37,7 @@ export default {
       if (p === "/api/grades/ingest" && req.method === "POST")
         return await gradesIngest(req, env);
       if (p === "/api/roster" && req.method === "GET") return await apiRoster(req, env);
+      if (p === "/api/grades" && req.method === "GET") return await apiGrades(req, env, url);
       if (p === "/admin" && req.method === "GET") return await adminList(req, env, url);
       if (p === "/admin/export.csv") return await adminExport(req, env);
       if (p === "/admin/roster.csv") return await adminRoster(req, env);
@@ -200,6 +201,18 @@ async function apiRoster(req: Request, env: Env): Promise<Response> {
   const rows = await listBindings(env.DB);
   return new Response(toRosterCsv(rows), {
     headers: { "Content-Type": "text/csv; charset=utf-8" },
+  });
+}
+
+// Grades for one problem (token-auth) — the OJ→Moodle "程式作業自動批改" pulls
+// this and fills the Moodle grader. score+verdict only (iron rule 2).
+async function apiGrades(req: Request, env: Env, url: URL): Promise<Response> {
+  if (!bearerOk(req, env)) return new Response("Unauthorized", { status: 401 });
+  const problemId = url.searchParams.get("problem_id");
+  if (!problemId) return new Response("problem_id required", { status: 400 });
+  const grades = await listGradesForProblem(env.DB, problemId);
+  return new Response(JSON.stringify({ ok: true, grades }), {
+    headers: { "Content-Type": "application/json" },
   });
 }
 
