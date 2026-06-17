@@ -18,6 +18,7 @@ import {
   GithubConflictError,
 } from "./db/bindings";
 import { upsertGrades, listGradesFor, listGradesForProblem, GradeInput } from "./db/grades";
+import { listStaff, addStaff, removeStaff, isStaffMember } from "./db/staff";
 import { toCsv, toRosterCsv } from "./csv";
 import { adminPage, dashboardPage } from "./html";
 import { pickLang, langCookie } from "./i18n";
@@ -43,6 +44,8 @@ export default {
       if (p === "/admin/export.csv") return await adminExport(req, env);
       if (p === "/admin/roster.csv") return await adminRoster(req, env);
       if (p === "/admin/delete" && req.method === "POST") return await adminDelete(req, env);
+      if (p === "/admin/staff/add" && req.method === "POST") return await staffAdd(req, env);
+      if (p === "/admin/staff/remove" && req.method === "POST") return await staffRemove(req, env);
       return new Response("Not found", { status: 404 });
     } catch (e) {
       // Log detail server-side; return a generic message so upstream status codes
@@ -200,7 +203,9 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
   const orgJoinUrl = env.COURSE_ORG
     ? `https://github.com/orgs/${env.COURSE_ORG}/invitation`
     : "";
-  const html = dashboardPage(lang, s.nycu!, binding, grades, isAdmin(env, studentId), flash, orgJoinUrl);
+  // Show the admin link to owners AND staff-table members.
+  const staff = isAdmin(env, studentId) || (await isStaffMember(env.DB, studentId));
+  const html = dashboardPage(lang, s.nycu!, binding, grades, staff, flash, orgJoinUrl);
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
   });
@@ -279,28 +284,39 @@ async function gradesIngest(req: Request, env: Env): Promise<Response> {
   });
 }
 
+// Owner = a bootstrap admin in ADMIN_IDS (manages staff + destructive ops).
 async function requireAdmin(req: Request, env: Env): Promise<SessionData | Response> {
   const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
   if (!session || !session.nycu) return redirect("/auth/nycu/start");
-  // Logged in but not an admin → forbidden (admin-ness is dynamic via ADMIN_IDS).
   if (!isAdmin(env, session.nycu.id)) {
     return new Response("Not authorized as admin", { status: 403 });
   }
   return session;
 }
 
+// Staff = an owner OR a member of the D1 staff table. May view /admin + export.
+async function requireStaff(req: Request, env: Env): Promise<SessionData | Response> {
+  const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
+  if (!session || !session.nycu) return redirect("/auth/nycu/start");
+  if (!isAdmin(env, session.nycu.id) && !(await isStaffMember(env.DB, session.nycu.id))) {
+    return new Response("Not authorized", { status: 403 });
+  }
+  return session;
+}
+
 async function adminList(req: Request, env: Env, url: URL): Promise<Response> {
-  const s = await requireAdmin(req, env);
+  const s = await requireStaff(req, env);
   if (s instanceof Response) return s;
+  const isOwner = isAdmin(env, s.nycu!.id); // owner controls (delete, manage staff)
   const lang = pickLang(url, req.headers.get("Cookie"));
-  const rows = await listBindings(env.DB);
-  return new Response(adminPage(lang, rows), {
+  const [rows, staff] = await Promise.all([listBindings(env.DB), listStaff(env.DB)]);
+  return new Response(adminPage(lang, rows, { isOwner, staff }), {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
   });
 }
 
 async function adminExport(req: Request, env: Env): Promise<Response> {
-  const s = await requireAdmin(req, env);
+  const s = await requireStaff(req, env);
   if (s instanceof Response) return s;
   const rows = await listBindings(env.DB);
   return new Response(toCsv(rows), {
@@ -312,7 +328,7 @@ async function adminExport(req: Request, env: Env): Promise<Response> {
 }
 
 async function adminRoster(req: Request, env: Env): Promise<Response> {
-  const s = await requireAdmin(req, env);
+  const s = await requireStaff(req, env);
   if (s instanceof Response) return s;
   const rows = await listBindings(env.DB);
   return new Response(toRosterCsv(rows), {
@@ -324,10 +340,29 @@ async function adminRoster(req: Request, env: Env): Promise<Response> {
 }
 
 async function adminDelete(req: Request, env: Env): Promise<Response> {
-  const s = await requireAdmin(req, env);
+  const s = await requireAdmin(req, env); // owner only — destructive
   if (s instanceof Response) return s;
   const form = await req.formData();
   const nycuId = String(form.get("nycu_id") ?? "");
   if (nycuId) await deleteBinding(env.DB, nycuId);
+  return redirect("/admin");
+}
+
+// Staff management — OWNER only (so a TA can't add/remove staff = no escalation).
+async function staffAdd(req: Request, env: Env): Promise<Response> {
+  const s = await requireAdmin(req, env);
+  if (s instanceof Response) return s;
+  const form = await req.formData();
+  const id = String(form.get("nycu_id") ?? "").trim();
+  if (id) await addStaff(env.DB, id, s.nycu!.id, new Date(Date.now()).toISOString());
+  return redirect("/admin");
+}
+
+async function staffRemove(req: Request, env: Env): Promise<Response> {
+  const s = await requireAdmin(req, env);
+  if (s instanceof Response) return s;
+  const form = await req.formData();
+  const id = String(form.get("nycu_id") ?? "").trim();
+  if (id) await removeStaff(env.DB, id);
   return redirect("/admin");
 }

@@ -26,14 +26,24 @@ describe("adminPage", () => {
     expect(html).toContain("&lt;script&gt;x&lt;/script&gt;");
   });
 
-  it("renders a delete form per row", () => {
-    const html = adminPage("zh", rows);
+  it("renders a delete form per row (owner only)", () => {
+    const html = adminPage("zh", rows, { isOwner: true, staff: [] });
     expect(html).toContain('action="/admin/delete"');
     expect(html).toContain('name="nycu_id" value="0856001"');
   });
 
+  it("hides delete forms for non-owner staff", () => {
+    const html = adminPage("zh", rows, { isOwner: false, staff: [] });
+    expect(html).not.toContain('action="/admin/delete"');
+  });
+
+  it("owner sees the staff-management section; staff does not", () => {
+    expect(adminPage("zh", rows, { isOwner: true, staff: [] })).toContain('action="/admin/staff/add"');
+    expect(adminPage("zh", rows, { isOwner: false, staff: [] })).not.toContain("/admin/staff/");
+  });
+
   it("does not interpolate user data into the inline onsubmit JS", () => {
-    const html = adminPage("zh", [{ ...rows[0], nycu_id: "O'Brien" }]);
+    const html = adminPage("zh", [{ ...rows[0], nycu_id: "O'Brien" }], { isOwner: true, staff: [] });
     // The id must not appear inside the confirm() JS string literal (would be
     // a DOM-XSS vector once the HTML parser decodes the entity back to a quote).
     expect(html).not.toContain("confirm('刪除");

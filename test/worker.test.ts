@@ -32,6 +32,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   await env.DB.prepare("DELETE FROM bindings").run();
   await env.DB.prepare("DELETE FROM grades").run();
+  await env.DB.prepare("DELETE FROM staff").run();
 });
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -237,6 +238,49 @@ describe("/admin auth gate", () => {
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("/auth/nycu/start");
     expect(await listBindings(env.DB)).toHaveLength(1);
+  });
+});
+
+describe("staff/TA management", () => {
+  const staffSession = () =>
+    signSession({ exp: Date.now() + 60000, nycu: { id: "ta01", name: "助教" } }, SECRET);
+
+  it("a staff-table member can view /admin (read-only: no delete / no manage-staff)", async () => {
+    await env.DB.prepare("INSERT INTO staff (nycu_id, added_by, added_at) VALUES ('ta01','admin1','t')").run();
+    const res = await call("/admin", { headers: cookie(await staffSession()) });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("綁定名單");
+    expect(body).not.toContain('action="/admin/delete"');     // owner-only
+    expect(body).not.toContain('action="/admin/staff/add"');  // owner-only
+  });
+
+  it("a logged-in non-staff non-owner is denied /admin (403)", async () => {
+    const res = await call("/admin", { headers: cookie(await staffSession()) }); // ta01 not yet staff
+    expect(res.status).toBe(403);
+  });
+
+  it("owner can add a staff member", async () => {
+    const owner = await signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "A" } }, SECRET);
+    const res = await call("/admin/staff/add", {
+      method: "POST",
+      headers: { ...cookie(owner), "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ nycu_id: "ta01" }).toString(),
+    });
+    expect(res.status).toBe(302);
+    const { results } = await env.DB.prepare("SELECT nycu_id FROM staff").all();
+    expect(results.map((r) => r.nycu_id)).toContain("ta01");
+  });
+
+  it("a staff member CANNOT manage staff (owner-only → 403, no escalation)", async () => {
+    await env.DB.prepare("INSERT INTO staff (nycu_id, added_by, added_at) VALUES ('ta01','admin1','t')").run();
+    const res = await call("/admin/staff/add", {
+      method: "POST",
+      headers: { ...cookie(await staffSession()), "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ nycu_id: "ta02" }).toString(),
+    });
+    expect(res.status).toBe(403);
+    expect((await env.DB.prepare("SELECT 1 FROM staff WHERE nycu_id='ta02'").first())).toBe(null);
   });
 });
 

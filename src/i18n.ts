@@ -46,6 +46,13 @@ export interface Strings {
   th_actions: string;
   delete: string;
   confirm_delete: string;
+  staff_heading: string;
+  staff_note: string;
+  staff_added_by: string;
+  staff_id_placeholder: string;
+  staff_add: string;
+  staff_remove: string;
+  staff_remove_confirm: string;
 }
 
 export const T: Record<Lang, Strings> = {
@@ -81,6 +88,13 @@ export const T: Record<Lang, Strings> = {
     th_actions: "",
     delete: "刪除",
     confirm_delete: "確定刪除此綁定？",
+    staff_heading: "TA／助教管理",
+    staff_note: "助教（NYCU 帳號）可檢視名單與匯出；只有 ADMIN_IDS 內的擁有者能新增/移除助教或刪除綁定。",
+    staff_added_by: "加入者",
+    staff_id_placeholder: "NYCU 帳號（學號/教職員帳號）",
+    staff_add: "新增助教",
+    staff_remove: "移除",
+    staff_remove_confirm: "確定移除此助教？",
   },
   en: {
     acct_title: "My Account",
@@ -114,6 +128,13 @@ export const T: Record<Lang, Strings> = {
     th_actions: "",
     delete: "Delete",
     confirm_delete: "Delete this binding?",
+    staff_heading: "TA / staff",
+    staff_note: "Staff (by NYCU id) can view bindings and export; only owners (ADMIN_IDS) can add/remove staff or delete bindings.",
+    staff_added_by: "Added by",
+    staff_id_placeholder: "NYCU id",
+    staff_add: "Add staff",
+    staff_remove: "Remove",
+    staff_remove_confirm: "Remove this staff member?",
   },
 };
 
