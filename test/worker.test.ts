@@ -263,11 +263,17 @@ describe("/me dashboard", () => {
     expect(body).toContain('href="/logout"'); // logout link
   });
 
-  it("logout clears the session cookie and redirects to the landing page", async () => {
+  it("logout clears the session cookie and forces a re-prompted NYCU login", async () => {
     const res = await call("/logout");
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("https://skhuang.github.io/maccount/");
+    expect(res.headers.get("Location")).toBe("/auth/nycu/start?prompt=login");
     expect(res.headers.get("Set-Cookie")).toContain("Max-Age=0"); // cleared
+  });
+
+  it("/auth/nycu/start?prompt=login adds prompt=login to the NYCU authorize URL", async () => {
+    const res = await call("/auth/nycu/start?prompt=login");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toContain("prompt=login");
   });
 
   it("hides the org-join link when COURSE_ORG is unset", async () => {

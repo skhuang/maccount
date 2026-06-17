@@ -73,7 +73,8 @@ async function startNycu(req: Request, env: Env, url: URL): Promise<Response> {
   const cookies = [setCookie(token)];
   const lang = url.searchParams.get("lang");
   if (lang === "en" || lang === "zh") cookies.push(langCookie(lang));
-  return redirect(nycuAuthorizeUrl(nycuConfig(env), redirectUri, nstate), cookies);
+  const forceLogin = url.searchParams.get("prompt") === "login"; // logout→switch
+  return redirect(nycuAuthorizeUrl(nycuConfig(env), redirectUri, nstate, forceLogin), cookies);
 }
 
 async function nycuCallback(req: Request, env: Env, url: URL): Promise<Response> {
@@ -168,9 +169,12 @@ async function githubCallback(req: Request, env: Env, url: URL): Promise<Respons
 // Clear the maccount session and bounce to the landing page so the user can log
 // in as a different account. (NYCU/GitHub SSO may still auto-reuse their own
 // session — switching those needs their logout / an incognito window.)
-function logout(env: Env): Response {
-  const landing = new URL(".", env.FRONTEND_DONE_URL).toString();
-  return redirect(landing, clearCookie());
+function logout(_env: Env): Response {
+  // Clear the maccount session AND start a fresh NYCU login that forces a
+  // re-prompt (prompt=login) — otherwise NYCU's SSO would silently log the same
+  // user straight back in, defeating "switch account". (GitHub-account switching
+  // still needs an incognito window; GitHub OAuth has no reliable re-prompt.)
+  return redirect("/auth/nycu/start?prompt=login", clearCookie());
 }
 
 // ── dashboard (/me) ───────────────────────────────────────────────────────

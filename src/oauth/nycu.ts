@@ -7,13 +7,19 @@ export interface NycuConfig {
   scope: string;
 }
 
-export function nycuAuthorizeUrl(cfg: NycuConfig, redirectUri: string, state: string): string {
+export function nycuAuthorizeUrl(
+  cfg: NycuConfig, redirectUri: string, state: string, forceLogin = false,
+): string {
   const u = new URL(cfg.authorizeUrl);
   u.searchParams.set("client_id", cfg.clientId);
   u.searchParams.set("redirect_uri", redirectUri);
   u.searchParams.set("response_type", "code");
   u.searchParams.set("scope", cfg.scope);
   u.searchParams.set("state", state);
+  // Force a fresh credential prompt (used by logout→switch-account) so NYCU's SSO
+  // doesn't silently re-log-in the same user. Best-effort: ignored by IdPs that
+  // don't honor it. Omitted on normal login so students keep SSO convenience.
+  if (forceLogin) u.searchParams.set("prompt", "login");
   return u.toString();
 }
 
