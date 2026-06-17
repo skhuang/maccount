@@ -67,3 +67,48 @@ export async function inviteOrgMember(
   if (!res.ok) throw new Error(`org invite failed: ${res.status}`);
   return (await res.json()) as { state?: string };
 }
+
+function ghHeaders(token: string): HeadersInit {
+  return {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "Content-Type": "application/json",
+    "User-Agent": "maccount",
+  };
+}
+
+// Add a user to an org team (role member). For a non-org-member this creates an
+// org invitation scoped to the team; for a member it's immediate. Idempotent.
+export async function addTeamMembership(
+  org: string, teamSlug: string, username: string, token: string,
+  fetcher: typeof fetch = fetch,
+): Promise<{ state?: string }> {
+  const res = await fetcher(
+    `https://api.github.com/orgs/${org}/teams/${teamSlug}/memberships/${username}`,
+    { method: "PUT", headers: ghHeaders(token), body: JSON.stringify({ role: "member" }) },
+  );
+  if (!res.ok) throw new Error(`team add failed: ${res.status}`);
+  return (await res.json()) as { state?: string };
+}
+
+export async function removeTeamMembership(
+  org: string, teamSlug: string, username: string, token: string,
+  fetcher: typeof fetch = fetch,
+): Promise<void> {
+  const res = await fetcher(
+    `https://api.github.com/orgs/${org}/teams/${teamSlug}/memberships/${username}`,
+    { method: "DELETE", headers: ghHeaders(token) },
+  );
+  if (!res.ok && res.status !== 404) throw new Error(`team remove failed: ${res.status}`);
+}
+
+export async function removeOrgMember(
+  org: string, username: string, token: string,
+  fetcher: typeof fetch = fetch,
+): Promise<void> {
+  const res = await fetcher(`https://api.github.com/orgs/${org}/memberships/${username}`, {
+    method: "DELETE", headers: ghHeaders(token),
+  });
+  if (!res.ok && res.status !== 404) throw new Error(`org remove failed: ${res.status}`);
+}

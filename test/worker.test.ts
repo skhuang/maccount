@@ -24,6 +24,7 @@ const testEnv: Env = {
   GRADES_INGEST_TOKEN: "ingest-secret",
   COURSE_ORG: "nycu-cs-course-ds",
   ORG_INVITE_TOKEN: "org-tok",
+  STAFF_TEAM: "", // sync off by default; sync tests override with "staff"
 };
 
 beforeAll(async () => {
@@ -281,6 +282,74 @@ describe("staff/TA management", () => {
     });
     expect(res.status).toBe(403);
     expect((await env.DB.prepare("SELECT 1 FROM staff WHERE nycu_id='ta02'").first())).toBe(null);
+  });
+
+  // ── GitHub org/team sync (scope: team+org) ──────────────────────────────
+  const syncEnv: Env = { ...testEnv, STAFF_TEAM: "staff" };
+  const owner = () => signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "A" } }, SECRET);
+  const ghCalls = () => {
+    const calls: { method: string; url: string }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input instanceof Request ? input.url : input);
+      calls.push({ method: (init?.method ?? "GET").toUpperCase(), url });
+      return new Response(JSON.stringify({ state: "pending" }), { headers: { "Content-Type": "application/json" } });
+    }));
+    return calls;
+  };
+  const bindTA = (login: string) =>
+    env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, created_at, updated_at) VALUES ('ta01','T',7,?,'t','t')",
+    ).bind(login).run();
+
+  it("add → invites the bound TA to the org AND the staff team", async () => {
+    await bindTA("monalisa");
+    const calls = ghCalls();
+    const res = await call("/admin/staff/add", {
+      method: "POST",
+      headers: { ...cookie(await owner()), "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ nycu_id: "ta01" }).toString(),
+    }, syncEnv);
+    expect(res.headers.get("Location")).toBe("/admin?staff_msg=ok");
+    expect(calls).toContainEqual({ method: "PUT", url: "https://api.github.com/orgs/nycu-cs-course-ds/memberships/monalisa" });
+    expect(calls).toContainEqual({ method: "PUT", url: "https://api.github.com/orgs/nycu-cs-course-ds/teams/staff/memberships/monalisa" });
+  });
+
+  it("remove → deletes the TA from the staff team AND the org", async () => {
+    await bindTA("monalisa");
+    await env.DB.prepare("INSERT INTO staff (nycu_id, added_by, added_at) VALUES ('ta01','admin1','t')").run();
+    const calls = ghCalls();
+    const res = await call("/admin/staff/remove", {
+      method: "POST",
+      headers: { ...cookie(await owner()), "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ nycu_id: "ta01" }).toString(),
+    }, syncEnv);
+    expect(res.headers.get("Location")).toBe("/admin?staff_msg=ok");
+    expect(calls).toContainEqual({ method: "DELETE", url: "https://api.github.com/orgs/nycu-cs-course-ds/teams/staff/memberships/monalisa" });
+    expect(calls).toContainEqual({ method: "DELETE", url: "https://api.github.com/orgs/nycu-cs-course-ds/memberships/monalisa" });
+  });
+
+  it("add for an unbound TA → DB row created, no GitHub calls, no-binding flash", async () => {
+    const calls = ghCalls();
+    const res = await call("/admin/staff/add", {
+      method: "POST",
+      headers: { ...cookie(await owner()), "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ nycu_id: "ta01" }).toString(),
+    }, syncEnv);
+    expect(res.headers.get("Location")).toBe("/admin?staff_msg=no-binding");
+    expect(await env.DB.prepare("SELECT 1 FROM staff WHERE nycu_id='ta01'").first()).not.toBe(null);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("a GitHub sync failure does not break the staff DB op (error flash)", async () => {
+    await bindTA("monalisa");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 500 })));
+    const res = await call("/admin/staff/add", {
+      method: "POST",
+      headers: { ...cookie(await owner()), "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ nycu_id: "ta01" }).toString(),
+    }, syncEnv);
+    expect(res.headers.get("Location")).toBe("/admin?staff_msg=error");
+    expect(await env.DB.prepare("SELECT 1 FROM staff WHERE nycu_id='ta01'").first()).not.toBe(null);
   });
 });
 

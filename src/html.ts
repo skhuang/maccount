@@ -45,10 +45,20 @@ interface StaffLite {
 export function adminPage(
   lang: Lang,
   rows: BindingRow[],
-  opts: { isOwner: boolean; staff: StaffLite[] } = { isOwner: false, staff: [] },
+  opts: { isOwner: boolean; staff: StaffLite[]; staffMsg?: string } = { isOwner: false, staff: [] },
 ): string {
   const t = T[lang];
   const { isOwner, staff } = opts;
+  // Flash from a staff add/remove → GitHub org/team sync (see syncStaffToGitHub).
+  const syncMsg: Record<string, string> = {
+    ok: t.staff_sync_ok,
+    "no-binding": t.staff_sync_nobinding,
+    error: t.staff_sync_error,
+  };
+  const banner =
+    isOwner && opts.staffMsg && syncMsg[opts.staffMsg]
+      ? `<p style="padding:8px;border:1px solid #ccc;background:#f6f6f6">${syncMsg[opts.staffMsg]}</p>`
+      : "";
   const trs = rows
     .map(
       (r) => `<tr>
@@ -90,6 +100,7 @@ export function adminPage(
 <body style="font-family:system-ui;max-width:900px;margin:2rem auto">
 ${langToggle("/admin", lang)}
 <h1>${t.admin_bindings.replace("{n}", String(rows.length))}</h1>
+${banner}
 <p><a href="/admin/export.csv">${t.export_full}</a>　|　<a href="/admin/roster.csv">${t.export_roster}</a></p>
 <table border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>NYCU id</th><th>${t.th_name}</th><th>GitHub</th><th>${t.th_github_id}</th><th>${t.th_updated}</th>${isOwner ? `<th>${t.th_actions}</th>` : ""}</tr></thead>

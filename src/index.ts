@@ -9,7 +9,10 @@ import {
 } from "./session";
 import { randomState } from "./util";
 import { nycuAuthorizeUrl, exchangeNycuCode, fetchNycuUser } from "./oauth/nycu";
-import { githubAuthorizeUrl, exchangeGithubCode, fetchGithubUser, inviteOrgMember } from "./oauth/github";
+import {
+  githubAuthorizeUrl, exchangeGithubCode, fetchGithubUser, inviteOrgMember,
+  addTeamMembership, removeTeamMembership, removeOrgMember,
+} from "./oauth/github";
 import {
   upsertBinding,
   listBindings,
@@ -310,7 +313,8 @@ async function adminList(req: Request, env: Env, url: URL): Promise<Response> {
   const isOwner = isAdmin(env, s.nycu!.id); // owner controls (delete, manage staff)
   const lang = pickLang(url, req.headers.get("Cookie"));
   const [rows, staff] = await Promise.all([listBindings(env.DB), listStaff(env.DB)]);
-  return new Response(adminPage(lang, rows, { isOwner, staff }), {
+  const staffMsg = url.searchParams.get("staff_msg") ?? "";
+  return new Response(adminPage(lang, rows, { isOwner, staff, staffMsg }), {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
   });
 }
@@ -348,14 +352,44 @@ async function adminDelete(req: Request, env: Env): Promise<Response> {
   return redirect("/admin");
 }
 
+// Sync a staff member to the GitHub org + staff team (scope: team+org).
+// Best-effort, never throws. Returns a short status code for the /admin flash:
+// "" (no GitHub sync configured), "ok", "no-binding" (TA hasn't bound GitHub),
+// or "error". The staff DB row is the source of truth; GitHub is a side effect.
+async function syncStaffToGitHub(env: Env, nycuId: string, add: boolean): Promise<string> {
+  if (!(env.COURSE_ORG && env.ORG_INVITE_TOKEN && env.STAFF_TEAM)) return "";
+  const b = await getBinding(env.DB, nycuId);
+  const login = b?.github_login;
+  if (!login) return "no-binding";
+  const { COURSE_ORG: org, STAFF_TEAM: team, ORG_INVITE_TOKEN: tok } = env;
+  try {
+    if (add) {
+      await inviteOrgMember(org, login, tok);          // org
+      await addTeamMembership(org, team, login, tok);  // staff team
+    } else {
+      await removeTeamMembership(org, team, login, tok); // staff team
+      await removeOrgMember(org, login, tok);            // org
+    }
+    return "ok";
+  } catch (e) {
+    console.error("staff github sync failed:", (e as Error).message);
+    return "error";
+  }
+}
+
+function adminRedirect(msg: string): Response {
+  return redirect(msg ? `/admin?staff_msg=${encodeURIComponent(msg)}` : "/admin");
+}
+
 // Staff management — OWNER only (so a TA can't add/remove staff = no escalation).
 async function staffAdd(req: Request, env: Env): Promise<Response> {
   const s = await requireAdmin(req, env);
   if (s instanceof Response) return s;
   const form = await req.formData();
   const id = String(form.get("nycu_id") ?? "").trim();
-  if (id) await addStaff(env.DB, id, s.nycu!.id, new Date(Date.now()).toISOString());
-  return redirect("/admin");
+  if (!id) return redirect("/admin");
+  await addStaff(env.DB, id, s.nycu!.id, new Date(Date.now()).toISOString());
+  return adminRedirect(await syncStaffToGitHub(env, id, true));
 }
 
 async function staffRemove(req: Request, env: Env): Promise<Response> {
@@ -363,6 +397,7 @@ async function staffRemove(req: Request, env: Env): Promise<Response> {
   if (s instanceof Response) return s;
   const form = await req.formData();
   const id = String(form.get("nycu_id") ?? "").trim();
-  if (id) await removeStaff(env.DB, id);
-  return redirect("/admin");
+  if (!id) return redirect("/admin");
+  await removeStaff(env.DB, id);
+  return adminRedirect(await syncStaffToGitHub(env, id, false));
 }
