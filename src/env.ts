@@ -17,6 +17,10 @@ export interface Env {
   // Shared secret the trusted OJ runner presents to POST /api/grades/ingest.
   // Set via `wrangler secret put GRADES_INGEST_TOKEN` (never in wrangler.toml).
   GRADES_INGEST_TOKEN: string;
+  // Course GitHub org (slug). When set, /me shows a one-time "join the org"
+  // invite link (orgs/<org>/invitation); empty = hide it. Set in wrangler.toml
+  // [vars] (not a secret).
+  COURSE_ORG: string;
 }
 
 export function nycuConfig(env: Env): NycuConfig {

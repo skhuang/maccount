@@ -22,6 +22,7 @@ const testEnv: Env = {
   NYCU_CLIENT_ID: "n_id",
   NYCU_CLIENT_SECRET: "n_secret",
   GRADES_INGEST_TOKEN: "ingest-secret",
+  COURSE_ORG: "nycu-cs-course-ds",
 };
 
 beforeAll(async () => {
@@ -38,8 +39,8 @@ afterEach(() => {
 function cookie(token: string): HeadersInit {
   return { Cookie: `${SESSION_COOKIE}=${token}` };
 }
-function call(path: string, init?: RequestInit) {
-  return worker.fetch(new Request(`https://api.example${path}`, init), testEnv);
+function call(path: string, init?: RequestInit, e: Env = testEnv) {
+  return worker.fetch(new Request(`https://api.example${path}`, init), e);
 }
 
 describe("/auth/nycu/start", () => {
@@ -230,6 +231,17 @@ describe("/me dashboard", () => {
     expect(body).toContain("/auth/github/start"); // bind action
     expect(body).toContain("尚未綁定");
     expect(body).not.toContain("管理功能"); // 314561004 is not in ADMIN_IDS
+    // org-join CTA from COURSE_ORG
+    expect(body).toContain("https://github.com/orgs/nycu-cs-course-ds/invitation");
+  });
+
+  it("hides the org-join link when COURSE_ORG is unset", async () => {
+    const session = await signSession(
+      { exp: Date.now() + 60000, nycu: { id: "314561004", name: "甲" } },
+      SECRET,
+    );
+    const res = await call("/me", { headers: { ...cookie(session) } }, { ...testEnv, COURSE_ORG: "" });
+    expect(await res.text()).not.toContain("/orgs/");
   });
 
   it("shows only the logged-in user's own grades, and the admin link for an admin", async () => {

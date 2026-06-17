@@ -50,6 +50,7 @@ export function dashboardPage(
   grades: GradeRow[],
   admin: boolean,
   flash: { bound?: boolean; error?: string | null },
+  orgJoinUrl: string = "",
 ): string {
   const t = T[lang];
   const gh = binding?.github_login
@@ -85,6 +86,11 @@ ${rows}
     ? `<p style="margin-top:1.5rem"><a href="/admin"><b>${t.admin_link}</b></a></p>`
     : "";
 
+  const orgHtml = orgJoinUrl
+    ? `<p style="padding:.5rem .8rem;border-radius:6px;background:#fff3cd">${t.join_org_prompt} ` +
+      `<a href="${h(orgJoinUrl)}" target="_blank" rel="noopener"><b>${t.join_org_link}</b></a></p>`
+    : "";
+
   return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${t.acct_title}</title>
@@ -94,6 +100,7 @@ ${langToggle("/me", lang)}
 ${flashHtml}
 <p>${t.student_id}：<b>${h(nycu.id)}</b>${nycu.name ? `（${h(nycu.name)}）` : ""}</p>
 <p>${t.github}：${gh}</p>
+${orgHtml}
 <h2>${t.grades_heading}</h2>
 ${table}
 <p style="color:#888;font-size:.9em">${t.privacy_note}</p>
