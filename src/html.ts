@@ -1,5 +1,6 @@
 import type { BindingRow } from "./csv";
 import type { GradeRow } from "./db/grades";
+import { T, langToggle, type Lang } from "./i18n";
 
 function h(v: unknown): string {
   return String(v ?? "").replace(
@@ -8,25 +9,31 @@ function h(v: unknown): string {
   );
 }
 
-export function adminPage(rows: BindingRow[]): string {
+function htmlLang(lang: Lang): string {
+  return lang === "en" ? "en" : "zh-Hant";
+}
+
+export function adminPage(lang: Lang, rows: BindingRow[]): string {
+  const t = T[lang];
   const trs = rows
     .map(
       (r) => `<tr>
   <td>${h(r.nycu_id)}</td><td>${h(r.nycu_name)}</td>
   <td>${h(r.github_login)}</td><td>${h(r.github_id)}</td>
   <td>${h(r.updated_at)}</td>
-  <td><form method="post" action="/admin/delete" onsubmit="return confirm('確定刪除此綁定？')">
-    <input type="hidden" name="nycu_id" value="${h(r.nycu_id)}"><button type="submit">刪除</button></form></td>
+  <td><form method="post" action="/admin/delete" onsubmit="return confirm('${t.confirm_delete}')">
+    <input type="hidden" name="nycu_id" value="${h(r.nycu_id)}"><button type="submit">${t.delete}</button></form></td>
 </tr>`,
     )
     .join("\n");
-  return `<!doctype html><html lang="zh-Hant"><meta charset="utf-8">
-<title>maccount 管理</title>
+  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">
+<title>${t.admin_title}</title>
 <body style="font-family:system-ui;max-width:900px;margin:2rem auto">
-<h1>綁定名單 (${rows.length})</h1>
-<p><a href="/admin/export.csv">⬇ 匯出 CSV（完整綁定）</a>　|　<a href="/admin/roster.csv">⬇ 匯出 roster.csv（github_login,student_id）</a></p>
+${langToggle("/admin", lang)}
+<h1>${t.admin_bindings.replace("{n}", String(rows.length))}</h1>
+<p><a href="/admin/export.csv">${t.export_full}</a>　|　<a href="/admin/roster.csv">${t.export_roster}</a></p>
 <table border="1" cellpadding="6" cellspacing="0">
-<thead><tr><th>NYCU id</th><th>姓名</th><th>GitHub</th><th>GitHub id</th><th>更新時間</th><th></th></tr></thead>
+<thead><tr><th>NYCU id</th><th>${t.th_name}</th><th>GitHub</th><th>${t.th_github_id}</th><th>${t.th_updated}</th><th>${t.th_actions}</th></tr></thead>
 <tbody>
 ${trs}
 </tbody></table>
@@ -37,15 +44,17 @@ ${trs}
 // admin link when the user is an admin. Grades show verdict + score ONLY (iron
 // rule 2) — never any test data.
 export function dashboardPage(
+  lang: Lang,
   nycu: { id: string; name: string },
   binding: BindingRow | null,
   grades: GradeRow[],
   admin: boolean,
-  flash: { kind: "ok" | "err"; text: string } | null,
+  flash: { bound?: boolean; error?: string | null },
 ): string {
+  const t = T[lang];
   const gh = binding?.github_login
-    ? `已綁定 <b>${h(binding.github_login)}</b> — <a href="/auth/github/start">重新綁定</a>`
-    : `<span style="color:#b00">尚未綁定</span> — <a href="/auth/github/start"><b>綁定 GitHub →</b></a>`;
+    ? `${t.bound} <b>${h(binding.github_login)}</b> — <a href="/auth/github/start">${t.rebind}</a>`
+    : `<span style="color:#b00">${t.not_bound}</span> — <a href="/auth/github/start"><b>${t.bind_action}</b></a>`;
 
   const rows = grades
     .map(
@@ -60,33 +69,34 @@ export function dashboardPage(
 
   const table = grades.length
     ? `<table border="1" cellpadding="6" cellspacing="0">
-<thead><tr><th>題目</th><th>結果</th><th>分數</th><th>更新時間</th></tr></thead>
+<thead><tr><th>${t.col_problem}</th><th>${t.col_result}</th><th>${t.col_score}</th><th>${t.col_updated}</th></tr></thead>
 <tbody>
 ${rows}
 </tbody></table>`
-    : `<p style="color:#666">目前沒有成績資料。送出程式並完成評分後，結果會顯示在這裡。</p>`;
+    : `<p style="color:#666">${t.no_grades}</p>`;
 
-  const flashHtml = flash
-    ? `<p style="padding:.5rem .8rem;border-radius:6px;background:${
-        flash.kind === "ok" ? "#d4edda" : "#f8d7da"
-      }">${h(flash.text)}</p>`
-    : "";
+  const flashHtml = flash.bound
+    ? `<p style="padding:.5rem .8rem;border-radius:6px;background:#d4edda">${t.flash_bound_ok}</p>`
+    : flash.error
+      ? `<p style="padding:.5rem .8rem;border-radius:6px;background:#f8d7da">${t.flash_error_prefix}${h(flash.error)}</p>`
+      : "";
 
   const adminHtml = admin
-    ? `<p style="margin-top:1.5rem"><a href="/admin"><b>🔧 管理功能</b></a>（綁定名單、匯出 CSV / roster）</p>`
+    ? `<p style="margin-top:1.5rem"><a href="/admin"><b>${t.admin_link}</b></a></p>`
     : "";
 
-  return `<!doctype html><html lang="zh-Hant"><meta charset="utf-8">
+  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>我的帳號</title>
+<title>${t.acct_title}</title>
 <body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
-<h1>我的帳號</h1>
+${langToggle("/me", lang)}
+<h1>${t.acct_heading}</h1>
 ${flashHtml}
-<p>學號：<b>${h(nycu.id)}</b>${nycu.name ? `（${h(nycu.name)}）` : ""}</p>
-<p>GitHub：${gh}</p>
-<h2>我的成績</h2>
+<p>${t.student_id}：<b>${h(nycu.id)}</b>${nycu.name ? `（${h(nycu.name)}）` : ""}</p>
+<p>${t.github}：${gh}</p>
+<h2>${t.grades_heading}</h2>
 ${table}
-<p style="color:#888;font-size:.9em">僅顯示分數與判定結果（AC/WA/TLE…）。測資內容不對外公開。</p>
+<p style="color:#888;font-size:.9em">${t.privacy_note}</p>
 ${adminHtml}
 </body></html>`;
 }

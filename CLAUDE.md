@@ -36,7 +36,8 @@
 | `db/bindings.ts` | D1：`upsertBinding`（一 GitHub 只綁一 NYCU）/ list / delete / `getBinding` |
 | `db/grades.ts` | D1：OJ 成績鏡像 `grades`（**score+verdict only**）— `upsertGrades` / `listGradesFor` |
 | `csv.ts` | `BindingRow` + `toCsv`（完整綁定）+ `toRosterCsv`（`github_login,student_id`） |
-| `html.ts` | 管理後台 + **學生 `/me` 成績頁** HTML（已做 XSS 跳脫） |
+| `html.ts` | 管理後台 + **學生 `/me` 儀表板** HTML（已做 XSS 跳脫；字串走 i18n） |
+| `i18n.ts` | 雙語（zh-Hant 預設 / en）：`pickLang`（?lang>cookie>zh）、`langCookie`、字串表 `T`、`langToggle` |
 
 ### 端點（新增）
 - `GET /me` — 登入後的**儀表板**：自己的綁定（+綁定 GitHub 按鈕）、OJ 成績（只顯示分數與判定）、admin 連結（若是 admin）。
@@ -49,7 +50,7 @@
 
 ```bash
 npm install
-npm test            # vitest，全部測試（目前 53 passed）
+npm test            # vitest，全部測試（目前 61 passed）
 npx tsc --noEmit    # 型別檢查
 npm run dev         # wrangler dev（本機，預設埠 8787）
 npx wrangler deploy # 部署 Worker（vars 變更也要重新 deploy 才生效）
