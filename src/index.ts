@@ -9,7 +9,7 @@ import {
 } from "./session";
 import { randomState } from "./util";
 import { nycuAuthorizeUrl, exchangeNycuCode, fetchNycuUser } from "./oauth/nycu";
-import { githubAuthorizeUrl, exchangeGithubCode, fetchGithubUser } from "./oauth/github";
+import { githubAuthorizeUrl, exchangeGithubCode, fetchGithubUser, inviteOrgMember } from "./oauth/github";
 import {
   upsertBinding,
   listBindings,
@@ -147,6 +147,16 @@ async function githubCallback(req: Request, env: Env, url: URL): Promise<Respons
   } catch (e) {
     if (e instanceof GithubConflictError) return redirect("/me?error=github_already_bound");
     throw e;
+  }
+  // Best-effort: invite the student to the course org right after binding, so the
+  // /me "join org" link is immediately actionable. A failure must NOT affect the
+  // binding (the dsjudge invite_org backfill covers any miss).
+  if (env.COURSE_ORG && env.ORG_INVITE_TOKEN) {
+    try {
+      await inviteOrgMember(env.COURSE_ORG, gh.login, env.ORG_INVITE_TOKEN);
+    } catch (e) {
+      console.error("org invite failed:", (e as Error).message);
+    }
   }
   // Stay logged in; back to the dashboard with a success flash.
   return redirect("/me?bound=1");
