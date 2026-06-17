@@ -49,6 +49,12 @@ describe("nycu oauth", () => {
     expect(u.origin + u.pathname).toBe("https://id.nycu.edu.tw/o/authorize/");
     expect(u.searchParams.get("response_type")).toBe("code");
     expect(u.searchParams.get("scope")).toBe("openid profile");
+    expect(u.searchParams.get("prompt")).toBe(null); // normal login: SSO, no re-prompt
+  });
+
+  it("forceLogin adds prompt=login (logout→switch account)", () => {
+    const u = new URL(nycuAuthorizeUrl(nycuCfg, "https://api/cb", "st8", true));
+    expect(u.searchParams.get("prompt")).toBe("login");
   });
 
   it("exchanges code for token", async () => {
