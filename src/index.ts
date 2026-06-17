@@ -19,7 +19,7 @@ import {
 } from "./db/bindings";
 import { upsertGrades, listGradesFor, GradeInput } from "./db/grades";
 import { toCsv, toRosterCsv } from "./csv";
-import { adminPage, studentPage } from "./html";
+import { adminPage, dashboardPage } from "./html";
 
 const TTL_MS = 15 * 60 * 1000;
 
@@ -30,8 +30,9 @@ export default {
     try {
       if (p === "/auth/nycu/start") return await startNycu(req, env, url);
       if (p === "/auth/nycu/callback") return await nycuCallback(req, env, url);
+      if (p === "/auth/github/start") return await startGithub(req, env);
       if (p === "/auth/github/callback") return await githubCallback(req, env, url);
-      if (p === "/me" && req.method === "GET") return await mePage(req, env);
+      if (p === "/me" && req.method === "GET") return await mePage(req, env, url);
       if (p === "/api/grades/ingest" && req.method === "POST")
         return await gradesIngest(req, env);
       if (p === "/api/roster" && req.method === "GET") return await apiRoster(req, env);
@@ -58,15 +59,11 @@ function redirect(location: string, cookie?: string): Response {
   return new Response(null, { status: 302, headers });
 }
 
-function parsePurpose(url: URL): "admin" | "me" | "bind" {
-  const p = url.searchParams.get("purpose");
-  return p === "admin" ? "admin" : p === "me" ? "me" : "bind";
-}
-
-async function startNycu(req: Request, env: Env, url: URL): Promise<Response> {
-  const purpose = parsePurpose(url);
+// Single entry point: log in with NYCU. The landing dashboard (/me) is where a
+// user then binds GitHub, sees grades, or (if admin) reaches admin functions.
+async function startNycu(req: Request, env: Env, _url: URL): Promise<Response> {
   const nstate = randomState();
-  const session: SessionData = { exp: Date.now() + TTL_MS, purpose, nstate };
+  const session: SessionData = { exp: Date.now() + TTL_MS, nstate };
   const token = await signSession(session, env.SESSION_SECRET);
   const redirectUri = `${env.PUBLIC_BASE_URL}/auth/nycu/callback`;
   return redirect(nycuAuthorizeUrl(nycuConfig(env), redirectUri, nstate), setCookie(token));
@@ -87,20 +84,18 @@ async function nycuCallback(req: Request, env: Env, url: URL): Promise<Response>
   const accessToken = await exchangeNycuCode(cfg, code, redirectUri);
   const user = await fetchNycuUser(cfg, accessToken);
 
-  if (session.purpose === "admin") {
-    if (!isAdmin(env, user.id)) return new Response("Not authorized as admin", { status: 403 });
-    const adminSession: SessionData = { exp: Date.now() + TTL_MS, admin: true, nycu: user };
-    return redirect("/admin", setCookie(await signSession(adminSession, env.SESSION_SECRET)));
-  }
+  // Logged in. Admin-ness is derived from ADMIN_IDS at each admin request — no
+  // separate login. Land everyone on the dashboard.
+  const loggedIn: SessionData = { exp: Date.now() + TTL_MS, nycu: user };
+  return redirect("/me", setCookie(await signSession(loggedIn, env.SESSION_SECRET)));
+}
 
-  if (session.purpose === "me") {
-    // Student logging in to view their own OJ status — no GitHub step needed.
-    const meSession: SessionData = { exp: Date.now() + TTL_MS, student: true, nycu: user };
-    return redirect("/me", setCookie(await signSession(meSession, env.SESSION_SECRET)));
-  }
-
+// Bind GitHub, started from the logged-in dashboard (not chained off NYCU login).
+async function startGithub(req: Request, env: Env): Promise<Response> {
+  const s = await requireLogin(req, env);
+  if (s instanceof Response) return s;
   const gstate = randomState();
-  const next: SessionData = { exp: Date.now() + TTL_MS, purpose: "bind", nycu: user, gstate };
+  const next: SessionData = { exp: Date.now() + TTL_MS, nycu: s.nycu, gstate };
   const token = await signSession(next, env.SESSION_SECRET);
   const ghUrl = githubAuthorizeUrl(
     env.GITHUB_CLIENT_ID,
@@ -144,30 +139,34 @@ async function githubCallback(req: Request, env: Env, url: URL): Promise<Respons
       now,
     });
   } catch (e) {
-    if (e instanceof GithubConflictError) return redirectDone(env, "err", "github_already_bound");
+    if (e instanceof GithubConflictError) return redirect("/me?error=github_already_bound");
     throw e;
   }
-  return redirectDone(env, "ok");
+  // Stay logged in; back to the dashboard with a success flash.
+  return redirect("/me?bound=1");
 }
 
-// ── student status (/me) ────────────────────────────────────────────────
-async function requireStudent(req: Request, env: Env): Promise<SessionData | Response> {
+// ── dashboard (/me) ───────────────────────────────────────────────────────
+async function requireLogin(req: Request, env: Env): Promise<SessionData | Response> {
   const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
-  if (!session || !session.student || !session.nycu) {
-    return redirect("/auth/nycu/start?purpose=me");
-  }
+  if (!session || !session.nycu) return redirect("/auth/nycu/start");
   return session;
 }
 
-async function mePage(req: Request, env: Env): Promise<Response> {
-  const s = await requireStudent(req, env);
+async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
+  const s = await requireLogin(req, env);
   if (s instanceof Response) return s;
   const studentId = s.nycu!.id; // == 學號
   const [binding, grades] = await Promise.all([
     getBinding(env.DB, studentId),
     listGradesFor(env.DB, studentId),
   ]);
-  return new Response(studentPage(s.nycu!, binding, grades), {
+  const flash = url.searchParams.get("bound") === "1"
+    ? { kind: "ok" as const, text: "GitHub 綁定成功。" }
+    : url.searchParams.get("error")
+      ? { kind: "err" as const, text: `操作未完成：${url.searchParams.get("error")}` }
+      : null;
+  return new Response(dashboardPage(s.nycu!, binding, grades, isAdmin(env, studentId), flash), {
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });
 }
@@ -235,8 +234,10 @@ async function gradesIngest(req: Request, env: Env): Promise<Response> {
 
 async function requireAdmin(req: Request, env: Env): Promise<SessionData | Response> {
   const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
-  if (!session || !session.admin || !session.nycu || !isAdmin(env, session.nycu.id)) {
-    return redirect("/auth/nycu/start?purpose=admin");
+  if (!session || !session.nycu) return redirect("/auth/nycu/start");
+  // Logged in but not an admin → forbidden (admin-ness is dynamic via ADMIN_IDS).
+  if (!isAdmin(env, session.nycu.id)) {
+    return new Response("Not authorized as admin", { status: 403 });
   }
   return session;
 }

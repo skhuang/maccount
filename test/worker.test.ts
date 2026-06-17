@@ -51,6 +51,29 @@ describe("/auth/nycu/start", () => {
   });
 });
 
+describe("/auth/nycu/callback (login → dashboard)", () => {
+  it("sets a logged-in session and redirects to /me", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input instanceof Request ? input.url : input);
+        if (url.includes("token"))
+          return new Response(JSON.stringify({ access_token: "n_tok" }), {
+            headers: { "Content-Type": "application/json" },
+          });
+        return new Response(JSON.stringify({ username: "AT9336", name: "師" }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+    const session = await signSession({ exp: Date.now() + 60000, nstate: "NS" }, SECRET);
+    const res = await call("/auth/nycu/callback?code=abc&state=NS", { headers: cookie(session) });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/me");
+    expect(res.headers.get("Set-Cookie")).toContain(SESSION_COOKIE);
+  });
+});
+
 describe("OAuth provider error on callback", () => {
   it("surfaces a NYCU error to the done page", async () => {
     const res = await call("/auth/nycu/callback?error=invalid_scope&state=x");
@@ -70,7 +93,7 @@ describe("OAuth provider error on callback", () => {
 });
 
 describe("/auth/github/callback (bind happy path)", () => {
-  it("upserts a binding and redirects to done?status=ok", async () => {
+  it("upserts a binding and redirects to /me?bound=1", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
@@ -89,14 +112,12 @@ describe("/auth/github/callback (bind happy path)", () => {
       }),
     );
     const session = await signSession(
-      { exp: Date.now() + 60000, purpose: "bind", nycu: { id: "0856001", name: "王小明" }, gstate: "GS" },
+      { exp: Date.now() + 60000, nycu: { id: "0856001", name: "王小明" }, gstate: "GS" },
       SECRET,
     );
     const res = await call("/auth/github/callback?code=abc&state=GS", { headers: cookie(session) });
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe(
-      "https://skhuang.github.io/maccount/done.html?status=ok",
-    );
+    expect(res.headers.get("Location")).toBe("/me?bound=1");
     const rows = await listBindings(env.DB);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ nycu_id: "0856001", github_id: 999, github_login: "octo" });
@@ -116,17 +137,16 @@ describe("/auth/github/callback (bind happy path)", () => {
       }),
     );
     const session = await signSession(
-      { exp: Date.now() + 60000, purpose: "bind", nycu: { id: "0856001", name: "王" }, gstate: "GS" },
+      { exp: Date.now() + 60000, nycu: { id: "0856001", name: "王" }, gstate: "GS" },
       SECRET,
     );
     const res = await call("/auth/github/callback?code=abc&state=GS", { headers: cookie(session) });
-    expect(res.headers.get("Location")).toContain("status=err");
-    expect(res.headers.get("Location")).toContain("reason=github_already_bound");
+    expect(res.headers.get("Location")).toBe("/me?error=github_already_bound");
   });
 
   it("rejects a state mismatch", async () => {
     const session = await signSession(
-      { exp: Date.now() + 60000, purpose: "bind", nycu: { id: "x", name: "x" }, gstate: "GS" },
+      { exp: Date.now() + 60000, nycu: { id: "x", name: "x" }, gstate: "GS" },
       SECRET,
     );
     const res = await call("/auth/github/callback?code=abc&state=WRONG", { headers: cookie(session) });
@@ -135,15 +155,15 @@ describe("/auth/github/callback (bind happy path)", () => {
 });
 
 describe("/admin auth gate", () => {
-  it("redirects anonymous users to admin login", async () => {
+  it("redirects anonymous users to NYCU login", async () => {
     const res = await call("/admin");
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start?purpose=admin");
+    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
   });
 
   it("serves the list to an admin session", async () => {
     const session = await signSession(
-      { exp: Date.now() + 60000, admin: true, nycu: { id: "admin1", name: "Admin" } },
+      { exp: Date.now() + 60000, nycu: { id: "admin1", name: "Admin" } },
       SECRET,
     );
     const res = await call("/admin", { headers: cookie(session) });
@@ -153,7 +173,7 @@ describe("/admin auth gate", () => {
 
   it("exports CSV to an admin session", async () => {
     const session = await signSession(
-      { exp: Date.now() + 60000, admin: true, nycu: { id: "admin1", name: "Admin" } },
+      { exp: Date.now() + 60000, nycu: { id: "admin1", name: "Admin" } },
       SECRET,
     );
     const res = await call("/admin/export.csv", { headers: cookie(session) });
@@ -164,17 +184,16 @@ describe("/admin auth gate", () => {
   it("denies CSV export to an anonymous request", async () => {
     const res = await call("/admin/export.csv");
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start?purpose=admin");
+    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
   });
 
-  it("denies CSV export to a non-admin (bind) session", async () => {
+  it("forbids CSV export to a logged-in non-admin (403)", async () => {
     const session = await signSession(
-      { exp: Date.now() + 60000, purpose: "bind", nycu: { id: "0856001", name: "王" } },
+      { exp: Date.now() + 60000, nycu: { id: "0856001", name: "王" } },
       SECRET,
     );
     const res = await call("/admin/export.csv", { headers: cookie(session) });
-    expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start?purpose=admin");
+    expect(res.status).toBe(403);
   });
 
   it("denies delete to an anonymous request and does not mutate", async () => {
@@ -188,39 +207,42 @@ describe("/admin auth gate", () => {
       body: body.toString(),
     });
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start?purpose=admin");
+    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
     expect(await listBindings(env.DB)).toHaveLength(1);
   });
 });
 
-describe("/me student status", () => {
-  it("redirects anonymous users to NYCU login (purpose=me)", async () => {
+describe("/me dashboard", () => {
+  it("redirects anonymous users to NYCU login", async () => {
     const res = await call("/me");
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start?purpose=me");
+    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
   });
 
-  it("rejects a non-student (bind) session", async () => {
+  it("shows the bind-GitHub action when not yet bound, and no admin link for a normal user", async () => {
     const session = await signSession(
-      { exp: Date.now() + 60000, purpose: "bind", nycu: { id: "314561004", name: "甲" } },
+      { exp: Date.now() + 60000, nycu: { id: "314561004", name: "甲" } },
       SECRET,
     );
     const res = await call("/me", { headers: cookie(session) });
-    expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start?purpose=me");
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("/auth/github/start"); // bind action
+    expect(body).toContain("尚未綁定");
+    expect(body).not.toContain("管理功能"); // 314561004 is not in ADMIN_IDS
   });
 
-  it("shows only the logged-in student's own grades", async () => {
+  it("shows only the logged-in user's own grades, and the admin link for an admin", async () => {
     await env.DB.batch([
       env.DB.prepare(
-        "INSERT INTO grades (student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('314561004','lab01-stack','AC',100,100,'t1')",
+        "INSERT INTO grades (student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('admin1','lab01-stack','AC',100,100,'t1')",
       ),
       env.DB.prepare(
         "INSERT INTO grades (student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('999999999','lab01-stack','WA',0,100,'t2')",
       ),
     ]);
     const session = await signSession(
-      { exp: Date.now() + 60000, student: true, nycu: { id: "314561004", name: "甲" } },
+      { exp: Date.now() + 60000, nycu: { id: "admin1", name: "Admin" } },
       SECRET,
     );
     const res = await call("/me", { headers: cookie(session) });
@@ -228,7 +250,36 @@ describe("/me student status", () => {
     const body = await res.text();
     expect(body).toContain("lab01-stack");
     expect(body).toContain("AC");
-    expect(body).not.toContain("999999999"); // never another student's row
+    expect(body).not.toContain("999999999"); // never another user's row
+    expect(body).toContain("管理功能"); // admin1 ∈ ADMIN_IDS → admin link
+  });
+
+  it("shows a success flash after binding (?bound=1)", async () => {
+    const session = await signSession(
+      { exp: Date.now() + 60000, nycu: { id: "314561004", name: "甲" } },
+      SECRET,
+    );
+    const res = await call("/me?bound=1", { headers: cookie(session) });
+    expect(await res.text()).toContain("綁定成功");
+  });
+});
+
+describe("/auth/github/start (bind from the dashboard)", () => {
+  it("redirects a logged-in user to GitHub authorize", async () => {
+    const session = await signSession(
+      { exp: Date.now() + 60000, nycu: { id: "314561004", name: "甲" } },
+      SECRET,
+    );
+    const res = await call("/auth/github/start", { headers: cookie(session) });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toContain("github.com/login/oauth/authorize");
+    expect(res.headers.get("Set-Cookie")).toContain(SESSION_COOKIE);
+  });
+
+  it("redirects an anonymous user to NYCU login first", async () => {
+    const res = await call("/auth/github/start");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
   });
 });
 
@@ -281,7 +332,7 @@ describe("/admin/roster.csv", () => {
       ),
     ]);
     const session = await signSession(
-      { exp: Date.now() + 60000, admin: true, nycu: { id: "admin1", name: "Admin" } },
+      { exp: Date.now() + 60000, nycu: { id: "admin1", name: "Admin" } },
       SECRET,
     );
     const res = await call("/admin/roster.csv", { headers: cookie(session) });
@@ -294,7 +345,7 @@ describe("/admin/roster.csv", () => {
   it("denies roster export to anonymous", async () => {
     const res = await call("/admin/roster.csv");
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start?purpose=admin");
+    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
   });
 });
 

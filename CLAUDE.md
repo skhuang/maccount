@@ -15,14 +15,19 @@
 - **儲存**：Cloudflare D1（SQLite），table `bindings`（schema 在 `migrations/0001_init.sql`）。
 - **為什麼需要後端**：github.io 是純靜態，無法保管 OAuth `client_secret`、也無資料庫；token 交換與儲存必須在伺服器端。
 
-### 流程
-入口頁 → `/auth/nycu/start` → NYCU 授權 → `/auth/nycu/callback`（驗 state、換 token、取 `username`）→ `/auth/github/callback`（驗 state、換 token、取 GitHub id+login、upsert D1）→ 跳回 `done.html?status=ok`。管理員走 `/auth/nycu/start?purpose=admin`。
+### 流程（單一 NYCU 登入 → 儀表板）
+入口頁 → `/auth/nycu/start` → NYCU 登入 → `/auth/nycu/callback`（驗 state、換 token、取 `username`、設定登入 session）→ **`/me` 儀表板**。在 `/me` 可：
+- **綁定 GitHub**：`/auth/github/start`（需登入）→ GitHub 授權 → `/auth/github/callback`（驗 gstate、upsert D1）→ 回 `/me?bound=1`（衝突 → `/me?error=github_already_bound`）。
+- **查成績**：列出自己的 OJ 結果（只顯示分數+判定）。
+- **管理功能**：`nycu_id ∈ ADMIN_IDS` 時 `/me` 顯示連到 `/admin` 的連結。
+
+沒有 `purpose`、沒有獨立的 admin 登入：登入後是同一個 session，admin 權限由 `isAdmin()` 在每個 admin 請求即時判定。OAuth provider 錯誤（NYCU/GitHub 回 `error=`）仍導回 `done.html?status=err`。
 
 ## 原始碼地圖（`src/`）
 
 | 檔 | 責任 |
 |---|---|
-| `index.ts` | 路由 + handler（startNycu / nycuCallback / githubCallback / **mePage** / **gradesIngest** / admin*） |
+| `index.ts` | 路由 + handler（startNycu / nycuCallback / **startGithub** / githubCallback / **mePage**=儀表板 / **gradesIngest** / admin*） |
 | `session.ts` | HMAC-SHA256 簽章 session cookie（`SessionData`、sign/verify、cookie 讀寫；`student` 旗標 = 學生登入 /me） |
 | `util.ts` | `randomState()`（CSRF state） |
 | `env.ts` | `Env` 型別、`nycuConfig()`、`isAdmin()`；新增 `GRADES_INGEST_TOKEN` |
@@ -34,7 +39,8 @@
 | `html.ts` | 管理後台 + **學生 `/me` 成績頁** HTML（已做 XSS 跳脫） |
 
 ### 端點（新增）
-- `GET /me` — 學生用 NYCU 登入（`?purpose=me`）後查自己的綁定 + OJ 成績（只顯示分數與判定）。
+- `GET /me` — 登入後的**儀表板**：自己的綁定（+綁定 GitHub 按鈕）、OJ 成績（只顯示分數與判定）、admin 連結（若是 admin）。
+- `GET /auth/github/start` — 從 `/me` 發動 GitHub 綁定（需登入 session）。
 - `POST /api/grades/ingest` — 受信任的 OJ runner 推送成績；`Authorization: Bearer <GRADES_INGEST_TOKEN>`，body 為 `[{student_id,problem_id,verdict,score,max_score,updated_at}]`，upsert 進 `grades`。**只存分數+判定，其餘欄位忽略**（OJ 鐵則 2：學生只看分數+verdict，測資不外洩）。
 - `GET /admin/roster.csv` — 匯出 `github_login,student_id` 給 dsjudge P4 的 `roster.csv`（即 maccount 取代 Classroom 匯出成為權威來源）。需 admin NYCU 登入。
 - `GET /api/roster` — 同樣的 `github_login,student_id`，但用 `Authorization: Bearer <GRADES_INGEST_TOKEN>`（無需 NYCU session），供 OJ 主機的 roster-sync 定時器自動拉取。
@@ -43,7 +49,7 @@
 
 ```bash
 npm install
-npm test            # vitest，全部測試（目前 47 passed）
+npm test            # vitest，全部測試（目前 53 passed）
 npx tsc --noEmit    # 型別檢查
 npm run dev         # wrangler dev（本機，預設埠 8787）
 npx wrangler deploy # 部署 Worker（vars 變更也要重新 deploy 才生效）

@@ -2,17 +2,20 @@
 <html lang="zh-Hant">
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>NYCU × GitHub 帳號綁定</title>
+<title>課程帳號 / 成績系統</title>
 <body style="font-family:system-ui;max-width:640px;margin:3rem auto;padding:0 1rem;line-height:1.6">
-  <h1>NYCU × GitHub 帳號綁定</h1>
-  <p>請依序完成兩個登入：先用 <b>NYCU 帳號 (id.nycu.edu.tw)</b> 確認身分，再授權你的 <b>GitHub</b> 帳號。完成後系統會記錄兩者的對應。</p>
-  <p><a id="start" style="display:inline-block;padding:.7rem 1.4rem;background:#0b5;color:#fff;border-radius:8px;text-decoration:none">開始綁定 →</a></p>
-  <p>已經綁定過？<a id="status">查詢我的上傳/評分狀態 →</a></p>
+  <h1>課程帳號 / 成績系統</h1>
+  <p>用你的 <b>NYCU 帳號 (id.nycu.edu.tw)</b> 登入。登入後可以：</p>
+  <ul>
+    <li>綁定你的 <b>GitHub</b> 帳號（作業評分用）</li>
+    <li>查詢你的<b>成績</b></li>
+    <li>具管理權限者可使用<b>管理功能</b></li>
+  </ul>
+  <p><a id="start" style="display:inline-block;padding:.7rem 1.4rem;background:#0b5;color:#fff;border-radius:8px;text-decoration:none">用 NYCU 帳號登入 →</a></p>
   <script>
     // 部署後把這裡換成你的 Worker 網址
     const WORKER_BASE = "https://maccount-api.skhuang.workers.dev";
     document.getElementById("start").href = WORKER_BASE + "/auth/nycu/start";
-    document.getElementById("status").href = WORKER_BASE + "/me";
   </script>
 </body>
 </html>
