@@ -34,6 +34,7 @@ export default {
       if (p === "/me" && req.method === "GET") return await mePage(req, env);
       if (p === "/api/grades/ingest" && req.method === "POST")
         return await gradesIngest(req, env);
+      if (p === "/api/roster" && req.method === "GET") return await apiRoster(req, env);
       if (p === "/admin" && req.method === "GET") return await adminList(req, env);
       if (p === "/admin/export.csv") return await adminExport(req, env);
       if (p === "/admin/roster.csv") return await adminRoster(req, env);
@@ -180,14 +181,27 @@ function safeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
+// Shared-secret check for the trusted OJ runner (ingest push + roster pull).
+function bearerOk(req: Request, env: Env): boolean {
+  const auth = req.headers.get("Authorization") ?? "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  return !!env.GRADES_INGEST_TOKEN && safeEqual(token, env.GRADES_INGEST_TOKEN);
+}
+
+// Machine-readable roster pull (github_login,student_id) for the OJ host's
+// roster-sync timer — token-auth (no NYCU session), unlike /admin/roster.csv.
+async function apiRoster(req: Request, env: Env): Promise<Response> {
+  if (!bearerOk(req, env)) return new Response("Unauthorized", { status: 401 });
+  const rows = await listBindings(env.DB);
+  return new Response(toRosterCsv(rows), {
+    headers: { "Content-Type": "text/csv; charset=utf-8" },
+  });
+}
+
 const MAX_INGEST_ROWS = 10000;
 
 async function gradesIngest(req: Request, env: Env): Promise<Response> {
-  const auth = req.headers.get("Authorization") ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  if (!env.GRADES_INGEST_TOKEN || !safeEqual(token, env.GRADES_INGEST_TOKEN)) {
-    return new Response("Unauthorized", { status: 401 });
-  }
+  if (!bearerOk(req, env)) return new Response("Unauthorized", { status: 401 });
   const body = (await req.json().catch(() => null)) as unknown;
   const arr = Array.isArray(body)
     ? body
