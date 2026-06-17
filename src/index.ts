@@ -172,7 +172,10 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
     bound: url.searchParams.get("bound") === "1",
     error: url.searchParams.get("error"),
   };
-  const html = dashboardPage(lang, s.nycu!, binding, grades, isAdmin(env, studentId), flash);
+  const orgJoinUrl = env.COURSE_ORG
+    ? `https://github.com/orgs/${env.COURSE_ORG}/invitation`
+    : "";
+  const html = dashboardPage(lang, s.nycu!, binding, grades, isAdmin(env, studentId), flash, orgJoinUrl);
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
   });

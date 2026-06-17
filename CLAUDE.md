@@ -40,7 +40,7 @@
 | `i18n.ts` | 雙語（zh-Hant 預設 / en）：`pickLang`（?lang>cookie>zh）、`langCookie`、字串表 `T`、`langToggle` |
 
 ### 端點（新增）
-- `GET /me` — 登入後的**儀表板**：自己的綁定（+綁定 GitHub 按鈕）、OJ 成績（只顯示分數與判定）、admin 連結（若是 admin）。
+- `GET /me` — 登入後的**儀表板**：自己的綁定（+綁定 GitHub 按鈕）、OJ 成績（只顯示分數與判定）、admin 連結（若是 admin）、以及（若 `COURSE_ORG` 有設）一條「加入課程 org」邀請連結 `https://github.com/orgs/<org>/invitation`（學生接受一次,之後 P4 的 repo 授權即時、免 email）。`COURSE_ORG` 放 `wrangler.toml [vars]`（非機密）。
 - `GET /auth/github/start` — 從 `/me` 發動 GitHub 綁定（需登入 session）。
 - `POST /api/grades/ingest` — 受信任的 OJ runner 推送成績；`Authorization: Bearer <GRADES_INGEST_TOKEN>`，body 為 `[{student_id,problem_id,verdict,score,max_score,updated_at}]`，upsert 進 `grades`。**只存分數+判定，其餘欄位忽略**（OJ 鐵則 2：學生只看分數+verdict，測資不外洩）。
 - `GET /admin/roster.csv` — 匯出 `github_login,student_id` 給 dsjudge P4 的 `roster.csv`（即 maccount 取代 Classroom 匯出成為權威來源）。需 admin NYCU 登入。
