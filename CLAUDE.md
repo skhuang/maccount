@@ -37,7 +37,7 @@
 | `db/grades.ts` | D1：OJ 成績鏡像 `grades`（**score+verdict only**；鍵 `(course_id,student_id,problem_id)`）— `upsertGrades` / `listGradesFor` / `listGradesForProblem(…, course_id?)` |
 | `db/staff.ts` | D1：TA/助教名單 `staff`（per-course；owner 管理）— `listStaff(db,course)` / `addStaff` / `removeStaff` / `isStaffMember(db,course,id)` / `isStaffAnywhere(db,id)`（access gate） |
 | `db/courses.ts` | D1：開課登錄 `courses`（多租戶；`course_id`↔`moodle_course_id`↔`github_org`）— `listCourses` / `getCourse` |
-| `db/enrollments.ts` | D1：每門課選課名單 `enrollments`（真相來源 = Moodle，Phase 3 同步）— `listEnrollments` / `isEnrolled` / `coursesForStudent` / `enroll` |
+| `db/enrollments.ts` | D1：每門課選課名單 `enrollments`（真相來源 = Moodle）— `listEnrollments` / `isEnrolled` / `coursesForStudent` / `enroll` / `bulkEnroll` / `replaceEnrollments`(同步) / `removeEnrollment` / `enrollmentCount` / `listEnrolledWithBinding`(join 綁定看已綁/未綁) |
 | `csv.ts` | `BindingRow` + `toCsv`（完整綁定）+ `toRosterCsv`（`github_login,student_id`） |
 | `html.ts` | 管理後台 + **學生 `/me` 儀表板** HTML（已做 XSS 跳脫；字串走 i18n） |
 | `i18n.ts` | 雙語（zh-Hant 預設 / en）：`pickLang`（?lang>cookie>zh）、`langCookie`、字串表 `T`、`langToggle` |
@@ -47,7 +47,9 @@
 - `GET /auth/github/start` — 從 `/me` 發動 GitHub 綁定（需登入 session）。
 - `GET /logout` — 清掉 maccount session cookie 並導向 `/auth/nycu/start?prompt=login`（強制 NYCU 重新輸入帳密,否則 NYCU SSO 會直接沿用同一帳號）。`prompt=login` 只在登出/切換時加,一般登入仍走 SSO。**切換 GitHub 帳號(綁定不同 GitHub)仍需用無痕視窗** —— GitHub OAuth 沒有可靠的重新選帳號參數。`/me` 右上有「登出（換帳號）」連結。成績的更新時間以 `fmtTime` 顯示為可讀的 Asia/Taipei `YYYY/MM/DD HH:MM`(而非原始 epoch)。
 - `POST /api/grades/ingest` — 受信任的 OJ runner 推送成績；`Authorization: Bearer <GRADES_INGEST_TOKEN>`，body 為 `[{student_id,problem_id,verdict,score,max_score,updated_at,course_id?}]`，upsert 進 `grades`。`course_id` 選填（Phase 2 起 dsjudge 會帶；未帶則 fall back `DEFAULT_COURSE_ID`）。**只存分數+判定，其餘欄位忽略**（OJ 鐵則 2：學生只看分數+verdict，測資不外洩）。
-- **`/admin` 課程選擇器 + `/c/<course_id>/admin`（Phase 1b）**：`GET /admin` 列課程（owner 看全部 + 建立課程表單；staff 只看自己的課）；`POST /admin/courses`（owner）建立/更新一門課（`course_id,name,term,moodle_course_id,github_org`）。每門課的後台在 `/c/<course_id>/admin`，含綁定名單 + 該課 staff 管理 + 匯出；子端點 `GET …/export.csv`(`bindings-<course>.csv`)、`GET …/roster.csv`(`roster-<course>.csv`)、`POST …/delete`(owner)、`POST …/staff/{add,remove}`(owner)。檢視/匯出 = owner 或該課 staff（`requireCourseStaff`）；刪除/管理 staff/建課 = owner（`requireAdmin`）。`/c/<id>/...` 會 `getCourse` 驗證課程存在（不存在→404）。
+- **`/admin` 課程選擇器 + `/c/<course_id>/admin`（Phase 1b）**：`GET /admin` 列課程（owner 看全部 + 建立課程表單；staff 只看自己的課）；`POST /admin/courses`（owner）建立/更新一門課（`course_id,name,term,moodle_course_id,github_org`）。每門課的後台在 `/c/<course_id>/admin`，含綁定名單 + 選課名單(enrollment) + 該課 staff 管理 + 課程設定 + 匯出；子端點 `GET …/export.csv`(`bindings-<course>.csv`)、`GET …/roster.csv`(`roster-<course>.csv`)、`POST …/delete`(owner)、`POST …/staff/{add,remove}`(owner)、`POST …/enroll`(owner)。檢視/匯出 = owner 或該課 staff（`requireCourseStaff`）；刪除/管理 staff/建課/匯入選課 = owner（`requireAdmin`）。`/c/<id>/...` 會 `getCourse` 驗證課程存在（不存在→404）。
+- **編輯課程**：`POST /admin/courses` 是 upsert（同 `course_id` 再送即更新；`created_at` 只在新建時設）。課程後台的「課程設定」表單(owner)預填 `name/term/moodle_course_id/github_org/status(active|archived)` → 再送即改。
+- **匯入選課名單（enrollment）**：真相來源 = Moodle。兩條路徑：(1) **手動**：課程後台「選課名單」貼上學號(逗號/空白/換行分隔)`POST /c/<id>/admin/enroll`，勾「取代整份名單」= `replaceEnrollments`(與 Moodle 同步、未列出者移除)，否則 `bulkEnroll`(累加、idempotent)。(2) **API**：`POST /api/enrollments/ingest`(`Authorization: Bearer <GRADES_INGEST_TOKEN>`，body `{course_id, student_ids:[…], replace?}`)供 seminar-moodle 自動把 Moodle 參與者推進來。**一旦某課有選課名單,該課的綁定名單表/`export.csv`/`roster.csv` 會縮到「選課∩已綁」**(空名單則 fall back 全域,向後相容)。選課名單會顯示每位學號的「已綁/未綁 GitHub」狀態。
 - `GET /api/roster` — 同樣的 `github_login,student_id`，但用 `Authorization: Bearer <GRADES_INGEST_TOKEN>`（無需 NYCU session），供 OJ 主機的 roster-sync 定時器自動拉取。
 - `GET /api/grades?problem_id=<id>` — 該題所有學生的 `{student_id,problem_id,verdict,score,max_score,updated_at}`（Bearer token）。供 seminar-moodle 的「程式作業自動批改」拉取後填進 Moodle 評分表。只回分數+判定。
 
