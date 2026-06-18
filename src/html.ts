@@ -54,9 +54,21 @@ interface CourseLite {
 export function adminHomePage(
   lang: Lang,
   courses: CourseLite[],
-  opts: { isOwner: boolean } = { isOwner: false },
+  opts: { isOwner: boolean; orgs?: string[] } = { isOwner: false },
 ): string {
   const t = T[lang];
+  // Query bindings by GitHub org — for students who bound but aren't enrolled
+  // in any course yet (so the per-course views don't show them).
+  const orgs = opts.orgs ?? [];
+  const orgLinks = orgs
+    .map((o) => `<li><a href="/admin/org/${encodeURIComponent(o)}">${h(o)}</a></li>`)
+    .join("\n");
+  const bindingsSection = `<h2>${t.bindings_query_heading}</h2>
+<ul>
+  <li><a href="/admin/bindings"><b>${t.bindings_all_link}</b></a></li>
+  ${orgLinks}
+</ul>
+<p style="color:#777;font-size:.9em">${t.bindings_query_note}</p>`;
   const items = courses.length
     ? courses
         .map(
@@ -87,6 +99,79 @@ ${langToggle("/admin", lang)}
 <h1>${t.admin_courses_heading}</h1>
 <ul>${items}</ul>
 ${createForm}
+${bindingsSection}
+</body></html>`;
+}
+
+// All bindings (the global registry), independent of course/enrollment — the
+// pre-enrollment catch-all. orgs link to the per-org join view.
+export function bindingsPage(lang: Lang, rows: BindingRow[], orgs: string[] = []): string {
+  const t = T[lang];
+  const trs = rows
+    .map(
+      (r) => `<tr><td>${h(r.nycu_id)}</td><td>${h(r.nycu_name)}</td>
+  <td>${h(r.github_login)}</td><td>${h(r.github_id)}</td><td>${h(fmtTime(r.updated_at))}</td></tr>`,
+    )
+    .join("\n");
+  const orgLinks = orgs
+    .map((o) => `<a href="/admin/org/${encodeURIComponent(o)}">${h(o)}</a>`)
+    .join("　");
+  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">
+<title>${t.admin_title}</title>
+<body style="font-family:system-ui;max-width:900px;margin:2rem auto;padding:0 1rem">
+${langToggle("/admin/bindings", lang)}
+<p style="font-size:.9em"><a href="/admin">← ${t.admin_courses_heading}</a></p>
+<h1>${t.bindings_all_link}（${rows.length}）</h1>
+${orgs.length ? `<p>${t.bindings_query_heading}：${orgLinks}</p>` : ""}
+<table border="1" cellpadding="6" cellspacing="0">
+<thead><tr><th>NYCU id</th><th>${t.th_name}</th><th>GitHub</th><th>${t.th_github_id}</th><th>${t.th_updated}</th></tr></thead>
+<tbody>
+${trs}
+</tbody></table>
+</body></html>`;
+}
+
+// Query bindings by GitHub org: each binding tagged with its membership of this
+// org (member/pending/—), plus org members/invitees with no maccount binding.
+export function orgMembersPage(
+  lang: Lang,
+  org: string,
+  view: { rows: { student_id: string; nycu_name: string | null; github_login: string | null; status: string }[]; unbound: string[] },
+  err = "",
+): string {
+  const t = T[lang];
+  const badge: Record<string, string> = {
+    member: `<span style="color:#0a0">${t.org_status_member}</span>`,
+    pending: `<span style="color:#b80">${t.org_status_pending}</span>`,
+    none: `<span style="color:#999">${t.org_status_none}</span>`,
+  };
+  // Bound students sorted: in-org first (member, pending), then not-in-org.
+  const order: Record<string, number> = { member: 0, pending: 1, none: 2 };
+  const sorted = [...view.rows].sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
+  const trs = sorted
+    .map(
+      (r) => `<tr><td>${h(r.github_login)}</td><td>${h(r.student_id)}</td>
+  <td>${h(r.nycu_name)}</td><td>${badge[r.status] ?? h(r.status)}</td></tr>`,
+    )
+    .join("\n");
+  const unbound = view.unbound.length
+    ? `<h2>${t.org_unbound_heading}（${view.unbound.length}）</h2>
+<p style="color:#777;font-size:.9em">${t.org_unbound_note}</p>
+<p>${view.unbound.map((l) => h(l)).join("、")}</p>`
+    : "";
+  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">
+<title>${t.admin_title}</title>
+<body style="font-family:system-ui;max-width:900px;margin:2rem auto;padding:0 1rem">
+${langToggle(`/admin/org/${encodeURIComponent(org)}`, lang)}
+<p style="font-size:.9em"><a href="/admin">← ${t.admin_courses_heading}</a>　|　<a href="/admin/bindings">${t.bindings_all_link}</a></p>
+<h1>GitHub org：${h(org)}</h1>
+${err ? `<p style="padding:8px;border:1px solid #c00;background:#fee">${t.org_fetch_error}：${h(err)}</p>` : ""}
+<table border="1" cellpadding="6" cellspacing="0">
+<thead><tr><th>GitHub</th><th>NYCU id</th><th>${t.th_name}</th><th>${t.org_status_col}</th></tr></thead>
+<tbody>
+${trs}
+</tbody></table>
+${unbound}
 </body></html>`;
 }
 

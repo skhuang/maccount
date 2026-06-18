@@ -49,6 +49,16 @@ export interface Strings {
   ph_course_term: string;
   ph_course_moodle: string;
   ph_course_org: string;
+  bindings_query_heading: string;
+  bindings_all_link: string;
+  bindings_query_note: string;
+  org_status_col: string;
+  org_status_member: string;
+  org_status_pending: string;
+  org_status_none: string;
+  org_unbound_heading: string;
+  org_unbound_note: string;
+  org_fetch_error: string;
   course_settings: string;
   course_status: string;
   course_save: string;
@@ -111,6 +121,16 @@ export const T: Record<Lang, Strings> = {
     ph_course_term: "學期（如 2026 / 2026-fall）",
     ph_course_moodle: "moodle_course_id（選填）",
     ph_course_org: "github_org（選填）",
+    bindings_query_heading: "查詢綁定（依 GitHub org）",
+    bindings_all_link: "所有綁定",
+    bindings_query_note: "學生綁定 GitHub 後、還沒選課時，可由此查；點 org 可即時比對誰已加入該 org。",
+    org_status_col: "org 狀態",
+    org_status_member: "已加入",
+    org_status_pending: "待接受",
+    org_status_none: "未加入",
+    org_unbound_heading: "已在 org、未在 maccount 綁定",
+    org_unbound_note: "這些 GitHub 帳號在 org 內，但沒有對應的 maccount 綁定（請其到 /me 綁定學號）。",
+    org_fetch_error: "讀取 org 成員失敗",
     course_settings: "課程設定",
     course_status: "狀態",
     course_save: "儲存課程設定",
@@ -173,6 +193,16 @@ export const T: Record<Lang, Strings> = {
     ph_course_term: "Term (e.g. 2026 / 2026-fall)",
     ph_course_moodle: "moodle_course_id (optional)",
     ph_course_org: "github_org (optional)",
+    bindings_query_heading: "Query bindings (by GitHub org)",
+    bindings_all_link: "All bindings",
+    bindings_query_note: "For students who bound GitHub but aren't enrolled yet; click an org to cross-check who has joined it.",
+    org_status_col: "org status",
+    org_status_member: "member",
+    org_status_pending: "pending",
+    org_status_none: "not joined",
+    org_unbound_heading: "In the org, not bound on maccount",
+    org_unbound_note: "These GitHub accounts are in the org but have no maccount binding (ask them to bind at /me).",
+    org_fetch_error: "failed to read org members",
     course_settings: "Course settings",
     course_status: "Status",
     course_save: "Save course settings",

@@ -4,8 +4,10 @@ import {
   upsertBinding,
   listBindings,
   deleteBinding,
+  orgBindingView,
   GithubConflictError,
 } from "../src/db/bindings";
+import type { BindingRow } from "../src/csv";
 
 beforeAll(async () => {
   await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
@@ -51,5 +53,20 @@ describe("bindings", () => {
     await upsertBinding(env.DB, base);
     await deleteBinding(env.DB, base.nycu_id);
     expect(await listBindings(env.DB)).toHaveLength(0);
+  });
+});
+
+describe("orgBindingView", () => {
+  const b = (nycu_id: string, github_login: string): BindingRow => ({
+    nycu_id, nycu_name: nycu_id, github_id: 1, github_login, created_at: "t", updated_at: "t",
+  });
+  it("tags each binding member/pending/none (case-insensitive) and lists unbound org accounts", () => {
+    const bindings = [b("B001", "Alice"), b("B002", "bob"), b("B003", "carol")];
+    const members = ["alice", "zoe"];      // zoe is in the org but has no binding
+    const pending = ["BOB"];               // case-insensitive match to b002
+    const v = orgBindingView(bindings, members, pending);
+    const byId = Object.fromEntries(v.rows.map((r) => [r.student_id, r.status]));
+    expect(byId).toEqual({ B001: "member", B002: "pending", B003: "none" });
+    expect(v.unbound).toEqual(["zoe"]); // org account with no maccount binding
   });
 });

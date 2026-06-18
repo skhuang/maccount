@@ -78,6 +78,38 @@ function ghHeaders(token: string): HeadersInit {
   };
 }
 
+// Follow ?page= pagination, collecting the `login` of each item. Capped at 10
+// pages (1000) — plenty for a class. Used to list an org's members + pending
+// invitations so the admin can query bindings by org.
+async function ghPagedLogins(
+  baseUrl: string, token: string, fetcher: typeof fetch,
+): Promise<string[]> {
+  const out: string[] = [];
+  for (let page = 1; page <= 10; page++) {
+    const res = await fetcher(`${baseUrl}?per_page=100&page=${page}`, { headers: ghHeaders(token) });
+    if (!res.ok) throw new Error(`${baseUrl} -> ${res.status}`);
+    const arr = (await res.json()) as { login?: string | null }[];
+    if (!Array.isArray(arr) || arr.length === 0) break;
+    for (const m of arr) if (m.login) out.push(m.login);
+    if (arr.length < 100) break;
+  }
+  return out;
+}
+
+// Active members of an org (logins).
+export async function listOrgMembers(
+  org: string, token: string, fetcher: typeof fetch = fetch,
+): Promise<string[]> {
+  return ghPagedLogins(`https://api.github.com/orgs/${org}/members`, token, fetcher);
+}
+
+// Pending org invitations (logins; email-only invites have no login → dropped).
+export async function listPendingOrgInvites(
+  org: string, token: string, fetcher: typeof fetch = fetch,
+): Promise<string[]> {
+  return ghPagedLogins(`https://api.github.com/orgs/${org}/invitations`, token, fetcher);
+}
+
 // Add a user to an org team (role member). For a non-org-member this creates an
 // org invitation scoped to the team; for a member it's immediate. Idempotent.
 export async function addTeamMembership(
