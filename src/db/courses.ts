@@ -28,6 +28,18 @@ export async function getCourse(db: D1Database, course_id: string): Promise<Cour
     .first<CourseRow>();
 }
 
+// Resolve a Moodle numeric course id → course-offering (for the seminar-moodle
+// enrollment sync, which knows the Moodle id, not our course_id). Newest first
+// if (mis)configured to more than one.
+export async function getCourseByMoodleId(
+  db: D1Database, moodle_course_id: string,
+): Promise<CourseRow | null> {
+  return await db
+    .prepare(`SELECT ${COLS} FROM courses WHERE moodle_course_id = ? ORDER BY created_at DESC`)
+    .bind(moodle_course_id)
+    .first<CourseRow>();
+}
+
 export interface CourseInput {
   course_id: string;
   name: string;

@@ -24,7 +24,7 @@ import { upsertGrades, listGradesFor, listGradesForProblem, GradeInput } from ".
 import {
   listStaff, addStaff, removeStaff, isStaffAnywhere, isStaffMember, coursesForStaff,
 } from "./db/staff";
-import { listCourses, getCourse, upsertCourse } from "./db/courses";
+import { listCourses, getCourse, getCourseByMoodleId, upsertCourse } from "./db/courses";
 import {
   bulkEnroll, replaceEnrollments, enrollmentCount, listEnrolledWithBinding, listEnrollments,
   coursesForStudent,
@@ -501,15 +501,24 @@ function parseStudentIds(blob: string): string[] {
 
 // POST /api/enrollments/ingest — token-auth roster import for automation
 // (e.g. seminar-moodle pushing Moodle participants). Body:
-// { course_id, student_ids: [...], replace?: bool }.
+// { course_id | moodle_course_id, student_ids: [...], replace?: bool }.
+// moodle_course_id is resolved to a course_id via courses.moodle_course_id, so
+// the caller can send the Moodle numeric id it already has.
 async function enrollmentsIngest(req: Request, env: Env): Promise<Response> {
   if (!bearerOk(req, env)) return new Response("Unauthorized", { status: 401 });
   const body = (await req.json().catch(() => null)) as
-    | { course_id?: unknown; student_ids?: unknown; replace?: unknown }
+    | { course_id?: unknown; moodle_course_id?: unknown; student_ids?: unknown; replace?: unknown }
     | null;
-  const course_id = typeof body?.course_id === "string" ? body.course_id : "";
   const list = Array.isArray(body?.student_ids) ? body!.student_ids : null;
-  if (!course_id || !list) return new Response("Bad request", { status: 400 });
+  if (!list) return new Response("Bad request", { status: 400 });
+  let course_id = typeof body?.course_id === "string" ? body.course_id : "";
+  const moodleId = body?.moodle_course_id != null ? String(body.moodle_course_id) : "";
+  if (!course_id && moodleId) {
+    const c = await getCourseByMoodleId(env.DB, moodleId);
+    if (!c) return new Response(`No course mapped to moodle_course_id ${moodleId}`, { status: 404 });
+    course_id = c.course_id;
+  }
+  if (!course_id) return new Response("Bad request", { status: 400 });
   if (!(await getCourse(env.DB, course_id))) return new Response("Unknown course", { status: 404 });
   const ids = list.filter((x): x is string => typeof x === "string");
   if (ids.length > MAX_INGEST_ROWS) return new Response("Too many rows", { status: 413 });
@@ -517,7 +526,7 @@ async function enrollmentsIngest(req: Request, env: Env): Promise<Response> {
   const n = body?.replace
     ? await replaceEnrollments(env.DB, course_id, ids, now)
     : await bulkEnroll(env.DB, course_id, ids, now);
-  return new Response(JSON.stringify({ ok: true, enrolled: n }), {
+  return new Response(JSON.stringify({ ok: true, course_id, enrolled: n }), {
     headers: { "Content-Type": "application/json" },
   });
 }
