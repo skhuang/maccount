@@ -155,6 +155,29 @@ describe("/auth/github/callback (bind happy path)", () => {
     expect((await listBindings(env.DB)).some((r) => r.github_login === "mona")).toBe(true);
   });
 
+  it("invites the binder to the effective org of their enrolled course", async () => {
+    await env.DB.prepare(
+      "INSERT INTO courses (course_id, name, github_org, status, created_at) VALUES ('swtest-2026','軟測','swtest-org','active','t')",
+    ).run();
+    await env.DB.prepare(
+      "INSERT INTO enrollments (course_id, student_id, role, created_at) VALUES ('swtest-2026','0856003','student','t')",
+    ).run();
+    const invited: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("access_token"))
+        return new Response(JSON.stringify({ access_token: "t" }), { headers: { "Content-Type": "application/json" } });
+      if (url.includes("/memberships/")) { invited.push(url); return new Response("{}", { headers: { "Content-Type": "application/json" } }); }
+      return new Response(JSON.stringify({ id: 777, login: "neo" }), { headers: { "Content-Type": "application/json" } });
+    }));
+    const session = await signSession(
+      { exp: Date.now() + 60000, nycu: { id: "0856003", name: "尼" }, gstate: "GS" }, SECRET);
+    await call("/auth/github/callback?code=abc&state=GS", { headers: cookie(session) });
+    expect(invited.some((u) => u.includes("/orgs/swtest-org/memberships/neo"))).toBe(true);
+    expect(invited.some((u) => u.includes("/orgs/nycu-cs-course-ds/"))).toBe(false); // only the enrolled course's org
+    await env.DB.prepare("DELETE FROM courses WHERE course_id='swtest-2026'").run();
+  });
+
   it("redirects with status=err when github already bound to another nycu", async () => {
     await env.DB.prepare(
       "INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, created_at, updated_at) VALUES ('other','x',999,'octo','t','t')",
@@ -515,6 +538,30 @@ describe("/me dashboard", () => {
     );
     const res = await call("/me", { headers: { ...cookie(session) } }, { ...testEnv, COURSE_ORG: "" });
     expect(await res.text()).not.toContain("/orgs/");
+  });
+
+  it("lists the effective org of each enrolled course (per-course github_org)", async () => {
+    // A course with its own org; student enrolled only there.
+    await env.DB.prepare(
+      "INSERT INTO courses (course_id, name, github_org, status, created_at) VALUES ('swtest-2026','軟測','swtest-org','active','t')",
+    ).run();
+    await env.DB.prepare(
+      "INSERT INTO enrollments (course_id, student_id, role, created_at) VALUES ('swtest-2026','314561004','student','t')",
+    ).run();
+    const session = await signSession({ exp: Date.now() + 60000, nycu: { id: "314561004", name: "甲" } }, SECRET);
+    const body = await (await call("/me", { headers: cookie(session) })).text();
+    expect(body).toContain("https://github.com/orgs/swtest-org/invitation"); // its own org
+    expect(body).not.toContain("/orgs/nycu-cs-course-ds/"); // not the shared one (enrolled elsewhere)
+    await env.DB.prepare("DELETE FROM courses WHERE course_id='swtest-2026'").run();
+  });
+
+  it("a course with no github_org falls back to the shared COURSE_ORG", async () => {
+    await env.DB.prepare(
+      "INSERT INTO enrollments (course_id, student_id, role, created_at) VALUES ('ds-2026','314561004','student','t')",
+    ).run();
+    const session = await signSession({ exp: Date.now() + 60000, nycu: { id: "314561004", name: "甲" } }, SECRET);
+    const body = await (await call("/me", { headers: cookie(session) })).text();
+    expect(body).toContain("https://github.com/orgs/nycu-cs-course-ds/invitation");
   });
 
   it("shows only the logged-in user's own grades, and the admin link for an admin", async () => {

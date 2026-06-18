@@ -241,7 +241,7 @@ export function dashboardPage(
   grades: GradeRow[],
   admin: boolean,
   flash: { bound?: boolean; error?: string | null },
-  orgJoinUrl: string = "",
+  orgJoins: { org: string; url: string }[] = [],
   courseNames: Record<string, string> = {},
 ): string {
   const t = T[lang];
@@ -293,9 +293,12 @@ ${courseTable(grp.rows)}`,
     ? `<p style="margin-top:1.5rem"><a href="/admin"><b>${t.admin_link}</b></a></p>`
     : "";
 
-  const orgHtml = orgJoinUrl
+  const orgHtml = orgJoins.length
     ? `<p style="padding:.5rem .8rem;border-radius:6px;background:#fff3cd">${t.join_org_prompt} ` +
-      `<a href="${h(orgJoinUrl)}" target="_blank" rel="noopener"><b>${t.join_org_link}</b></a></p>`
+      orgJoins
+        .map((j) => `<a href="${h(j.url)}" target="_blank" rel="noopener"><b>${h(j.org)}</b></a>`)
+        .join("　") +
+      `</p>`
     : "";
 
   return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">
