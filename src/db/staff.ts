@@ -48,3 +48,13 @@ export async function isStaffAnywhere(db: D1Database, nycu_id: string): Promise<
   const row = await db.prepare("SELECT 1 FROM staff WHERE nycu_id = ? LIMIT 1").bind(nycu_id).first();
   return row != null;
 }
+
+// Course ids a user is staff of — for the /admin course picker (a TA sees only
+// their courses; owners see all).
+export async function coursesForStaff(db: D1Database, nycu_id: string): Promise<string[]> {
+  const { results } = await db
+    .prepare("SELECT course_id FROM staff WHERE nycu_id = ? ORDER BY course_id")
+    .bind(nycu_id)
+    .all<{ course_id: string }>();
+  return (results ?? []).map((r) => r.course_id);
+}

@@ -42,13 +42,63 @@ interface StaffLite {
   added_by: string | null;
 }
 
+interface CourseLite {
+  course_id: string;
+  name: string;
+  term?: string | null;
+  status?: string;
+}
+
+// /admin course picker: owners see all courses + a create form; staff see only
+// the courses they belong to. Each links to /c/<course_id>/admin.
+export function adminHomePage(
+  lang: Lang,
+  courses: CourseLite[],
+  opts: { isOwner: boolean } = { isOwner: false },
+): string {
+  const t = T[lang];
+  const items = courses.length
+    ? courses
+        .map(
+          (c) => `<li><a href="/c/${encodeURIComponent(c.course_id)}/admin"><b>${h(c.name)}</b></a>
+  <span style="color:#999">${h(c.course_id)}${c.term ? " · " + h(c.term) : ""}${
+    c.status && c.status !== "active" ? " · " + h(c.status) : ""
+  }</span></li>`,
+        )
+        .join("\n")
+    : `<li style="color:#666">${t.no_courses}</li>`;
+  const createForm = opts.isOwner
+    ? `<h2>${t.course_create}</h2>
+<form method="post" action="/admin/courses" style="display:grid;gap:6px;max-width:440px">
+  <input name="course_id" placeholder="${t.ph_course_id}" required pattern="[A-Za-z0-9_-]+">
+  <input name="name" placeholder="${t.ph_course_name}" required>
+  <input name="term" placeholder="${t.ph_course_term}">
+  <input name="moodle_course_id" placeholder="${t.ph_course_moodle}">
+  <input name="github_org" placeholder="${t.ph_course_org}">
+  <button type="submit">${t.course_create}</button>
+</form>
+<p style="color:#777;font-size:.9em">${t.course_create_note}</p>`
+    : "";
+  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">
+<title>${t.admin_title}</title>
+<body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
+${langToggle("/admin", lang)}
+<p style="text-align:right;font-size:.9em"><a href="/me">${t.acct_heading}</a>　|　<a href="/logout">${t.logout}</a></p>
+<h1>${t.admin_courses_heading}</h1>
+<ul>${items}</ul>
+${createForm}
+</body></html>`;
+}
+
 export function adminPage(
   lang: Lang,
+  course: { course_id: string; name: string },
   rows: BindingRow[],
   opts: { isOwner: boolean; staff: StaffLite[]; staffMsg?: string } = { isOwner: false, staff: [] },
 ): string {
   const t = T[lang];
   const { isOwner, staff } = opts;
+  const base = `/c/${encodeURIComponent(course.course_id)}/admin`;
   // Flash from a staff add/remove → GitHub org/team sync (see syncStaffToGitHub).
   const syncMsg: Record<string, string> = {
     ok: t.staff_sync_ok,
@@ -67,7 +117,7 @@ export function adminPage(
   <td>${h(fmtTime(r.updated_at))}</td>${
     isOwner
       ? `
-  <td><form method="post" action="/admin/delete" onsubmit="return confirm('${t.confirm_delete}')">
+  <td><form method="post" action="${base}/delete" onsubmit="return confirm('${t.confirm_delete}')">
     <input type="hidden" name="nycu_id" value="${h(r.nycu_id)}"><button type="submit">${t.delete}</button></form></td>`
       : ""
   }
@@ -79,7 +129,7 @@ export function adminPage(
   const staffRows = staff
     .map(
       (s) => `<tr><td>${h(s.nycu_id)}</td><td>${h(s.added_by)}</td>
-  <td><form method="post" action="/admin/staff/remove" onsubmit="return confirm('${t.staff_remove_confirm}')">
+  <td><form method="post" action="${base}/staff/remove" onsubmit="return confirm('${t.staff_remove_confirm}')">
     <input type="hidden" name="nycu_id" value="${h(s.nycu_id)}"><button type="submit">${t.staff_remove}</button></form></td></tr>`,
     )
     .join("\n");
@@ -89,7 +139,7 @@ export function adminPage(
 <table border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>NYCU id</th><th>${t.staff_added_by}</th><th></th></tr></thead>
 <tbody>${staffRows}</tbody></table>
-<form method="post" action="/admin/staff/add" style="margin-top:8px">
+<form method="post" action="${base}/staff/add" style="margin-top:8px">
   <input name="nycu_id" placeholder="${t.staff_id_placeholder}" required>
   <button type="submit">${t.staff_add}</button>
 </form>`
@@ -98,10 +148,12 @@ export function adminPage(
   return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">
 <title>${t.admin_title}</title>
 <body style="font-family:system-ui;max-width:900px;margin:2rem auto">
-${langToggle("/admin", lang)}
-<h1>${t.admin_bindings.replace("{n}", String(rows.length))}</h1>
+${langToggle(base, lang)}
+<p style="font-size:.9em"><a href="/admin">← ${t.admin_courses_heading}</a></p>
+<h1>${h(course.name)} <span style="color:#999;font-size:.6em">${h(course.course_id)}</span></h1>
+<h2>${t.admin_bindings.replace("{n}", String(rows.length))}</h2>
 ${banner}
-<p><a href="/admin/export.csv">${t.export_full}</a>　|　<a href="/admin/roster.csv">${t.export_roster}</a></p>
+<p><a href="${base}/export.csv">${t.export_full}</a>　|　<a href="${base}/roster.csv">${t.export_roster}</a></p>
 <table border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>NYCU id</th><th>${t.th_name}</th><th>GitHub</th><th>${t.th_github_id}</th><th>${t.th_updated}</th>${isOwner ? `<th>${t.th_actions}</th>` : ""}</tr></thead>
 <tbody>
@@ -122,29 +174,45 @@ export function dashboardPage(
   admin: boolean,
   flash: { bound?: boolean; error?: string | null },
   orgJoinUrl: string = "",
+  courseNames: Record<string, string> = {},
 ): string {
   const t = T[lang];
   const gh = binding?.github_login
     ? `${t.bound} <b>${h(binding.github_login)}</b> — <a href="/auth/github/start">${t.rebind}</a>`
     : `<span style="color:#b00">${t.not_bound}</span> — <a href="/auth/github/start"><b>${t.bind_action}</b></a>`;
 
-  const rows = grades
-    .map(
-      (g) => `<tr>
+  const renderRows = (rs: GradeRow[]) =>
+    rs
+      .map(
+        (g) => `<tr>
   <td>${h(g.problem_id)}</td>
   <td>${h(g.verdict ?? "-")}</td>
   <td>${g.score == null ? "-" : h(g.score)} / ${g.max_score == null ? "-" : h(g.max_score)}</td>
   <td>${h(fmtTime(g.updated_at))}</td>
 </tr>`,
-    )
-    .join("\n");
+      )
+      .join("\n");
 
-  const table = grades.length
-    ? `<table border="1" cellpadding="6" cellspacing="0">
+  // Group by course (grades arrive ordered by course_id from listGradesFor).
+  const byCourse: { cid: string; rows: GradeRow[] }[] = [];
+  for (const g of grades) {
+    let grp = byCourse.find((x) => x.cid === g.course_id);
+    if (!grp) byCourse.push((grp = { cid: g.course_id, rows: [] }));
+    grp.rows.push(g);
+  }
+  const courseTable = (rs: GradeRow[]) => `<table border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>${t.col_problem}</th><th>${t.col_result}</th><th>${t.col_score}</th><th>${t.col_updated}</th></tr></thead>
 <tbody>
-${rows}
-</tbody></table>`
+${renderRows(rs)}
+</tbody></table>`;
+
+  const table = grades.length
+    ? byCourse
+        .map(
+          (grp) => `<h3 style="margin:1rem 0 .3rem">${h(courseNames[grp.cid] || grp.cid)}</h3>
+${courseTable(grp.rows)}`,
+        )
+        .join("\n")
     : `<p style="color:#666">${t.no_grades}</p>`;
 
   const flashHtml = flash.bound
