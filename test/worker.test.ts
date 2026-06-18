@@ -25,6 +25,7 @@ const testEnv: Env = {
   COURSE_ORG: "nycu-cs-course-ds",
   ORG_INVITE_TOKEN: "org-tok",
   STAFF_TEAM: "", // sync off by default; sync tests override with "staff"
+  DEFAULT_COURSE_ID: "ds-2026",
 };
 
 beforeAll(async () => {
@@ -247,7 +248,7 @@ describe("staff/TA management", () => {
     signSession({ exp: Date.now() + 60000, nycu: { id: "ta01", name: "助教" } }, SECRET);
 
   it("a staff-table member can view /admin (read-only: no delete / no manage-staff)", async () => {
-    await env.DB.prepare("INSERT INTO staff (nycu_id, added_by, added_at) VALUES ('ta01','admin1','t')").run();
+    await env.DB.prepare("INSERT INTO staff (course_id, nycu_id, added_by, added_at) VALUES ('ds-2026','ta01','admin1','t')").run();
     const res = await call("/admin", { headers: cookie(await staffSession()) });
     expect(res.status).toBe(200);
     const body = await res.text();
@@ -274,7 +275,7 @@ describe("staff/TA management", () => {
   });
 
   it("a staff member CANNOT manage staff (owner-only → 403, no escalation)", async () => {
-    await env.DB.prepare("INSERT INTO staff (nycu_id, added_by, added_at) VALUES ('ta01','admin1','t')").run();
+    await env.DB.prepare("INSERT INTO staff (course_id, nycu_id, added_by, added_at) VALUES ('ds-2026','ta01','admin1','t')").run();
     const res = await call("/admin/staff/add", {
       method: "POST",
       headers: { ...cookie(await staffSession()), "Content-Type": "application/x-www-form-urlencoded" },
@@ -316,7 +317,7 @@ describe("staff/TA management", () => {
 
   it("remove → deletes the TA from the staff team AND the org", async () => {
     await bindTA("monalisa");
-    await env.DB.prepare("INSERT INTO staff (nycu_id, added_by, added_at) VALUES ('ta01','admin1','t')").run();
+    await env.DB.prepare("INSERT INTO staff (course_id, nycu_id, added_by, added_at) VALUES ('ds-2026','ta01','admin1','t')").run();
     const calls = ghCalls();
     const res = await call("/admin/staff/remove", {
       method: "POST",
@@ -401,10 +402,10 @@ describe("/me dashboard", () => {
   it("shows only the logged-in user's own grades, and the admin link for an admin", async () => {
     await env.DB.batch([
       env.DB.prepare(
-        "INSERT INTO grades (student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('admin1','lab01-stack','AC',100,100,'t1')",
+        "INSERT INTO grades (course_id, student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('ds-2026','admin1','lab01-stack','AC',100,100,'t1')",
       ),
       env.DB.prepare(
-        "INSERT INTO grades (student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('999999999','lab01-stack','WA',0,100,'t2')",
+        "INSERT INTO grades (course_id, student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('ds-2026','999999999','lab01-stack','WA',0,100,'t2')",
       ),
     ]);
     const session = await signSession(
@@ -499,6 +500,24 @@ describe("/api/grades/ingest", () => {
     expect(row).toMatchObject({ problem_id: "lab01-stack", verdict: "AC", score: 100 });
   });
 
+  it("defaults course_id to DEFAULT_COURSE_ID, and honors an explicit one", async () => {
+    await call("/api/grades/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer ingest-secret" },
+      body: JSON.stringify([
+        rows[0], // no course_id → ds-2026 (back-compat)
+        { ...rows[0], course_id: "ds-2027", problem_id: "lab09-x" }, // explicit
+      ]),
+    });
+    const got = await env.DB
+      .prepare("SELECT course_id, problem_id FROM grades WHERE student_id='314561004' ORDER BY course_id")
+      .all<{ course_id: string; problem_id: string }>();
+    expect(got.results).toEqual([
+      { course_id: "ds-2026", problem_id: "lab01-stack" },
+      { course_id: "ds-2027", problem_id: "lab09-x" },
+    ]);
+  });
+
   it("ignores extra fields (no test data ever stored)", async () => {
     await call("/api/grades/ingest", {
       method: "POST",
@@ -507,7 +526,7 @@ describe("/api/grades/ingest", () => {
     });
     const cols = await env.DB.prepare("SELECT * FROM grades LIMIT 1").first();
     expect(Object.keys(cols ?? {})).toEqual([
-      "student_id", "problem_id", "verdict", "score", "max_score", "updated_at",
+      "course_id", "student_id", "problem_id", "verdict", "score", "max_score", "updated_at",
     ]);
   });
 });
@@ -541,13 +560,13 @@ describe("/api/grades (token-auth pull for 程式作業自動批改)", () => {
   beforeEach(async () => {
     await env.DB.batch([
       env.DB.prepare(
-        "INSERT INTO grades (student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('AT9336','lab01-stack','AC',100,100,'t1')",
+        "INSERT INTO grades (course_id, student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('ds-2026','AT9336','lab01-stack','AC',100,100,'t1')",
       ),
       env.DB.prepare(
-        "INSERT INTO grades (student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('B002','lab01-stack','WA',30,100,'t2')",
+        "INSERT INTO grades (course_id, student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('ds-2026','B002','lab01-stack','WA',30,100,'t2')",
       ),
       env.DB.prepare(
-        "INSERT INTO grades (student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('AT9336','lab02-queue','TLE',0,100,'t3')",
+        "INSERT INTO grades (course_id, student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('ds-2026','AT9336','lab02-queue','TLE',0,100,'t3')",
       ),
     ]);
   });

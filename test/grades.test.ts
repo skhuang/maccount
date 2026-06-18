@@ -10,6 +10,7 @@ beforeEach(async () => {
 });
 
 const g = (over = {}) => ({
+  course_id: "ds-2026",
   student_id: "314561004",
   problem_id: "lab01-stack",
   verdict: "AC",
@@ -44,5 +45,15 @@ describe("grades db", () => {
     await upsertGrades(env.DB, [g(), g({ student_id: "999999999" })]);
     expect(await listGradesFor(env.DB, "314561004")).toHaveLength(1);
     expect(await listGradesFor(env.DB, "000000000")).toHaveLength(0);
+  });
+
+  it("the same (student,problem) in two courses stays distinct (course_id in PK)", async () => {
+    await upsertGrades(env.DB, [g({ course_id: "ds-2026" }), g({ course_id: "ds-2027", score: 40 })]);
+    const rows = await listGradesFor(env.DB, "314561004");
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => [r.course_id, r.score])).toEqual([
+      ["ds-2026", 100],
+      ["ds-2027", 40],
+    ]);
   });
 });
