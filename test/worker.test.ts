@@ -419,6 +419,46 @@ describe("staff/TA management", () => {
   });
 });
 
+describe("exam list on /me + /me/exam/<id>", () => {
+  const sess = () => signSession({ exp: Date.now() + 60000, nycu: { id: "S9", name: "生" } }, SECRET);
+  const ins = (pid: string, type: string, aid: string, title: string, repo: string, score: string) =>
+    env.DB.prepare(
+      "INSERT INTO grades (course_id, student_id, problem_id, verdict, score, max_score, updated_at, repo, assignment_id, assignment_type, assignment_title) VALUES ('ds-2026','S9',?,?,?,100,'t',?,?,?,?)",
+    ).bind(pid, score ? "AC" : null, score || null, repo, aid, type, title).run();
+
+  it("/me lists exams (link to /me/exam/<id>) and keeps labs flat", async () => {
+    await ins("lab01-stack", "lab", "ds2026-lab01", "Lab 1", "org/lab01-stack-S9", "100");
+    await ins("mid-p1", "exam", "mid", "期中考", "org/mid-p1-S9", "");   // not solved yet
+    const body = await (await call("/me", { headers: cookie(await sess()) })).text();
+    expect(body).toContain('href="/me/exam/mid"'); // exam → list link
+    expect(body).toContain("期中考");
+    expect(body).toContain("lab01-stack ↗");        // lab → flat row with repo link
+    expect(body).not.toContain('href="/me/exam/ds2026-lab01"'); // lab is NOT in the exam list
+  });
+
+  it("/me/exam/<id> shows the exam's problems with repo links (own rows only)", async () => {
+    await ins("mid-p1", "exam", "mid", "期中考", "org/mid-p1-S9", "");
+    await ins("mid-p2", "exam", "mid", "期中考", "org/mid-p2-S9", "40");
+    const res = await call("/me/exam/mid", { headers: cookie(await sess()) });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("期中考");
+    expect(body).toContain('href="https://github.com/org/mid-p1-S9"'); // 去解題
+    expect(body).toContain('href="https://github.com/org/mid-p2-S9"');
+    expect(body).toContain("去解題");
+  });
+
+  it("/me/exam/<id> with no rows for this student → 404", async () => {
+    const res = await call("/me/exam/nonexistent", { headers: cookie(await sess()) });
+    expect(res.status).toBe(404);
+  });
+
+  it("/me/exam/<id> requires login", async () => {
+    const res = await call("/me/exam/mid");
+    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
+  });
+});
+
 describe("binding queries (總表 + by GitHub org)", () => {
   const owner = () => signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "A" } }, SECRET);
   const bind = (nycu: string, login: string) =>
@@ -779,7 +819,27 @@ describe("/api/grades/ingest", () => {
     const cols = await env.DB.prepare("SELECT * FROM grades LIMIT 1").first();
     expect(Object.keys(cols ?? {})).toEqual([
       "course_id", "student_id", "problem_id", "verdict", "score", "max_score", "updated_at", "repo",
+      "assignment_id", "assignment_type", "assignment_title",
     ]);
+  });
+
+  it("repo-only provisioning row keeps score null; a later grade fills it (COALESCE)", async () => {
+    const ingest = (b: unknown) =>
+      call("/api/grades/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer ingest-secret" },
+        body: JSON.stringify(b),
+      });
+    // provision push: repo + assignment, no score
+    await ingest([{ course_id: "ds-2026", student_id: "S1", problem_id: "p1",
+      repo: "org/p1-S1", assignment_id: "mid", assignment_type: "exam", assignment_title: "期中考", updated_at: "t1" }]);
+    let row = await env.DB.prepare("SELECT score, repo, assignment_type FROM grades WHERE student_id='S1'").first<{ score: number | null; repo: string; assignment_type: string }>();
+    expect(row?.score).toBe(null); // not 0 → /me shows "go solve"
+    expect(row?.repo).toBe("org/p1-S1");
+    // later grade push: score, no assignment_title → title preserved (COALESCE)
+    await ingest([{ course_id: "ds-2026", student_id: "S1", problem_id: "p1", verdict: "AC", score: 90, max_score: 100, updated_at: "t2" }]);
+    row = await env.DB.prepare("SELECT score, assignment_title FROM grades WHERE student_id='S1'").first();
+    expect(row).toMatchObject({ score: 90, assignment_title: "期中考" });
   });
 
   it("stores the repo and /me links it; absent repo → no link", async () => {
