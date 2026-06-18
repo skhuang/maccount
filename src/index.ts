@@ -22,7 +22,9 @@ import {
   orgBindingView,
   GithubConflictError,
 } from "./db/bindings";
-import { upsertGrades, listGradesFor, listGradesForProblem, GradeInput } from "./db/grades";
+import {
+  upsertGrades, listGradesFor, listGradesForProblem, listGradesForStudentAssignment, GradeInput,
+} from "./db/grades";
 import {
   listStaff, addStaff, removeStaff, isStaffAnywhere, isStaffMember, coursesForStaff,
 } from "./db/staff";
@@ -32,7 +34,7 @@ import {
   coursesForStudent,
 } from "./db/enrollments";
 import { toCsv, toRosterCsv } from "./csv";
-import { adminPage, adminHomePage, bindingsPage, orgMembersPage, dashboardPage } from "./html";
+import { adminPage, adminHomePage, bindingsPage, orgMembersPage, dashboardPage, examPage } from "./html";
 import { pickLang, langCookie } from "./i18n";
 
 const TTL_MS = 15 * 60 * 1000;
@@ -48,6 +50,8 @@ export default {
       if (p === "/auth/github/callback") return await githubCallback(req, env, url);
       if (p === "/logout") return logout(env);
       if (p === "/me" && req.method === "GET") return await mePage(req, env, url);
+      const em = p.match(/^\/me\/exam\/([A-Za-z0-9._-]+)$/);
+      if (em && req.method === "GET") return await meExam(req, env, url, em[1]);
       if (p === "/api/grades/ingest" && req.method === "POST")
         return await gradesIngest(req, env);
       if (p === "/api/roster" && req.method === "GET") return await apiRoster(req, env);
@@ -258,6 +262,19 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
   });
 }
 
+// GET /me/exam/<assignment_id> — the student's own view of one exam: its coding
+// problems with repo ("去解題") links + scores. Only the logged-in student's rows.
+async function meExam(req: Request, env: Env, url: URL, assignmentId: string): Promise<Response> {
+  const s = await requireLogin(req, env);
+  if (s instanceof Response) return s;
+  const lang = pickLang(url, req.headers.get("Cookie"));
+  const rows = await listGradesForStudentAssignment(env.DB, s.nycu!.id, assignmentId);
+  if (rows.length === 0) return new Response("Not found", { status: 404 });
+  return new Response(examPage(lang, assignmentId, rows), {
+    headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
+  });
+}
+
 // ── grades ingest (trusted OJ runner → D1) ────────────────────────────────
 // Constant-time token compare (length leak on a random token is acceptable).
 function safeEqual(a: string, b: string): boolean {
@@ -323,11 +340,16 @@ async function gradesIngest(req: Request, env: Env): Promise<Response> {
       problem_id: x.problem_id,
       // The student's own repo for this problem (not test data) — link target.
       repo: typeof x.repo === "string" && x.repo ? x.repo : null,
-      // score + verdict ONLY — any other fields in the payload are ignored.
-      verdict: String(x.verdict ?? ""),
-      score: Number(x.score ?? 0),
-      max_score: Number(x.max_score ?? 0),
+      // score + verdict ONLY of the grade fields. They're NULL for a repo-only
+      // provisioning row (before solving) so /me shows "go solve", not 0.
+      verdict: typeof x.verdict === "string" && x.verdict ? x.verdict : null,
+      score: x.score == null || x.score === "" ? null : Number(x.score),
+      max_score: x.max_score == null || x.max_score === "" ? null : Number(x.max_score),
       updated_at: String(x.updated_at ?? new Date(Date.now()).toISOString()),
+      // Assignment grouping (provisioning sends these); lets /me list exams.
+      assignment_id: typeof x.assignment_id === "string" && x.assignment_id ? x.assignment_id : null,
+      assignment_type: x.assignment_type === "exam" ? "exam" : x.assignment_type === "lab" ? "lab" : null,
+      assignment_title: typeof x.assignment_title === "string" && x.assignment_title ? x.assignment_title : null,
     });
   }
   const upserted = await upsertGrades(env.DB, rows);

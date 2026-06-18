@@ -59,6 +59,10 @@ export interface Strings {
   org_unbound_heading: string;
   org_unbound_note: string;
   org_fetch_error: string;
+  exam_list_heading: string;
+  exam_go_solve: string;
+  exam_no_repo: string;
+  exam_intro: string;
   course_settings: string;
   course_status: string;
   course_save: string;
@@ -131,6 +135,10 @@ export const T: Record<Lang, Strings> = {
     org_unbound_heading: "已在 org、未在 maccount 綁定",
     org_unbound_note: "這些 GitHub 帳號在 org 內，但沒有對應的 maccount 綁定（請其到 /me 綁定學號）。",
     org_fetch_error: "讀取 org 成員失敗",
+    exam_list_heading: "考試",
+    exam_go_solve: "去解題",
+    exam_no_repo: "repo 尚未建立",
+    exam_intro: "點各題的「去解題」開啟你的 repo，clone 後 git push 即由 OJ 評分；概念題在 Moodle 測驗作答。",
     course_settings: "課程設定",
     course_status: "狀態",
     course_save: "儲存課程設定",
@@ -203,6 +211,10 @@ export const T: Record<Lang, Strings> = {
     org_unbound_heading: "In the org, not bound on maccount",
     org_unbound_note: "These GitHub accounts are in the org but have no maccount binding (ask them to bind at /me).",
     org_fetch_error: "failed to read org members",
+    exam_list_heading: "Exams",
+    exam_go_solve: "go solve",
+    exam_no_repo: "repo not created yet",
+    exam_intro: "Open your repo via each problem's “go solve”, clone, and git push — the OJ grades it; concept questions are in the Moodle quiz.",
     course_settings: "Course settings",
     course_status: "Status",
     course_save: "Save course settings",

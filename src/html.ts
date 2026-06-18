@@ -13,6 +13,13 @@ function htmlLang(lang: Lang): string {
   return lang === "en" ? "en" : "zh-Hant";
 }
 
+// The student's repo link for a problem: a bare owner/name → github.com; a full
+// http(s) URL (e.g. a Gitea exam repo) is used as-is. null when no repo yet.
+function repoHref(repo: string | null | undefined): string | null {
+  if (!repo) return null;
+  return /^https?:\/\//.test(repo) ? repo : `https://github.com/${repo}`;
+}
+
 // Render a stored updated_at (epoch seconds/ms, or an ISO string) as a readable
 // Asia/Taipei timestamp "YYYY/MM/DD HH:MM". Falls back to the raw value.
 export function fmtTime(raw: string | null | undefined): string {
@@ -338,9 +345,8 @@ export function dashboardPage(
   // owner/name → github.com; a full http(s) URL is used as-is.
   const problemCell = (g: GradeRow) => {
     const pid = h(g.problem_id);
-    if (!g.repo) return pid;
-    const url = /^https?:\/\//.test(g.repo) ? g.repo : `https://github.com/${g.repo}`;
-    return `<a href="${h(url)}" target="_blank" rel="noopener">${pid} ↗</a>`;
+    const url = repoHref(g.repo);
+    return url ? `<a href="${h(url)}" target="_blank" rel="noopener">${pid} ↗</a>` : pid;
   };
   const renderRows = (rs: GradeRow[]) =>
     rs
@@ -367,11 +373,29 @@ export function dashboardPage(
 ${renderRows(rs)}
 </tbody></table>`;
 
+  // Within a course: labs (and untyped) shown flat; exams grouped into an exam
+  // list the student enters at /me/exam/<assignment_id>.
+  const courseBlock = (rs: GradeRow[]) => {
+    const labRows = rs.filter((g) => g.assignment_type !== "exam");
+    const exams = new Map<string, string>(); // assignment_id -> title
+    for (const g of rs) {
+      if (g.assignment_type === "exam" && g.assignment_id) {
+        exams.set(g.assignment_id, g.assignment_title || g.assignment_id);
+      }
+    }
+    const examList = exams.size
+      ? `<p style="margin:.3rem 0 .2rem;font-weight:600">${t.exam_list_heading}</p>
+<ul>${[...exams].map(([aid, title]) =>
+          `<li><a href="/me/exam/${encodeURIComponent(aid)}">${h(title)} ↗</a></li>`).join("")}</ul>`
+      : "";
+    return `${labRows.length ? courseTable(labRows) : ""}${examList}`;
+  };
+
   const table = grades.length
     ? byCourse
         .map(
           (grp) => `<h3 style="margin:1rem 0 .3rem">${h(courseNames[grp.cid] || grp.cid)}</h3>
-${courseTable(grp.rows)}`,
+${courseBlock(grp.rows)}`,
         )
         .join("\n")
     : `<p style="color:#666">${t.no_grades}</p>`;
@@ -409,5 +433,38 @@ ${orgHtml}
 ${table}
 <p style="color:#888;font-size:.9em">${t.privacy_note}</p>
 ${adminHtml}
+</body></html>`;
+}
+
+// One exam, the logged-in student's view: each coding problem with its repo
+// ("去解題") link + score. Reached from /me's exam list.
+export function examPage(lang: Lang, assignmentId: string, rows: GradeRow[]): string {
+  const t = T[lang];
+  const title = rows.find((r) => r.assignment_title)?.assignment_title || assignmentId;
+  const trs = rows
+    .map((g) => {
+      const url = repoHref(g.repo);
+      const repoCell = url
+        ? `<a href="${h(url)}" target="_blank" rel="noopener">${t.exam_go_solve} ↗</a>`
+        : `<span style="color:#999">${t.exam_no_repo}</span>`;
+      return `<tr><td>${h(g.problem_id)}</td><td>${repoCell}</td>
+  <td>${h(g.verdict ?? "-")}</td>
+  <td>${g.score == null ? "-" : h(g.score)} / ${g.max_score == null ? "-" : h(g.max_score)}</td></tr>`;
+    })
+    .join("\n");
+  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${h(title)}</title>
+<body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
+${langToggle(`/me/exam/${encodeURIComponent(assignmentId)}`, lang)}
+<p style="font-size:.9em"><a href="/me">← ${t.acct_heading}</a></p>
+<h1>${h(title)}</h1>
+<p style="color:#888;font-size:.9em">${t.exam_intro}</p>
+<table border="1" cellpadding="6" cellspacing="0">
+<thead><tr><th>${t.col_problem}</th><th>repo</th><th>${t.col_result}</th><th>${t.col_score}</th></tr></thead>
+<tbody>
+${trs}
+</tbody></table>
+<p style="color:#888;font-size:.9em">${t.privacy_note}</p>
 </body></html>`;
 }
