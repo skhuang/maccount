@@ -21,7 +21,7 @@ import {
   GithubConflictError,
 } from "./db/bindings";
 import { upsertGrades, listGradesFor, listGradesForProblem, GradeInput } from "./db/grades";
-import { listStaff, addStaff, removeStaff, isStaffMember } from "./db/staff";
+import { listStaff, addStaff, removeStaff, isStaffAnywhere } from "./db/staff";
 import { toCsv, toRosterCsv } from "./csv";
 import { adminPage, dashboardPage } from "./html";
 import { pickLang, langCookie } from "./i18n";
@@ -206,8 +206,8 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
   const orgJoinUrl = env.COURSE_ORG
     ? `https://github.com/orgs/${env.COURSE_ORG}/invitation`
     : "";
-  // Show the admin link to owners AND staff-table members.
-  const staff = isAdmin(env, studentId) || (await isStaffMember(env.DB, studentId));
+  // Show the admin link to owners AND staff-table members (of any course).
+  const staff = isAdmin(env, studentId) || (await isStaffAnywhere(env.DB, studentId));
   const html = dashboardPage(lang, s.nycu!, binding, grades, staff, flash, orgJoinUrl);
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
@@ -272,6 +272,9 @@ async function gradesIngest(req: Request, env: Env): Promise<Response> {
     if (!x || typeof x.student_id !== "string" || typeof x.problem_id !== "string") continue;
     if (!x.student_id || !x.problem_id) continue;
     rows.push({
+      // Course-offering tag; dsjudge sends it from Phase 2. Until then, rows
+      // without one fall back to the default course (back-compat).
+      course_id: (typeof x.course_id === "string" && x.course_id) || defaultCourse(env),
       student_id: x.student_id,
       problem_id: x.problem_id,
       // score + verdict ONLY — any other fields in the payload are ignored.
@@ -301,7 +304,7 @@ async function requireAdmin(req: Request, env: Env): Promise<SessionData | Respo
 async function requireStaff(req: Request, env: Env): Promise<SessionData | Response> {
   const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
   if (!session || !session.nycu) return redirect("/auth/nycu/start");
-  if (!isAdmin(env, session.nycu.id) && !(await isStaffMember(env.DB, session.nycu.id))) {
+  if (!isAdmin(env, session.nycu.id) && !(await isStaffAnywhere(env.DB, session.nycu.id))) {
     return new Response("Not authorized", { status: 403 });
   }
   return session;
@@ -312,7 +315,7 @@ async function adminList(req: Request, env: Env, url: URL): Promise<Response> {
   if (s instanceof Response) return s;
   const isOwner = isAdmin(env, s.nycu!.id); // owner controls (delete, manage staff)
   const lang = pickLang(url, req.headers.get("Cookie"));
-  const [rows, staff] = await Promise.all([listBindings(env.DB), listStaff(env.DB)]);
+  const [rows, staff] = await Promise.all([listBindings(env.DB), listStaff(env.DB, defaultCourse(env))]);
   const staffMsg = url.searchParams.get("staff_msg") ?? "";
   return new Response(adminPage(lang, rows, { isOwner, staff, staffMsg }), {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
@@ -352,6 +355,12 @@ async function adminDelete(req: Request, env: Env): Promise<Response> {
   return redirect("/admin");
 }
 
+// Course-offering used by the not-yet-course-scoped routes (Phase 1a). Phase 1b
+// replaces this with /c/<course_id>/ routing.
+function defaultCourse(env: Env): string {
+  return env.DEFAULT_COURSE_ID || "ds-2026";
+}
+
 // Sync a staff member to the GitHub org + staff team (scope: team+org).
 // Best-effort, never throws. Returns a short status code for the /admin flash:
 // "" (no GitHub sync configured), "ok", "no-binding" (TA hasn't bound GitHub),
@@ -388,7 +397,7 @@ async function staffAdd(req: Request, env: Env): Promise<Response> {
   const form = await req.formData();
   const id = String(form.get("nycu_id") ?? "").trim();
   if (!id) return redirect("/admin");
-  await addStaff(env.DB, id, s.nycu!.id, new Date(Date.now()).toISOString());
+  await addStaff(env.DB, defaultCourse(env), id, s.nycu!.id, new Date(Date.now()).toISOString());
   return adminRedirect(await syncStaffToGitHub(env, id, true));
 }
 
@@ -398,6 +407,6 @@ async function staffRemove(req: Request, env: Env): Promise<Response> {
   const form = await req.formData();
   const id = String(form.get("nycu_id") ?? "").trim();
   if (!id) return redirect("/admin");
-  await removeStaff(env.DB, id);
+  await removeStaff(env.DB, defaultCourse(env), id);
   return adminRedirect(await syncStaffToGitHub(env, id, false));
 }

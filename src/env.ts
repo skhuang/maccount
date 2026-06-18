@@ -29,6 +29,10 @@ export interface Env {
   // (with COURSE_ORG + ORG_INVITE_TOKEN), adding/removing a staff member in
   // /admin also syncs them to this org team (+ org). wrangler.toml [vars].
   STAFF_TEAM: string;
+  // Default course-offering id used for back-compat until routes/ingest are
+  // fully course-scoped (Phase 1b/2): the non-course-scoped /admin and grade
+  // ingests without an explicit course_id fall back to this. wrangler.toml [vars].
+  DEFAULT_COURSE_ID: string;
 }
 
 export function nycuConfig(env: Env): NycuConfig {

@@ -21,3 +21,6 @@ ADMIN_IDS = ""
 COURSE_ORG = "nycu-cs-course-ds"
 # Org team slug for TA/staff; must match dsjudge's OJ_PROVISION_TEAM.
 STAFF_TEAM = "staff"
+# Default course-offering id for back-compat (non-course-scoped /admin + grade
+# ingests without an explicit course_id fall back to this). Code default: ds-2026.
+DEFAULT_COURSE_ID = "ds-2026"
