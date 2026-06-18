@@ -27,6 +27,7 @@ import {
 import { listCourses, getCourse, upsertCourse } from "./db/courses";
 import {
   bulkEnroll, replaceEnrollments, enrollmentCount, listEnrolledWithBinding, listEnrollments,
+  coursesForStudent,
 } from "./db/enrollments";
 import { toCsv, toRosterCsv } from "./csv";
 import { adminPage, adminHomePage, dashboardPage } from "./html";
@@ -162,16 +163,18 @@ async function githubCallback(req: Request, env: Env, url: URL): Promise<Respons
     if (e instanceof GithubConflictError) return redirect("/me?error=github_already_bound");
     throw e;
   }
-  // Best-effort: invite the student to the course org right after binding, so the
-  // /me "join org" link is immediately actionable. A failure must NOT affect the
-  // binding (the dsjudge invite_org backfill covers any miss).
-  if (env.COURSE_ORG && env.ORG_INVITE_TOKEN) {
-    try {
-      const m = await inviteOrgMember(env.COURSE_ORG, gh.login, env.ORG_INVITE_TOKEN);
-      // Visible in `wrangler tail`: state is "pending" (invite sent) or "active".
-      console.log(`org invite: ${gh.login} -> ${m.state ?? "?"} (${env.COURSE_ORG})`);
-    } catch (e) {
-      console.error("org invite failed:", (e as Error).message);
+  // Best-effort: invite the student to the GitHub org(s) of the courses they're
+  // enrolled in (deduped effective orgs; falls back to the shared COURSE_ORG when
+  // not yet enrolled), so the /me "join org" link is immediately actionable. A
+  // failure must NOT affect the binding (dsjudge invite_org backfills any miss).
+  if (env.ORG_INVITE_TOKEN) {
+    for (const org of await studentOrgs(env, session.nycu.id)) {
+      try {
+        const m = await inviteOrgMember(org, gh.login, env.ORG_INVITE_TOKEN);
+        console.log(`org invite: ${gh.login} -> ${m.state ?? "?"} (${org})`);
+      } catch (e) {
+        console.error(`org invite failed (${org}):`, (e as Error).message);
+      }
     }
   }
   // Stay logged in; back to the dashboard with a success flash.
@@ -187,6 +190,30 @@ function logout(_env: Env): Response {
   // user straight back in, defeating "switch account". (GitHub-account switching
   // still needs an incognito window; GitHub OAuth has no reliable re-prompt.)
   return redirect("/auth/nycu/start?prompt=login", clearCookie());
+}
+
+// A course's effective GitHub org: its own github_org, else the shared
+// COURSE_ORG (model A + per-course override — see github-org-model).
+function effectiveOrg(env: Env, course: { github_org?: string | null }): string {
+  return (course.github_org ?? "").trim() || env.COURSE_ORG;
+}
+
+// The deduped GitHub orgs a student must belong to: the effective org of each
+// course they're enrolled in. Falls back to the shared COURSE_ORG when the
+// student has no enrollment yet (pre-Phase-3 sync), so the join link still shows.
+async function studentOrgs(env: Env, studentId: string): Promise<string[]> {
+  const ids = new Set(await coursesForStudent(env.DB, studentId));
+  const orgs = new Set<string>();
+  if (ids.size) {
+    for (const c of await listCourses(env.DB)) {
+      if (ids.has(c.course_id)) {
+        const o = effectiveOrg(env, c);
+        if (o) orgs.add(o);
+      }
+    }
+  }
+  if (orgs.size === 0 && env.COURSE_ORG) orgs.add(env.COURSE_ORG);
+  return [...orgs];
 }
 
 // ── dashboard (/me) ───────────────────────────────────────────────────────
@@ -212,12 +239,15 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
     bound: url.searchParams.get("bound") === "1",
     error: url.searchParams.get("error"),
   };
-  const orgJoinUrl = env.COURSE_ORG
-    ? `https://github.com/orgs/${env.COURSE_ORG}/invitation`
-    : "";
+  // Join link(s) for the org(s) of the student's enrolled courses (deduped;
+  // falls back to the shared COURSE_ORG when not yet enrolled).
+  const orgJoins = (await studentOrgs(env, studentId)).map((org) => ({
+    org,
+    url: `https://github.com/orgs/${org}/invitation`,
+  }));
   // Show the admin link to owners AND staff-table members (of any course).
   const staff = isAdmin(env, studentId) || (await isStaffAnywhere(env.DB, studentId));
-  const html = dashboardPage(lang, s.nycu!, binding, grades, staff, flash, orgJoinUrl, courseNames);
+  const html = dashboardPage(lang, s.nycu!, binding, grades, staff, flash, orgJoins, courseNames);
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
   });
