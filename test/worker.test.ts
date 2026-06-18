@@ -778,8 +778,23 @@ describe("/api/grades/ingest", () => {
     });
     const cols = await env.DB.prepare("SELECT * FROM grades LIMIT 1").first();
     expect(Object.keys(cols ?? {})).toEqual([
-      "course_id", "student_id", "problem_id", "verdict", "score", "max_score", "updated_at",
+      "course_id", "student_id", "problem_id", "verdict", "score", "max_score", "updated_at", "repo",
     ]);
+  });
+
+  it("stores the repo and /me links it; absent repo → no link", async () => {
+    await call("/api/grades/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer ingest-secret" },
+      body: JSON.stringify([
+        { ...rows[0], student_id: "admin1", repo: "nycu-cs-course-ds/lab01-stack-skhuang" },
+      ]),
+    });
+    const row = await env.DB.prepare("SELECT repo FROM grades WHERE student_id='admin1'").first<{ repo: string }>();
+    expect(row?.repo).toBe("nycu-cs-course-ds/lab01-stack-skhuang");
+    const session = await signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "A" } }, SECRET);
+    const body = await (await call("/me", { headers: cookie(session) })).text();
+    expect(body).toContain('href="https://github.com/nycu-cs-course-ds/lab01-stack-skhuang"');
   });
 });
 

@@ -12,6 +12,7 @@ export interface GradeRow {
   score: number | null;
   max_score: number | null;
   updated_at: string;
+  repo: string | null; // student's repo full_name for this problem (or null)
 }
 
 export interface GradeInput {
@@ -22,19 +23,20 @@ export interface GradeInput {
   score: number;
   max_score: number;
   updated_at: string;
+  repo?: string | null;
 }
 
 // Upsert a batch keyed by (course_id, student_id, problem_id). Returns count written.
 export async function upsertGrades(db: D1Database, rows: GradeInput[]): Promise<number> {
   if (rows.length === 0) return 0;
   const stmt = db.prepare(
-    `INSERT INTO grades (course_id, student_id, problem_id, verdict, score, max_score, updated_at)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+    `INSERT INTO grades (course_id, student_id, problem_id, verdict, score, max_score, updated_at, repo)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
      ON CONFLICT(course_id, student_id, problem_id) DO UPDATE SET
-       verdict = ?4, score = ?5, max_score = ?6, updated_at = ?7`,
+       verdict = ?4, score = ?5, max_score = ?6, updated_at = ?7, repo = ?8`,
   );
   const batch = rows.map((r) =>
-    stmt.bind(r.course_id, r.student_id, r.problem_id, r.verdict, r.score, r.max_score, r.updated_at),
+    stmt.bind(r.course_id, r.student_id, r.problem_id, r.verdict, r.score, r.max_score, r.updated_at, r.repo ?? null),
   );
   await db.batch(batch);
   return batch.length;
@@ -45,7 +47,7 @@ export async function upsertGrades(db: D1Database, rows: GradeInput[]): Promise<
 export async function listGradesFor(db: D1Database, student_id: string): Promise<GradeRow[]> {
   const { results } = await db
     .prepare(
-      `SELECT course_id, student_id, problem_id, verdict, score, max_score, updated_at
+      `SELECT course_id, student_id, problem_id, verdict, score, max_score, updated_at, repo
        FROM grades WHERE student_id = ? ORDER BY course_id, problem_id`,
     )
     .bind(student_id)
@@ -59,9 +61,9 @@ export async function listGradesForProblem(
   db: D1Database, problem_id: string, course_id?: string,
 ): Promise<GradeRow[]> {
   const sql = course_id
-    ? `SELECT course_id, student_id, problem_id, verdict, score, max_score, updated_at
+    ? `SELECT course_id, student_id, problem_id, verdict, score, max_score, updated_at, repo
        FROM grades WHERE problem_id = ? AND course_id = ? ORDER BY student_id`
-    : `SELECT course_id, student_id, problem_id, verdict, score, max_score, updated_at
+    : `SELECT course_id, student_id, problem_id, verdict, score, max_score, updated_at, repo
        FROM grades WHERE problem_id = ? ORDER BY student_id`;
   const stmt = course_id
     ? db.prepare(sql).bind(problem_id, course_id)

@@ -334,11 +334,19 @@ export function dashboardPage(
     ? `${t.bound} <b>${h(binding.github_login)}</b> — <a href="/auth/github/start">${t.rebind}</a>`
     : `<span style="color:#b00">${t.not_bound}</span> — <a href="/auth/github/start"><b>${t.bind_action}</b></a>`;
 
+  // The student's own repo for the problem; link to it when present. A bare
+  // owner/name → github.com; a full http(s) URL is used as-is.
+  const problemCell = (g: GradeRow) => {
+    const pid = h(g.problem_id);
+    if (!g.repo) return pid;
+    const url = /^https?:\/\//.test(g.repo) ? g.repo : `https://github.com/${g.repo}`;
+    return `<a href="${h(url)}" target="_blank" rel="noopener">${pid} ↗</a>`;
+  };
   const renderRows = (rs: GradeRow[]) =>
     rs
       .map(
         (g) => `<tr>
-  <td>${h(g.problem_id)}</td>
+  <td>${problemCell(g)}</td>
   <td>${h(g.verdict ?? "-")}</td>
   <td>${g.score == null ? "-" : h(g.score)} / ${g.max_score == null ? "-" : h(g.max_score)}</td>
   <td>${h(fmtTime(g.updated_at))}</td>

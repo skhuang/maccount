@@ -321,6 +321,8 @@ async function gradesIngest(req: Request, env: Env): Promise<Response> {
       course_id: (typeof x.course_id === "string" && x.course_id) || defaultCourse(env),
       student_id: x.student_id,
       problem_id: x.problem_id,
+      // The student's own repo for this problem (not test data) — link target.
+      repo: typeof x.repo === "string" && x.repo ? x.repo : null,
       // score + verdict ONLY — any other fields in the payload are ignored.
       verdict: String(x.verdict ?? ""),
       score: Number(x.score ?? 0),
