@@ -192,38 +192,41 @@ describe("/admin auth gate", () => {
     expect(res.headers.get("Location")).toBe("/auth/nycu/start");
   });
 
-  it("serves the list to an admin session", async () => {
+  it("serves the course picker to an admin session", async () => {
     const session = await signSession(
       { exp: Date.now() + 60000, nycu: { id: "admin1", name: "Admin" } },
       SECRET,
     );
     const res = await call("/admin", { headers: cookie(session) });
     expect(res.status).toBe(200);
-    expect(await res.text()).toContain("綁定名單");
+    const body = await res.text();
+    expect(body).toContain('href="/c/ds-2026/admin"'); // seeded course
+    expect(body).toContain('action="/admin/courses"'); // owner create form
   });
 
-  it("exports CSV to an admin session", async () => {
+  it("exports a course's CSV to an admin session", async () => {
     const session = await signSession(
       { exp: Date.now() + 60000, nycu: { id: "admin1", name: "Admin" } },
       SECRET,
     );
-    const res = await call("/admin/export.csv", { headers: cookie(session) });
+    const res = await call("/c/ds-2026/admin/export.csv", { headers: cookie(session) });
     expect(res.headers.get("Content-Type")).toContain("text/csv");
+    expect(res.headers.get("Content-Disposition")).toContain("bindings-ds-2026.csv");
     expect(await res.text()).toContain("nycu_id,nycu_name");
   });
 
   it("denies CSV export to an anonymous request", async () => {
-    const res = await call("/admin/export.csv");
+    const res = await call("/c/ds-2026/admin/export.csv");
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("/auth/nycu/start");
   });
 
-  it("forbids CSV export to a logged-in non-admin (403)", async () => {
+  it("forbids CSV export to a logged-in non-staff (403)", async () => {
     const session = await signSession(
       { exp: Date.now() + 60000, nycu: { id: "0856001", name: "王" } },
       SECRET,
     );
-    const res = await call("/admin/export.csv", { headers: cookie(session) });
+    const res = await call("/c/ds-2026/admin/export.csv", { headers: cookie(session) });
     expect(res.status).toBe(403);
   });
 
@@ -232,7 +235,7 @@ describe("/admin auth gate", () => {
       "INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, created_at, updated_at) VALUES ('0856001','王',1,'octo','t','t')",
     ).run();
     const body = new URLSearchParams({ nycu_id: "0856001" });
-    const res = await call("/admin/delete", {
+    const res = await call("/c/ds-2026/admin/delete", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: body.toString(),
@@ -247,14 +250,29 @@ describe("staff/TA management", () => {
   const staffSession = () =>
     signSession({ exp: Date.now() + 60000, nycu: { id: "ta01", name: "助教" } }, SECRET);
 
-  it("a staff-table member can view /admin (read-only: no delete / no manage-staff)", async () => {
+  it("a staff member sees /admin as a picker listing only their course", async () => {
     await env.DB.prepare("INSERT INTO staff (course_id, nycu_id, added_by, added_at) VALUES ('ds-2026','ta01','admin1','t')").run();
     const res = await call("/admin", { headers: cookie(await staffSession()) });
     expect(res.status).toBe(200);
     const body = await res.text();
+    expect(body).toContain('href="/c/ds-2026/admin"'); // link into their course
+    expect(body).not.toContain('action="/admin/courses"'); // owner-only create form
+  });
+
+  it("a staff member can view their course admin read-only (no delete / no manage-staff)", async () => {
+    await env.DB.prepare("INSERT INTO staff (course_id, nycu_id, added_by, added_at) VALUES ('ds-2026','ta01','admin1','t')").run();
+    const res = await call("/c/ds-2026/admin", { headers: cookie(await staffSession()) });
+    expect(res.status).toBe(200);
+    const body = await res.text();
     expect(body).toContain("綁定名單");
-    expect(body).not.toContain('action="/admin/delete"');     // owner-only
-    expect(body).not.toContain('action="/admin/staff/add"');  // owner-only
+    expect(body).not.toContain('action="/c/ds-2026/admin/delete"');     // owner-only
+    expect(body).not.toContain('action="/c/ds-2026/admin/staff/add"');  // owner-only
+  });
+
+  it("a TA of a different course is denied this course's admin (403)", async () => {
+    await env.DB.prepare("INSERT INTO staff (course_id, nycu_id, added_by, added_at) VALUES ('ds-2027','ta01','admin1','t')").run();
+    const res = await call("/c/ds-2026/admin", { headers: cookie(await staffSession()) });
+    expect(res.status).toBe(403);
   });
 
   it("a logged-in non-staff non-owner is denied /admin (403)", async () => {
@@ -262,21 +280,44 @@ describe("staff/TA management", () => {
     expect(res.status).toBe(403);
   });
 
-  it("owner can add a staff member", async () => {
+  it("owner can add a staff member to a course", async () => {
     const owner = await signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "A" } }, SECRET);
-    const res = await call("/admin/staff/add", {
+    const res = await call("/c/ds-2026/admin/staff/add", {
       method: "POST",
       headers: { ...cookie(owner), "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ nycu_id: "ta01" }).toString(),
     });
     expect(res.status).toBe(302);
-    const { results } = await env.DB.prepare("SELECT nycu_id FROM staff").all();
-    expect(results.map((r) => r.nycu_id)).toContain("ta01");
+    const row = await env.DB.prepare("SELECT course_id FROM staff WHERE nycu_id='ta01'").first<{ course_id: string }>();
+    expect(row?.course_id).toBe("ds-2026"); // written under the path's course
+  });
+
+  it("owner can create a course (POST /admin/courses)", async () => {
+    const owner = await signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "A" } }, SECRET);
+    const res = await call("/admin/courses", {
+      method: "POST",
+      headers: { ...cookie(owner), "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ course_id: "swtest-2026", name: "軟體測試 2026", moodle_course_id: "12345" }).toString(),
+    });
+    expect(res.status).toBe(302);
+    const row = await env.DB.prepare("SELECT name, moodle_course_id FROM courses WHERE course_id='swtest-2026'").first();
+    expect(row).toMatchObject({ name: "軟體測試 2026", moodle_course_id: "12345" });
+    await env.DB.prepare("DELETE FROM courses WHERE course_id='swtest-2026'").run();
+  });
+
+  it("a staff member CANNOT create a course (owner-only → 403)", async () => {
+    const res = await call("/admin/courses", {
+      method: "POST",
+      headers: { ...cookie(await staffSession()), "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ course_id: "hack-2026", name: "x" }).toString(),
+    });
+    expect(res.status).toBe(403);
+    expect(await env.DB.prepare("SELECT 1 FROM courses WHERE course_id='hack-2026'").first()).toBe(null);
   });
 
   it("a staff member CANNOT manage staff (owner-only → 403, no escalation)", async () => {
     await env.DB.prepare("INSERT INTO staff (course_id, nycu_id, added_by, added_at) VALUES ('ds-2026','ta01','admin1','t')").run();
-    const res = await call("/admin/staff/add", {
+    const res = await call("/c/ds-2026/admin/staff/add", {
       method: "POST",
       headers: { ...cookie(await staffSession()), "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ nycu_id: "ta02" }).toString(),
@@ -305,12 +346,12 @@ describe("staff/TA management", () => {
   it("add → invites the bound TA to the org AND the staff team", async () => {
     await bindTA("monalisa");
     const calls = ghCalls();
-    const res = await call("/admin/staff/add", {
+    const res = await call("/c/ds-2026/admin/staff/add", {
       method: "POST",
       headers: { ...cookie(await owner()), "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ nycu_id: "ta01" }).toString(),
     }, syncEnv);
-    expect(res.headers.get("Location")).toBe("/admin?staff_msg=ok");
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?staff_msg=ok");
     expect(calls).toContainEqual({ method: "PUT", url: "https://api.github.com/orgs/nycu-cs-course-ds/memberships/monalisa" });
     expect(calls).toContainEqual({ method: "PUT", url: "https://api.github.com/orgs/nycu-cs-course-ds/teams/staff/memberships/monalisa" });
   });
@@ -319,24 +360,24 @@ describe("staff/TA management", () => {
     await bindTA("monalisa");
     await env.DB.prepare("INSERT INTO staff (course_id, nycu_id, added_by, added_at) VALUES ('ds-2026','ta01','admin1','t')").run();
     const calls = ghCalls();
-    const res = await call("/admin/staff/remove", {
+    const res = await call("/c/ds-2026/admin/staff/remove", {
       method: "POST",
       headers: { ...cookie(await owner()), "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ nycu_id: "ta01" }).toString(),
     }, syncEnv);
-    expect(res.headers.get("Location")).toBe("/admin?staff_msg=ok");
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?staff_msg=ok");
     expect(calls).toContainEqual({ method: "DELETE", url: "https://api.github.com/orgs/nycu-cs-course-ds/teams/staff/memberships/monalisa" });
     expect(calls).toContainEqual({ method: "DELETE", url: "https://api.github.com/orgs/nycu-cs-course-ds/memberships/monalisa" });
   });
 
   it("add for an unbound TA → DB row created, no GitHub calls, no-binding flash", async () => {
     const calls = ghCalls();
-    const res = await call("/admin/staff/add", {
+    const res = await call("/c/ds-2026/admin/staff/add", {
       method: "POST",
       headers: { ...cookie(await owner()), "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ nycu_id: "ta01" }).toString(),
     }, syncEnv);
-    expect(res.headers.get("Location")).toBe("/admin?staff_msg=no-binding");
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?staff_msg=no-binding");
     expect(await env.DB.prepare("SELECT 1 FROM staff WHERE nycu_id='ta01'").first()).not.toBe(null);
     expect(calls).toHaveLength(0);
   });
@@ -344,12 +385,12 @@ describe("staff/TA management", () => {
   it("a GitHub sync failure does not break the staff DB op (error flash)", async () => {
     await bindTA("monalisa");
     vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 500 })));
-    const res = await call("/admin/staff/add", {
+    const res = await call("/c/ds-2026/admin/staff/add", {
       method: "POST",
       headers: { ...cookie(await owner()), "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ nycu_id: "ta01" }).toString(),
     }, syncEnv);
-    expect(res.headers.get("Location")).toBe("/admin?staff_msg=error");
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?staff_msg=error");
     expect(await env.DB.prepare("SELECT 1 FROM staff WHERE nycu_id='ta01'").first()).not.toBe(null);
   });
 });
@@ -417,8 +458,26 @@ describe("/me dashboard", () => {
     const body = await res.text();
     expect(body).toContain("lab01-stack");
     expect(body).toContain("AC");
+    expect(body).toContain("資料結構 2026"); // grades grouped under the course name
     expect(body).not.toContain("999999999"); // never another user's row
     expect(body).toContain("管理功能"); // admin1 ∈ ADMIN_IDS → admin link
+  });
+
+  it("groups a student's grades by course on /me", async () => {
+    await env.DB.batch([
+      env.DB.prepare(
+        "INSERT INTO grades (course_id, student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('ds-2026','admin1','lab01-stack','AC',100,100,'t1')",
+      ),
+      env.DB.prepare(
+        "INSERT INTO grades (course_id, student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('ds-2027','admin1','lab09-x','WA',10,100,'t2')",
+      ),
+    ]);
+    // ds-2027 isn't seeded → heading falls back to the course_id
+    const session = await signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "A" } }, SECRET);
+    const body = await (await call("/me", { headers: cookie(session) })).text();
+    expect(body).toContain("資料結構 2026"); // seeded ds-2026 name
+    expect(body.indexOf("資料結構 2026")).toBeLessThan(body.indexOf("ds-2027")); // ordered by course_id
+    expect(body).toContain("lab09-x");
   });
 
   it("shows a success flash after binding (?bound=1)", async () => {
@@ -531,7 +590,7 @@ describe("/api/grades/ingest", () => {
   });
 });
 
-describe("/admin/roster.csv", () => {
+describe("/c/<id>/admin/roster.csv", () => {
   it("emits github_login,student_id for admins (only bound rows)", async () => {
     await env.DB.batch([
       env.DB.prepare(
@@ -542,7 +601,7 @@ describe("/admin/roster.csv", () => {
       { exp: Date.now() + 60000, nycu: { id: "admin1", name: "Admin" } },
       SECRET,
     );
-    const res = await call("/admin/roster.csv", { headers: cookie(session) });
+    const res = await call("/c/ds-2026/admin/roster.csv", { headers: cookie(session) });
     expect(res.headers.get("Content-Type")).toContain("text/csv");
     const body = await res.text();
     expect(body).toContain("github_login,student_id");
@@ -550,7 +609,7 @@ describe("/admin/roster.csv", () => {
   });
 
   it("denies roster export to anonymous", async () => {
-    const res = await call("/admin/roster.csv");
+    const res = await call("/c/ds-2026/admin/roster.csv");
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("/auth/nycu/start");
   });

@@ -21,9 +21,12 @@ import {
   GithubConflictError,
 } from "./db/bindings";
 import { upsertGrades, listGradesFor, listGradesForProblem, GradeInput } from "./db/grades";
-import { listStaff, addStaff, removeStaff, isStaffAnywhere } from "./db/staff";
+import {
+  listStaff, addStaff, removeStaff, isStaffAnywhere, isStaffMember, coursesForStaff,
+} from "./db/staff";
+import { listCourses, getCourse, upsertCourse } from "./db/courses";
 import { toCsv, toRosterCsv } from "./csv";
-import { adminPage, dashboardPage } from "./html";
+import { adminPage, adminHomePage, dashboardPage } from "./html";
 import { pickLang, langCookie } from "./i18n";
 
 const TTL_MS = 15 * 60 * 1000;
@@ -43,12 +46,10 @@ export default {
         return await gradesIngest(req, env);
       if (p === "/api/roster" && req.method === "GET") return await apiRoster(req, env);
       if (p === "/api/grades" && req.method === "GET") return await apiGrades(req, env, url);
-      if (p === "/admin" && req.method === "GET") return await adminList(req, env, url);
-      if (p === "/admin/export.csv") return await adminExport(req, env);
-      if (p === "/admin/roster.csv") return await adminRoster(req, env);
-      if (p === "/admin/delete" && req.method === "POST") return await adminDelete(req, env);
-      if (p === "/admin/staff/add" && req.method === "POST") return await staffAdd(req, env);
-      if (p === "/admin/staff/remove" && req.method === "POST") return await staffRemove(req, env);
+      if (p === "/admin" && req.method === "GET") return await adminHome(req, env, url);
+      if (p === "/admin/courses" && req.method === "POST") return await courseUpsert(req, env);
+      const cm = p.match(/^\/c\/([A-Za-z0-9_-]+)\/admin(\/[A-Za-z0-9._/-]*)?$/);
+      if (cm) return await courseAdminRouter(req, env, url, cm[1], cm[2] ?? "");
       return new Response("Not found", { status: 404 });
     } catch (e) {
       // Log detail server-side; return a generic message so upstream status codes
@@ -195,10 +196,13 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
   if (s instanceof Response) return s;
   const studentId = s.nycu!.id; // == 學號
   const lang = pickLang(url, req.headers.get("Cookie"));
-  const [binding, grades] = await Promise.all([
+  const [binding, grades, courses] = await Promise.all([
     getBinding(env.DB, studentId),
     listGradesFor(env.DB, studentId),
+    listCourses(env.DB),
   ]);
+  const courseNames: Record<string, string> = {};
+  for (const c of courses) courseNames[c.course_id] = c.name;
   const flash = {
     bound: url.searchParams.get("bound") === "1",
     error: url.searchParams.get("error"),
@@ -208,7 +212,7 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
     : "";
   // Show the admin link to owners AND staff-table members (of any course).
   const staff = isAdmin(env, studentId) || (await isStaffAnywhere(env.DB, studentId));
-  const html = dashboardPage(lang, s.nycu!, binding, grades, staff, flash, orgJoinUrl);
+  const html = dashboardPage(lang, s.nycu!, binding, grades, staff, flash, orgJoinUrl, courseNames);
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
   });
@@ -310,53 +314,125 @@ async function requireStaff(req: Request, env: Env): Promise<SessionData | Respo
   return session;
 }
 
-async function adminList(req: Request, env: Env, url: URL): Promise<Response> {
+// Staff of a SPECIFIC course (owner is staff of every course). Gates the
+// course-scoped admin views + exports.
+async function requireCourseStaff(
+  req: Request, env: Env, courseId: string,
+): Promise<SessionData | Response> {
+  const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
+  if (!session || !session.nycu) return redirect("/auth/nycu/start");
+  if (!isAdmin(env, session.nycu.id) && !(await isStaffMember(env.DB, courseId, session.nycu.id))) {
+    return new Response("Not authorized", { status: 403 });
+  }
+  return session;
+}
+
+// /admin — course picker. Owners see all courses + a create form; staff see
+// only their courses.
+async function adminHome(req: Request, env: Env, url: URL): Promise<Response> {
   const s = await requireStaff(req, env);
   if (s instanceof Response) return s;
-  const isOwner = isAdmin(env, s.nycu!.id); // owner controls (delete, manage staff)
+  const isOwner = isAdmin(env, s.nycu!.id);
   const lang = pickLang(url, req.headers.get("Cookie"));
-  const [rows, staff] = await Promise.all([listBindings(env.DB), listStaff(env.DB, defaultCourse(env))]);
-  const staffMsg = url.searchParams.get("staff_msg") ?? "";
-  return new Response(adminPage(lang, rows, { isOwner, staff, staffMsg }), {
+  let courses = await listCourses(env.DB);
+  if (!isOwner) {
+    const mine = new Set(await coursesForStaff(env.DB, s.nycu!.id));
+    courses = courses.filter((c) => mine.has(c.course_id));
+  }
+  return new Response(adminHomePage(lang, courses, { isOwner }), {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
   });
 }
 
-async function adminExport(req: Request, env: Env): Promise<Response> {
-  const s = await requireStaff(req, env);
+// POST /admin/courses — owner creates/updates a course-offering.
+async function courseUpsert(req: Request, env: Env): Promise<Response> {
+  const s = await requireAdmin(req, env);
+  if (s instanceof Response) return s;
+  const form = await req.formData();
+  const course_id = String(form.get("course_id") ?? "").trim();
+  const name = String(form.get("name") ?? "").trim();
+  if (!course_id || !/^[A-Za-z0-9_-]+$/.test(course_id) || !name) return redirect("/admin");
+  await upsertCourse(
+    env.DB,
+    {
+      course_id,
+      name,
+      term: String(form.get("term") ?? "").trim() || null,
+      moodle_course_id: String(form.get("moodle_course_id") ?? "").trim() || null,
+      github_org: String(form.get("github_org") ?? "").trim() || null,
+    },
+    new Date(Date.now()).toISOString(),
+  );
+  return redirect("/admin");
+}
+
+// /c/<course_id>/admin[/...] dispatch.
+async function courseAdminRouter(
+  req: Request, env: Env, url: URL, courseId: string, sub: string,
+): Promise<Response> {
+  const m = req.method;
+  if (sub === "" && m === "GET") return await courseAdmin(req, env, url, courseId);
+  if (sub === "/export.csv" && m === "GET") return await courseExport(req, env, courseId);
+  if (sub === "/roster.csv" && m === "GET") return await courseRoster(req, env, courseId);
+  if (sub === "/delete" && m === "POST") return await courseDelete(req, env, courseId);
+  if (sub === "/staff/add" && m === "POST") return await staffAdd(req, env, courseId);
+  if (sub === "/staff/remove" && m === "POST") return await staffRemove(req, env, courseId);
+  return new Response("Not found", { status: 404 });
+}
+
+async function courseAdmin(req: Request, env: Env, url: URL, courseId: string): Promise<Response> {
+  const s = await requireCourseStaff(req, env, courseId);
+  if (s instanceof Response) return s;
+  const course = await getCourse(env.DB, courseId);
+  if (!course) return new Response("Course not found", { status: 404 });
+  const isOwner = isAdmin(env, s.nycu!.id);
+  const lang = pickLang(url, req.headers.get("Cookie"));
+  const [rows, staff] = await Promise.all([listBindings(env.DB), listStaff(env.DB, courseId)]);
+  const staffMsg = url.searchParams.get("staff_msg") ?? "";
+  return new Response(
+    adminPage(lang, { course_id: course.course_id, name: course.name }, rows, { isOwner, staff, staffMsg }),
+    { headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) } },
+  );
+}
+
+// Bindings are global identity; until Phase 3 enrollment sync, the per-course
+// export is the full bindings list (filename tagged with the course).
+async function courseExport(req: Request, env: Env, courseId: string): Promise<Response> {
+  const s = await requireCourseStaff(req, env, courseId);
   if (s instanceof Response) return s;
   const rows = await listBindings(env.DB);
   return new Response(toCsv(rows), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": 'attachment; filename="bindings.csv"',
+      "Content-Disposition": `attachment; filename="bindings-${courseId}.csv"`,
     },
   });
 }
 
-async function adminRoster(req: Request, env: Env): Promise<Response> {
-  const s = await requireStaff(req, env);
+async function courseRoster(req: Request, env: Env, courseId: string): Promise<Response> {
+  const s = await requireCourseStaff(req, env, courseId);
   if (s instanceof Response) return s;
   const rows = await listBindings(env.DB);
   return new Response(toRosterCsv(rows), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": 'attachment; filename="roster.csv"',
+      "Content-Disposition": `attachment; filename="roster-${courseId}.csv"`,
     },
   });
 }
 
-async function adminDelete(req: Request, env: Env): Promise<Response> {
+async function courseDelete(req: Request, env: Env, courseId: string): Promise<Response> {
   const s = await requireAdmin(req, env); // owner only — destructive
   if (s instanceof Response) return s;
   const form = await req.formData();
   const nycuId = String(form.get("nycu_id") ?? "");
   if (nycuId) await deleteBinding(env.DB, nycuId);
-  return redirect("/admin");
+  return redirect(`/c/${encodeURIComponent(courseId)}/admin`);
 }
 
-// Course-offering used by the not-yet-course-scoped routes (Phase 1a). Phase 1b
-// replaces this with /c/<course_id>/ routing.
+// Fallback course for grade ingests that don't (yet) carry a course_id — dsjudge
+// starts sending one in Phase 2. Admin routes are course-scoped (/c/<id>/) as
+// of Phase 1b and no longer use this.
 function defaultCourse(env: Env): string {
   return env.DEFAULT_COURSE_ID || "ds-2026";
 }
@@ -386,27 +462,28 @@ async function syncStaffToGitHub(env: Env, nycuId: string, add: boolean): Promis
   }
 }
 
-function adminRedirect(msg: string): Response {
-  return redirect(msg ? `/admin?staff_msg=${encodeURIComponent(msg)}` : "/admin");
+function adminRedirect(courseId: string, msg: string): Response {
+  const base = `/c/${encodeURIComponent(courseId)}/admin`;
+  return redirect(msg ? `${base}?staff_msg=${encodeURIComponent(msg)}` : base);
 }
 
 // Staff management — OWNER only (so a TA can't add/remove staff = no escalation).
-async function staffAdd(req: Request, env: Env): Promise<Response> {
+async function staffAdd(req: Request, env: Env, courseId: string): Promise<Response> {
   const s = await requireAdmin(req, env);
   if (s instanceof Response) return s;
   const form = await req.formData();
   const id = String(form.get("nycu_id") ?? "").trim();
-  if (!id) return redirect("/admin");
-  await addStaff(env.DB, defaultCourse(env), id, s.nycu!.id, new Date(Date.now()).toISOString());
-  return adminRedirect(await syncStaffToGitHub(env, id, true));
+  if (!id) return redirect(`/c/${encodeURIComponent(courseId)}/admin`);
+  await addStaff(env.DB, courseId, id, s.nycu!.id, new Date(Date.now()).toISOString());
+  return adminRedirect(courseId, await syncStaffToGitHub(env, id, true));
 }
 
-async function staffRemove(req: Request, env: Env): Promise<Response> {
+async function staffRemove(req: Request, env: Env, courseId: string): Promise<Response> {
   const s = await requireAdmin(req, env);
   if (s instanceof Response) return s;
   const form = await req.formData();
   const id = String(form.get("nycu_id") ?? "").trim();
-  if (!id) return redirect("/admin");
-  await removeStaff(env.DB, defaultCourse(env), id);
-  return adminRedirect(await syncStaffToGitHub(env, id, false));
+  if (!id) return redirect(`/c/${encodeURIComponent(courseId)}/admin`);
+  await removeStaff(env.DB, courseId, id);
+  return adminRedirect(courseId, await syncStaffToGitHub(env, id, false));
 }

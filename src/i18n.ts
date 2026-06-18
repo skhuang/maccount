@@ -40,6 +40,15 @@ export interface Strings {
   admin_bindings: string; // "{n}" placeholder
   export_full: string;
   export_roster: string;
+  admin_courses_heading: string;
+  no_courses: string;
+  course_create: string;
+  course_create_note: string;
+  ph_course_id: string;
+  ph_course_name: string;
+  ph_course_term: string;
+  ph_course_moodle: string;
+  ph_course_org: string;
   th_name: string;
   th_github_id: string;
   th_updated: string;
@@ -83,6 +92,15 @@ export const T: Record<Lang, Strings> = {
     flash_error_prefix: "操作未完成：",
     admin_title: "maccount 管理",
     admin_bindings: "綁定名單 ({n})",
+    admin_courses_heading: "課程列表",
+    no_courses: "尚無課程。",
+    course_create: "建立／更新課程",
+    course_create_note: "course_id 為英數與 - _（如 ds-2026）；moodle_course_id 為 Moodle 課程數字 id（之後對應選課/成績用）。再次送出相同 course_id 即更新。",
+    ph_course_id: "course_id（如 ds-2026）",
+    ph_course_name: "課程名稱（如 資料結構 2026）",
+    ph_course_term: "學期（如 2026 / 2026-fall）",
+    ph_course_moodle: "moodle_course_id（選填）",
+    ph_course_org: "github_org（選填）",
     export_full: "⬇ 匯出 CSV（完整綁定）",
     export_roster: "⬇ 匯出 roster.csv（github_login,student_id）",
     th_name: "姓名",
@@ -126,6 +144,15 @@ export const T: Record<Lang, Strings> = {
     flash_error_prefix: "Action not completed: ",
     admin_title: "maccount Admin",
     admin_bindings: "Bindings ({n})",
+    admin_courses_heading: "Courses",
+    no_courses: "No courses yet.",
+    course_create: "Create / update course",
+    course_create_note: "course_id is alphanumeric + - _ (e.g. ds-2026); moodle_course_id is the Moodle numeric course id (used later for enrollment/grade mapping). Submitting the same course_id again updates it.",
+    ph_course_id: "course_id (e.g. ds-2026)",
+    ph_course_name: "Course name (e.g. Data Structures 2026)",
+    ph_course_term: "Term (e.g. 2026 / 2026-fall)",
+    ph_course_moodle: "moodle_course_id (optional)",
+    ph_course_org: "github_org (optional)",
     export_full: "⬇ Export CSV (full bindings)",
     export_roster: "⬇ Export roster.csv (github_login,student_id)",
     th_name: "Name",
