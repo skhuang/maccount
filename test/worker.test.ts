@@ -474,6 +474,27 @@ describe("course edit + enrollment", () => {
     expect((await ing({ course_id: "ds-2026", student_ids: ["x"] }, "wrong")).status).toBe(401);
   });
 
+  it("token API ingest resolves moodle_course_id → course_id", async () => {
+    await env.DB.prepare("UPDATE courses SET moodle_course_id='21910' WHERE course_id='ds-2026'").run();
+    const res = await call("/api/enrollments/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer ingest-secret" },
+      body: JSON.stringify({ moodle_course_id: 21910, student_ids: ["m9", "m8"], replace: true }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, course_id: "ds-2026", enrolled: 2 });
+    const { results } = await env.DB.prepare("SELECT student_id FROM enrollments WHERE course_id='ds-2026' ORDER BY student_id").all();
+    expect(results.map((r) => r.student_id)).toEqual(["m8", "m9"]);
+    // an unmapped moodle id → 404
+    const miss = await call("/api/enrollments/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer ingest-secret" },
+      body: JSON.stringify({ moodle_course_id: 99999, student_ids: ["x"] }),
+    });
+    expect(miss.status).toBe(404);
+    await env.DB.prepare("UPDATE courses SET moodle_course_id=NULL WHERE course_id='ds-2026'").run();
+  });
+
   it("course roster.csv narrows to enrolled ∩ bound once a roster exists", async () => {
     await env.DB.batch([
       env.DB.prepare("INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, created_at, updated_at) VALUES ('a01','甲',1,'alice','t','t')"),
