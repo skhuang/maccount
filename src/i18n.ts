@@ -49,6 +49,16 @@ export interface Strings {
   ph_course_term: string;
   ph_course_moodle: string;
   ph_course_org: string;
+  course_settings: string;
+  course_status: string;
+  course_save: string;
+  enroll_heading: string; // "{n}" placeholder
+  enroll_note: string; // "{bound}" placeholder
+  enroll_show_list: string;
+  enroll_unbound: string;
+  enroll_placeholder: string;
+  enroll_replace: string;
+  enroll_import: string;
   th_name: string;
   th_github_id: string;
   th_updated: string;
@@ -101,6 +111,16 @@ export const T: Record<Lang, Strings> = {
     ph_course_term: "學期（如 2026 / 2026-fall）",
     ph_course_moodle: "moodle_course_id（選填）",
     ph_course_org: "github_org（選填）",
+    course_settings: "課程設定",
+    course_status: "狀態",
+    course_save: "儲存課程設定",
+    enroll_heading: "選課名單（{n}）",
+    enroll_note: "已綁定 GitHub：{bound}。匯入後，此課的綁定名單與 roster 匯出會縮到「選課∩已綁」。",
+    enroll_show_list: "顯示選課名單",
+    enroll_unbound: "未綁定",
+    enroll_placeholder: "貼上學號，一行一個（或以逗號／空白分隔）",
+    enroll_replace: "取代整份名單（與 Moodle 同步；未列出者移除）",
+    enroll_import: "匯入選課名單",
     export_full: "⬇ 匯出 CSV（完整綁定）",
     export_roster: "⬇ 匯出 roster.csv（github_login,student_id）",
     th_name: "姓名",
@@ -153,6 +173,16 @@ export const T: Record<Lang, Strings> = {
     ph_course_term: "Term (e.g. 2026 / 2026-fall)",
     ph_course_moodle: "moodle_course_id (optional)",
     ph_course_org: "github_org (optional)",
+    course_settings: "Course settings",
+    course_status: "Status",
+    course_save: "Save course settings",
+    enroll_heading: "Enrollment ({n})",
+    enroll_note: "Bound to GitHub: {bound}. Once imported, this course's bindings list and roster export narrow to enrolled ∩ bound.",
+    enroll_show_list: "Show roster",
+    enroll_unbound: "not bound",
+    enroll_placeholder: "Paste 學號, one per line (or comma/space separated)",
+    enroll_replace: "Replace the whole roster (sync with Moodle; drop those not listed)",
+    enroll_import: "Import roster",
     export_full: "⬇ Export CSV (full bindings)",
     export_roster: "⬇ Export roster.csv (github_login,student_id)",
     th_name: "Name",

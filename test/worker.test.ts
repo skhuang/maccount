@@ -35,6 +35,7 @@ beforeEach(async () => {
   await env.DB.prepare("DELETE FROM bindings").run();
   await env.DB.prepare("DELETE FROM grades").run();
   await env.DB.prepare("DELETE FROM staff").run();
+  await env.DB.prepare("DELETE FROM enrollments").run();
 });
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -392,6 +393,82 @@ describe("staff/TA management", () => {
     }, syncEnv);
     expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?staff_msg=error");
     expect(await env.DB.prepare("SELECT 1 FROM staff WHERE nycu_id='ta01'").first()).not.toBe(null);
+  });
+});
+
+describe("course edit + enrollment", () => {
+  const owner = () => signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "A" } }, SECRET);
+  const staffSession = () => signSession({ exp: Date.now() + 60000, nycu: { id: "ta01", name: "助教" } }, SECRET);
+  const post = async (path: string, fields: Record<string, string>, session: string) =>
+    call(path, {
+      method: "POST",
+      headers: { ...cookie(session), "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(fields).toString(),
+    });
+
+  it("owner edits an existing course (re-upsert updates fields, keeps created_at)", async () => {
+    const before = await env.DB.prepare("SELECT created_at FROM courses WHERE course_id='ds-2026'").first<{ created_at: string }>();
+    const res = await post("/admin/courses", { course_id: "ds-2026", name: "資料結構 一", moodle_course_id: "777", status: "archived" }, await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin");
+    const row = await env.DB.prepare("SELECT name, moodle_course_id, status, created_at FROM courses WHERE course_id='ds-2026'").first();
+    expect(row).toMatchObject({ name: "資料結構 一", moodle_course_id: "777", status: "archived" });
+    expect((row as { created_at: string }).created_at).toBe(before!.created_at); // unchanged on update
+    // restore for other tests
+    await post("/admin/courses", { course_id: "ds-2026", name: "資料結構 2026", status: "active" }, await owner());
+  });
+
+  it("owner imports enrollment by paste (additive)", async () => {
+    const res = await post("/c/ds-2026/admin/enroll", { student_ids: "a01, a02\n a03" }, await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin");
+    const { results } = await env.DB.prepare("SELECT student_id FROM enrollments WHERE course_id='ds-2026' ORDER BY student_id").all();
+    expect(results.map((r) => r.student_id)).toEqual(["a01", "a02", "a03"]);
+  });
+
+  it("replace mode swaps the roster", async () => {
+    await post("/c/ds-2026/admin/enroll", { student_ids: "a01 a02" }, await owner());
+    await post("/c/ds-2026/admin/enroll", { student_ids: "a02 a03", replace: "1" }, await owner());
+    const { results } = await env.DB.prepare("SELECT student_id FROM enrollments WHERE course_id='ds-2026' ORDER BY student_id").all();
+    expect(results.map((r) => r.student_id)).toEqual(["a02", "a03"]);
+  });
+
+  it("a staff member cannot import enrollment (owner-only → 403)", async () => {
+    await env.DB.prepare("INSERT INTO staff (course_id, nycu_id, added_by, added_at) VALUES ('ds-2026','ta01','admin1','t')").run();
+    const res = await post("/c/ds-2026/admin/enroll", { student_ids: "x" }, await staffSession());
+    expect(res.status).toBe(403);
+    expect(await env.DB.prepare("SELECT 1 FROM enrollments WHERE course_id='ds-2026'").first()).toBe(null);
+  });
+
+  it("token API ingest enrolls (and 404s an unknown course, 401s a bad token)", async () => {
+    const ing = (body: unknown, tok = "ingest-secret") =>
+      call("/api/enrollments/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify(body),
+      });
+    expect((await ing({ course_id: "ds-2026", student_ids: ["m1", "m2"] })).status).toBe(200);
+    expect(await env.DB.prepare("SELECT COUNT(*) n FROM enrollments WHERE course_id='ds-2026'").first<{ n: number }>()).toMatchObject({ n: 2 });
+    expect((await ing({ course_id: "nope", student_ids: ["x"] })).status).toBe(404);
+    expect((await ing({ course_id: "ds-2026", student_ids: ["x"] }, "wrong")).status).toBe(401);
+  });
+
+  it("course roster.csv narrows to enrolled ∩ bound once a roster exists", async () => {
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, created_at, updated_at) VALUES ('a01','甲',1,'alice','t','t')"),
+      env.DB.prepare("INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, created_at, updated_at) VALUES ('z99','乙',2,'zoe','t','t')"),
+    ]);
+    await post("/c/ds-2026/admin/enroll", { student_ids: "a01 b02" }, await owner()); // a01 bound, b02 not; z99 not enrolled
+    const body = await (await call("/c/ds-2026/admin/roster.csv", { headers: cookie(await owner()) })).text();
+    expect(body).toContain("alice,a01"); // enrolled ∩ bound
+    expect(body).not.toContain("zoe");   // bound but NOT enrolled → excluded
+  });
+
+  it("course admin shows the enrollment section with bound/unbound", async () => {
+    await env.DB.prepare("INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, created_at, updated_at) VALUES ('a01','甲',1,'alice','t','t')").run();
+    await post("/c/ds-2026/admin/enroll", { student_ids: "a01 b02" }, await owner());
+    const body = await (await call("/c/ds-2026/admin", { headers: cookie(await owner()) })).text();
+    expect(body).toContain("選課名單（2）");
+    expect(body).toContain("課程設定"); // owner edit form
+    expect(body).toContain('value="ds-2026"'); // settings form prefilled course_id
   });
 });
 

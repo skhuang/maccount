@@ -47,6 +47,40 @@ describe("adminPage", () => {
     expect(adminPage("zh", course, rows, { isOwner: false, staff: [] })).not.toContain("/admin/staff/");
   });
 
+  it("renders the enrollment section (bound/unbound) and a prefilled settings form for owners", () => {
+    const html = adminPage(
+      "zh",
+      { ...course, term: "2026", moodle_course_id: "12345", status: "archived" },
+      [],
+      {
+        isOwner: true,
+        staff: [],
+        enrolled: [
+          { student_id: "a01", github_login: "alice" },
+          { student_id: "b02", github_login: null },
+        ],
+      },
+    );
+    expect(html).toContain("選課名單（2）");
+    expect(html).toContain("alice");
+    expect(html).toContain("未綁定"); // b02 has no binding
+    expect(html).toContain(`action="/c/ds-2026/admin/enroll"`);
+    // settings form prefilled
+    expect(html).toContain('name="moodle_course_id" value="12345"');
+    expect(html).toContain('<option value="archived" selected>');
+  });
+
+  it("hides import + settings from non-owner staff", () => {
+    const html = adminPage("zh", course, [], {
+      isOwner: false,
+      staff: [],
+      enrolled: [{ student_id: "a01", github_login: "alice" }],
+    });
+    expect(html).toContain("選課名單（1）"); // staff can see the roster
+    expect(html).not.toContain("/admin/enroll"); // but not import
+    expect(html).not.toContain("課程設定"); // nor edit settings
+  });
+
   it("does not interpolate user data into the inline onsubmit JS", () => {
     const html = adminPage("zh", course, [{ ...rows[0], nycu_id: "O'Brien" }], { isOwner: true, staff: [] });
     expect(html).not.toContain("confirm('刪除");

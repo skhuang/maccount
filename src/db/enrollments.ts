@@ -50,3 +50,71 @@ export async function enroll(
     .bind(course_id, student_id, role, now)
     .run();
 }
+
+// Add many student_ids to a course (idempotent — existing rows untouched).
+// Returns the number of ids submitted (deduped). Empty input is a no-op.
+export async function bulkEnroll(
+  db: D1Database, course_id: string, student_ids: string[], now: string,
+): Promise<number> {
+  const ids = [...new Set(student_ids.map((s) => s.trim()).filter(Boolean))];
+  if (ids.length === 0) return 0;
+  const stmt = db.prepare(
+    `INSERT INTO enrollments (course_id, student_id, role, created_at) VALUES (?1, ?2, 'student', ?3)
+     ON CONFLICT(course_id, student_id) DO NOTHING`,
+  );
+  await db.batch(ids.map((id) => stmt.bind(course_id, id, now)));
+  return ids.length;
+}
+
+// Replace a course's entire roster with the given ids (Moodle-authoritative sync).
+export async function replaceEnrollments(
+  db: D1Database, course_id: string, student_ids: string[], now: string,
+): Promise<number> {
+  const ids = [...new Set(student_ids.map((s) => s.trim()).filter(Boolean))];
+  const ops: D1PreparedStatement[] = [
+    db.prepare("DELETE FROM enrollments WHERE course_id = ?").bind(course_id),
+  ];
+  const ins = db.prepare(
+    `INSERT INTO enrollments (course_id, student_id, role, created_at) VALUES (?1, ?2, 'student', ?3)`,
+  );
+  for (const id of ids) ops.push(ins.bind(course_id, id, now));
+  await db.batch(ops);
+  return ids.length;
+}
+
+export async function removeEnrollment(
+  db: D1Database, course_id: string, student_id: string,
+): Promise<void> {
+  await db.prepare("DELETE FROM enrollments WHERE course_id = ? AND student_id = ?")
+    .bind(course_id, student_id).run();
+}
+
+export async function enrollmentCount(db: D1Database, course_id: string): Promise<number> {
+  const row = await db
+    .prepare("SELECT COUNT(*) AS n FROM enrollments WHERE course_id = ?")
+    .bind(course_id)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
+export interface EnrolledStudent {
+  student_id: string;
+  nycu_name: string | null;
+  github_login: string | null; // null = enrolled but hasn't bound GitHub yet
+  github_id: number | null;
+}
+
+// A course's roster joined to bindings, so the admin sees who hasn't bound yet.
+export async function listEnrolledWithBinding(
+  db: D1Database, course_id: string,
+): Promise<EnrolledStudent[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT e.student_id, b.nycu_name, b.github_login, b.github_id
+       FROM enrollments e LEFT JOIN bindings b ON b.nycu_id = e.student_id
+       WHERE e.course_id = ? ORDER BY e.student_id`,
+    )
+    .bind(course_id)
+    .all<EnrolledStudent>();
+  return results ?? [];
+}

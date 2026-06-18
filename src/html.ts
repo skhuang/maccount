@@ -90,14 +90,32 @@ ${createForm}
 </body></html>`;
 }
 
+interface EnrolledLite {
+  student_id: string;
+  github_login: string | null;
+}
+
 export function adminPage(
   lang: Lang,
-  course: { course_id: string; name: string },
+  course: {
+    course_id: string;
+    name: string;
+    term?: string | null;
+    moodle_course_id?: string | null;
+    github_org?: string | null;
+    status?: string;
+  },
   rows: BindingRow[],
-  opts: { isOwner: boolean; staff: StaffLite[]; staffMsg?: string } = { isOwner: false, staff: [] },
+  opts: {
+    isOwner: boolean;
+    staff: StaffLite[];
+    staffMsg?: string;
+    enrolled?: EnrolledLite[];
+  } = { isOwner: false, staff: [] },
 ): string {
   const t = T[lang];
   const { isOwner, staff } = opts;
+  const enrolled = opts.enrolled ?? [];
   const base = `/c/${encodeURIComponent(course.course_id)}/admin`;
   // Flash from a staff add/remove → GitHub org/team sync (see syncStaffToGitHub).
   const syncMsg: Record<string, string> = {
@@ -145,6 +163,54 @@ export function adminPage(
 </form>`
     : "";
 
+  // Enrollment (course roster). Bound = has a GitHub binding; unbound students
+  // still need to bind. Import is owner-only.
+  const bound = enrolled.filter((e) => e.github_login).length;
+  const enrolledRows = enrolled
+    .map(
+      (e) => `<tr><td>${h(e.student_id)}</td><td>${
+        e.github_login ? h(e.github_login) : `<span style="color:#b00">${t.enroll_unbound}</span>`
+      }</td></tr>`,
+    )
+    .join("\n");
+  const enrollImport = isOwner
+    ? `<form method="post" action="${base}/enroll" style="margin-top:8px">
+  <textarea name="student_ids" rows="4" cols="40" placeholder="${t.enroll_placeholder}"></textarea><br>
+  <label><input type="checkbox" name="replace" value="1"> ${t.enroll_replace}</label><br>
+  <button type="submit">${t.enroll_import}</button>
+</form>`
+    : "";
+  const enrollSection = `<h2>${t.enroll_heading.replace("{n}", String(enrolled.length))}</h2>
+<p style="color:#777;font-size:.9em">${t.enroll_note.replace("{bound}", String(bound))}</p>${
+    enrolled.length
+      ? `
+<details><summary>${t.enroll_show_list}</summary>
+<table border="1" cellpadding="6" cellspacing="0">
+<thead><tr><th>NYCU id</th><th>GitHub</th></tr></thead>
+<tbody>${enrolledRows}</tbody></table></details>`
+      : ""
+  }
+${enrollImport}`;
+
+  // Course settings — owner edits name/term/Moodle/org/status (re-submits the
+  // upsert with the same course_id).
+  const settingsSection = isOwner
+    ? `<h2>${t.course_settings}</h2>
+<form method="post" action="/admin/courses" style="display:grid;gap:6px;max-width:440px">
+  <input type="hidden" name="course_id" value="${h(course.course_id)}">
+  <label>${t.ph_course_name}<input name="name" value="${h(course.name)}" required></label>
+  <label>${t.ph_course_term}<input name="term" value="${h(course.term ?? "")}"></label>
+  <label>${t.ph_course_moodle}<input name="moodle_course_id" value="${h(course.moodle_course_id ?? "")}"></label>
+  <label>${t.ph_course_org}<input name="github_org" value="${h(course.github_org ?? "")}"></label>
+  <label>${t.course_status}
+    <select name="status">
+      <option value="active"${course.status !== "archived" ? " selected" : ""}>active</option>
+      <option value="archived"${course.status === "archived" ? " selected" : ""}>archived</option>
+    </select></label>
+  <button type="submit">${t.course_save}</button>
+</form>`
+    : "";
+
   return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">
 <title>${t.admin_title}</title>
 <body style="font-family:system-ui;max-width:900px;margin:2rem auto">
@@ -159,7 +225,9 @@ ${banner}
 <tbody>
 ${trs}
 </tbody></table>
+${enrollSection}
 ${staffSection}
+${settingsSection}
 </body></html>`;
 }
 

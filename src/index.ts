@@ -25,6 +25,9 @@ import {
   listStaff, addStaff, removeStaff, isStaffAnywhere, isStaffMember, coursesForStaff,
 } from "./db/staff";
 import { listCourses, getCourse, upsertCourse } from "./db/courses";
+import {
+  bulkEnroll, replaceEnrollments, enrollmentCount, listEnrolledWithBinding, listEnrollments,
+} from "./db/enrollments";
 import { toCsv, toRosterCsv } from "./csv";
 import { adminPage, adminHomePage, dashboardPage } from "./html";
 import { pickLang, langCookie } from "./i18n";
@@ -46,6 +49,8 @@ export default {
         return await gradesIngest(req, env);
       if (p === "/api/roster" && req.method === "GET") return await apiRoster(req, env);
       if (p === "/api/grades" && req.method === "GET") return await apiGrades(req, env, url);
+      if (p === "/api/enrollments/ingest" && req.method === "POST")
+        return await enrollmentsIngest(req, env);
       if (p === "/admin" && req.method === "GET") return await adminHome(req, env, url);
       if (p === "/admin/courses" && req.method === "POST") return await courseUpsert(req, env);
       const cm = p.match(/^\/c\/([A-Za-z0-9_-]+)\/admin(\/[A-Za-z0-9._/-]*)?$/);
@@ -352,6 +357,7 @@ async function courseUpsert(req: Request, env: Env): Promise<Response> {
   const course_id = String(form.get("course_id") ?? "").trim();
   const name = String(form.get("name") ?? "").trim();
   if (!course_id || !/^[A-Za-z0-9_-]+$/.test(course_id) || !name) return redirect("/admin");
+  const statusIn = String(form.get("status") ?? "").trim();
   await upsertCourse(
     env.DB,
     {
@@ -360,10 +366,13 @@ async function courseUpsert(req: Request, env: Env): Promise<Response> {
       term: String(form.get("term") ?? "").trim() || null,
       moodle_course_id: String(form.get("moodle_course_id") ?? "").trim() || null,
       github_org: String(form.get("github_org") ?? "").trim() || null,
+      status: statusIn === "archived" ? "archived" : "active",
     },
     new Date(Date.now()).toISOString(),
   );
-  return redirect("/admin");
+  // Edits come from the course page; new courses from the picker. Return to
+  // wherever makes sense: the course page if it now exists.
+  return redirect(`/c/${encodeURIComponent(course_id)}/admin`);
 }
 
 // /c/<course_id>/admin[/...] dispatch.
@@ -377,6 +386,7 @@ async function courseAdminRouter(
   if (sub === "/delete" && m === "POST") return await courseDelete(req, env, courseId);
   if (sub === "/staff/add" && m === "POST") return await staffAdd(req, env, courseId);
   if (sub === "/staff/remove" && m === "POST") return await staffRemove(req, env, courseId);
+  if (sub === "/enroll" && m === "POST") return await courseEnroll(req, env, courseId);
   return new Response("Not found", { status: 404 });
 }
 
@@ -387,20 +397,35 @@ async function courseAdmin(req: Request, env: Env, url: URL, courseId: string): 
   if (!course) return new Response("Course not found", { status: 404 });
   const isOwner = isAdmin(env, s.nycu!.id);
   const lang = pickLang(url, req.headers.get("Cookie"));
-  const [rows, staff] = await Promise.all([listBindings(env.DB), listStaff(env.DB, courseId)]);
+  const [rows, staff, enrolled] = await Promise.all([
+    listBindings(env.DB),
+    listStaff(env.DB, courseId),
+    listEnrolledWithBinding(env.DB, courseId),
+  ]);
+  // Once a course has an enrolled roster, the bindings table scopes to it
+  // (enrolled ∩ bound); before that it shows the global registry (back-compat).
+  const scoped = enrolled.length ? rows.filter((r) => enrolled.some((e) => e.student_id === r.nycu_id)) : rows;
   const staffMsg = url.searchParams.get("staff_msg") ?? "";
   return new Response(
-    adminPage(lang, { course_id: course.course_id, name: course.name }, rows, { isOwner, staff, staffMsg }),
+    adminPage(lang, course, scoped, { isOwner, staff, staffMsg, enrolled }),
     { headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) } },
   );
 }
 
-// Bindings are global identity; until Phase 3 enrollment sync, the per-course
-// export is the full bindings list (filename tagged with the course).
+// Enrolled student_ids for a course, or null if the course has no roster yet
+// (callers then fall back to the global binding list — back-compat).
+async function enrolledSet(env: Env, courseId: string): Promise<Set<string> | null> {
+  const rows = await listEnrollments(env.DB, courseId);
+  return rows.length ? new Set(rows.map((r) => r.student_id)) : null;
+}
+
+// Per-course bindings CSV. Scoped to the enrolled roster once one exists.
 async function courseExport(req: Request, env: Env, courseId: string): Promise<Response> {
   const s = await requireCourseStaff(req, env, courseId);
   if (s instanceof Response) return s;
-  const rows = await listBindings(env.DB);
+  const set = await enrolledSet(env, courseId);
+  let rows = await listBindings(env.DB);
+  if (set) rows = rows.filter((r) => set.has(r.nycu_id));
   return new Response(toCsv(rows), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
@@ -409,15 +434,61 @@ async function courseExport(req: Request, env: Env, courseId: string): Promise<R
   });
 }
 
+// Per-course roster.csv (github_login,student_id). Scoped to enrolled ∩ bound.
 async function courseRoster(req: Request, env: Env, courseId: string): Promise<Response> {
   const s = await requireCourseStaff(req, env, courseId);
   if (s instanceof Response) return s;
-  const rows = await listBindings(env.DB);
+  const set = await enrolledSet(env, courseId);
+  let rows = await listBindings(env.DB);
+  if (set) rows = rows.filter((r) => set.has(r.nycu_id));
   return new Response(toRosterCsv(rows), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="roster-${courseId}.csv"`,
     },
+  });
+}
+
+// POST /c/<id>/admin/enroll — owner imports a roster (paste). `replace` swaps
+// the whole roster (Moodle-authoritative); otherwise it's additive.
+async function courseEnroll(req: Request, env: Env, courseId: string): Promise<Response> {
+  const s = await requireAdmin(req, env);
+  if (s instanceof Response) return s;
+  if (!(await getCourse(env.DB, courseId))) return new Response("Course not found", { status: 404 });
+  const form = await req.formData();
+  const ids = parseStudentIds(String(form.get("student_ids") ?? ""));
+  const replace = form.get("replace") != null;
+  const now = new Date(Date.now()).toISOString();
+  if (replace) await replaceEnrollments(env.DB, courseId, ids, now);
+  else await bulkEnroll(env.DB, courseId, ids, now);
+  return redirect(`/c/${encodeURIComponent(courseId)}/admin`);
+}
+
+// Split a pasted blob of 學號 on commas / whitespace / newlines.
+function parseStudentIds(blob: string): string[] {
+  return blob.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
+}
+
+// POST /api/enrollments/ingest — token-auth roster import for automation
+// (e.g. seminar-moodle pushing Moodle participants). Body:
+// { course_id, student_ids: [...], replace?: bool }.
+async function enrollmentsIngest(req: Request, env: Env): Promise<Response> {
+  if (!bearerOk(req, env)) return new Response("Unauthorized", { status: 401 });
+  const body = (await req.json().catch(() => null)) as
+    | { course_id?: unknown; student_ids?: unknown; replace?: unknown }
+    | null;
+  const course_id = typeof body?.course_id === "string" ? body.course_id : "";
+  const list = Array.isArray(body?.student_ids) ? body!.student_ids : null;
+  if (!course_id || !list) return new Response("Bad request", { status: 400 });
+  if (!(await getCourse(env.DB, course_id))) return new Response("Unknown course", { status: 404 });
+  const ids = list.filter((x): x is string => typeof x === "string");
+  if (ids.length > MAX_INGEST_ROWS) return new Response("Too many rows", { status: 413 });
+  const now = new Date(Date.now()).toISOString();
+  const n = body?.replace
+    ? await replaceEnrollments(env.DB, course_id, ids, now)
+    : await bulkEnroll(env.DB, course_id, ids, now);
+  return new Response(JSON.stringify({ ok: true, enrolled: n }), {
+    headers: { "Content-Type": "application/json" },
   });
 }
 
