@@ -12,12 +12,14 @@ import { nycuAuthorizeUrl, exchangeNycuCode, fetchNycuUser } from "./oauth/nycu"
 import {
   githubAuthorizeUrl, exchangeGithubCode, fetchGithubUser, inviteOrgMember,
   addTeamMembership, removeTeamMembership, removeOrgMember,
+  listOrgMembers, listPendingOrgInvites,
 } from "./oauth/github";
 import {
   upsertBinding,
   listBindings,
   deleteBinding,
   getBinding,
+  orgBindingView,
   GithubConflictError,
 } from "./db/bindings";
 import { upsertGrades, listGradesFor, listGradesForProblem, GradeInput } from "./db/grades";
@@ -30,7 +32,7 @@ import {
   coursesForStudent,
 } from "./db/enrollments";
 import { toCsv, toRosterCsv } from "./csv";
-import { adminPage, adminHomePage, dashboardPage } from "./html";
+import { adminPage, adminHomePage, bindingsPage, orgMembersPage, dashboardPage } from "./html";
 import { pickLang, langCookie } from "./i18n";
 
 const TTL_MS = 15 * 60 * 1000;
@@ -53,7 +55,10 @@ export default {
       if (p === "/api/enrollments/ingest" && req.method === "POST")
         return await enrollmentsIngest(req, env);
       if (p === "/admin" && req.method === "GET") return await adminHome(req, env, url);
+      if (p === "/admin/bindings" && req.method === "GET") return await adminBindings(req, env, url);
       if (p === "/admin/courses" && req.method === "POST") return await courseUpsert(req, env);
+      const om = p.match(/^\/admin\/org\/([A-Za-z0-9_.-]+)$/);
+      if (om && req.method === "GET") return await adminOrgView(req, env, url, om[1]);
       const cm = p.match(/^\/c\/([A-Za-z0-9_-]+)\/admin(\/[A-Za-z0-9._/-]*)?$/);
       if (cm) return await courseAdminRouter(req, env, url, cm[1], cm[2] ?? "");
       return new Response("Not found", { status: 404 });
@@ -364,6 +369,18 @@ async function requireCourseStaff(
 
 // /admin — course picker. Owners see all courses + a create form; staff see
 // only their courses.
+// Distinct GitHub orgs across all courses (each course's effective org) + the
+// shared COURSE_ORG — the set offered for the "query bindings by org" view.
+async function effectiveOrgs(env: Env): Promise<string[]> {
+  const orgs = new Set<string>();
+  if (env.COURSE_ORG) orgs.add(env.COURSE_ORG);
+  for (const c of await listCourses(env.DB)) {
+    const o = effectiveOrg(env, c);
+    if (o) orgs.add(o);
+  }
+  return [...orgs];
+}
+
 async function adminHome(req: Request, env: Env, url: URL): Promise<Response> {
   const s = await requireStaff(req, env);
   if (s instanceof Response) return s;
@@ -374,7 +391,45 @@ async function adminHome(req: Request, env: Env, url: URL): Promise<Response> {
     const mine = new Set(await coursesForStaff(env.DB, s.nycu!.id));
     courses = courses.filter((c) => mine.has(c.course_id));
   }
-  return new Response(adminHomePage(lang, courses, { isOwner }), {
+  const orgs = await effectiveOrgs(env);
+  return new Response(adminHomePage(lang, courses, { isOwner, orgs }), {
+    headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
+  });
+}
+
+// GET /admin/bindings — the global binding registry (all bound students),
+// independent of course/enrollment. The pre-enrollment catch-all.
+async function adminBindings(req: Request, env: Env, url: URL): Promise<Response> {
+  const s = await requireStaff(req, env);
+  if (s instanceof Response) return s;
+  const lang = pickLang(url, req.headers.get("Cookie"));
+  const [rows, orgs] = await Promise.all([listBindings(env.DB), effectiveOrgs(env)]);
+  return new Response(bindingsPage(lang, rows, orgs), {
+    headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
+  });
+}
+
+// GET /admin/org/<org> — query bindings by GitHub org: live-fetch the org's
+// members + pending invites (once each) and join to the binding registry.
+async function adminOrgView(req: Request, env: Env, url: URL, org: string): Promise<Response> {
+  const s = await requireStaff(req, env);
+  if (s instanceof Response) return s;
+  if (!(await effectiveOrgs(env)).includes(org)) return new Response("Unknown org", { status: 404 });
+  if (!env.ORG_INVITE_TOKEN) return new Response("ORG_INVITE_TOKEN not set", { status: 400 });
+  const lang = pickLang(url, req.headers.get("Cookie"));
+  let members: string[] = [];
+  let pending: string[] = [];
+  let err = "";
+  try {
+    [members, pending] = await Promise.all([
+      listOrgMembers(org, env.ORG_INVITE_TOKEN),
+      listPendingOrgInvites(org, env.ORG_INVITE_TOKEN),
+    ]);
+  } catch (e) {
+    err = (e as Error).message;
+  }
+  const view = orgBindingView(await listBindings(env.DB), members, pending);
+  return new Response(orgMembersPage(lang, org, view, err), {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
   });
 }

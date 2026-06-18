@@ -419,6 +419,54 @@ describe("staff/TA management", () => {
   });
 });
 
+describe("binding queries (總表 + by GitHub org)", () => {
+  const owner = () => signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "A" } }, SECRET);
+  const bind = (nycu: string, login: string) =>
+    env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, created_at, updated_at) VALUES (?,?,?,?,?,?)",
+    ).bind(nycu, nycu, Math.floor(Math.random() * 1e6), login, "t", "t").run();
+
+  it("/admin/bindings lists all bindings (independent of enrollment)", async () => {
+    await bind("0856001", "ming");
+    const res = await call("/admin/bindings", { headers: cookie(await owner()) });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("所有綁定");
+    expect(body).toContain("ming");
+    expect(body).toContain("0856001");
+    expect(body).toContain('href="/admin/org/nycu-cs-course-ds"'); // effective org link
+  });
+
+  it("/admin/bindings is auth-gated", async () => {
+    const res = await call("/admin/bindings");
+    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
+  });
+
+  it("/admin/org/<org> joins org members/pending to bindings", async () => {
+    await bind("0856001", "ming");   // will be a member
+    await bind("0856002", "hua");    // pending
+    await bind("0856003", "solo");   // not in org
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const u = String(input instanceof Request ? input.url : input);
+      if (u.includes("/members")) return new Response(JSON.stringify([{ login: "ming" }, { login: "ghost" }]), { headers: { "Content-Type": "application/json" } });
+      if (u.includes("/invitations")) return new Response(JSON.stringify([{ login: "hua" }]), { headers: { "Content-Type": "application/json" } });
+      throw new Error("unexpected " + u);
+    }));
+    const res = await call("/admin/org/nycu-cs-course-ds", { headers: cookie(await owner()) });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("已加入"); // ming member badge
+    expect(body).toContain("待接受"); // hua pending badge
+    expect(body).toContain("未加入"); // solo not joined
+    expect(body).toContain("ghost"); // org member with no maccount binding (unbound section)
+  });
+
+  it("/admin/org/<unknown> → 404", async () => {
+    const res = await call("/admin/org/not-a-course-org", { headers: cookie(await owner()) });
+    expect(res.status).toBe(404);
+  });
+});
+
 describe("course edit + enrollment", () => {
   const owner = () => signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "A" } }, SECRET);
   const staffSession = () => signSession({ exp: Date.now() + 60000, nycu: { id: "ta01", name: "助教" } }, SECRET);

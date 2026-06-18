@@ -50,6 +50,36 @@ export async function deleteBinding(db: D1Database, nycu_id: string): Promise<vo
   await db.prepare("DELETE FROM bindings WHERE nycu_id = ?").bind(nycu_id).run();
 }
 
+export type OrgStatus = "member" | "pending" | "none";
+
+export interface OrgBindingRow {
+  student_id: string;
+  nycu_name: string | null;
+  github_login: string | null;
+  status: OrgStatus; // membership of THIS org for the bound github account
+}
+
+// Join the binding registry to a GitHub org's members + pending invites (by
+// login, case-insensitive). Returns each binding tagged with its org status,
+// plus org members/invitees that have NO maccount binding (joined GitHub but
+// didn't bind). Pure — the handler fetches members/pending from GitHub. Used by
+// the admin "query bindings by org" view (esp. before enrollment exists).
+export function orgBindingView(
+  bindings: BindingRow[], members: string[], pending: string[],
+): { rows: OrgBindingRow[]; unbound: string[] } {
+  const lc = (s: string) => s.toLowerCase();
+  const mem = new Set(members.map(lc));
+  const pend = new Set(pending.map(lc));
+  const boundLogins = new Set(bindings.map((b) => lc(b.github_login ?? "")));
+  const rows: OrgBindingRow[] = bindings.map((b) => {
+    const l = lc(b.github_login ?? "");
+    const status: OrgStatus = mem.has(l) ? "member" : pend.has(l) ? "pending" : "none";
+    return { student_id: b.nycu_id, nycu_name: b.nycu_name, github_login: b.github_login, status };
+  });
+  const unbound = [...new Set([...members, ...pending])].filter((l) => l && !boundLogins.has(lc(l)));
+  return { rows, unbound };
+}
+
 export async function getBinding(db: D1Database, nycu_id: string): Promise<BindingRow | null> {
   return await db
     .prepare(
