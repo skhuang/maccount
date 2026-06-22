@@ -3,6 +3,9 @@ export interface BindingRow {
   nycu_name: string | null;
   github_id: number;
   github_login: string | null;
+  // Optional: present once the student also binds a Google account.
+  google_sub?: string | null;
+  google_email?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -13,11 +16,13 @@ function esc(v: unknown): string {
 }
 
 export function toCsv(rows: BindingRow[]): string {
-  const header = ["nycu_id", "nycu_name", "github_id", "github_login", "created_at", "updated_at"];
+  const header = [
+    "nycu_id", "nycu_name", "github_id", "github_login", "google_email", "created_at", "updated_at",
+  ];
   const lines = [header.join(",")];
   for (const r of rows) {
     lines.push(
-      [r.nycu_id, r.nycu_name, r.github_id, r.github_login, r.created_at, r.updated_at]
+      [r.nycu_id, r.nycu_name, r.github_id, r.github_login, r.google_email, r.created_at, r.updated_at]
         .map(esc)
         .join(","),
     );

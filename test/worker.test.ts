@@ -3,6 +3,8 @@ import { env, applyD1Migrations } from "cloudflare:test";
 import worker from "../src/index";
 import { signSession, SESSION_COOKIE } from "../src/session";
 import { listBindings } from "../src/db/bindings";
+import { encryptSecret } from "../src/crypto";
+import { STAFF_GOOGLE_SCOPE } from "../src/oauth/drive";
 import type { Env } from "../src/env";
 
 const SECRET = "test-secret";
@@ -15,6 +17,10 @@ const testEnv: Env = {
   ADMIN_IDS: "admin1",
   GITHUB_CLIENT_ID: "gh_id",
   GITHUB_CLIENT_SECRET: "gh_secret",
+  GOOGLE_CLIENT_ID: "g_id",
+  GOOGLE_CLIENT_SECRET: "g_secret",
+  GOOGLE_SCOPE: "openid email https://www.googleapis.com/auth/drive.file",
+  GOOGLE_TOKEN_KEY: "test-token-key",
   NYCU_AUTHORIZE_URL: "https://id.nycu.edu.tw/o/authorize/",
   NYCU_TOKEN_URL: "https://id.nycu.edu.tw/o/token/",
   NYCU_USERINFO_URL: "https://id.nycu.edu.tw/o/userinfo/",
@@ -206,6 +212,314 @@ describe("/auth/github/callback (bind happy path)", () => {
     );
     const res = await call("/auth/github/callback?code=abc&state=WRONG", { headers: cookie(session) });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("/auth/google/start (bind from the dashboard)", () => {
+  it("redirects a logged-in user to Google authorize", async () => {
+    const session = await signSession(
+      { exp: Date.now() + 60000, nycu: { id: "314561004", name: "甲" } },
+      SECRET,
+    );
+    const res = await call("/auth/google/start", { headers: cookie(session) });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toContain("accounts.google.com/o/oauth2/v2/auth");
+    expect(res.headers.get("Set-Cookie")).toContain(SESSION_COOKIE);
+  });
+
+  it("redirects an anonymous user to NYCU login first", async () => {
+    const res = await call("/auth/google/start");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
+  });
+
+  it("?drive=1 requests the full drive scope (staff connect)", async () => {
+    const session = await signSession(
+      { exp: Date.now() + 60000, nycu: { id: "admin1", name: "A" } },
+      SECRET,
+    );
+    const res = await call("/auth/google/start?drive=1", { headers: cookie(session) });
+    const loc = new URL(res.headers.get("Location")!);
+    expect(loc.searchParams.get("scope")).toBe(STAFF_GOOGLE_SCOPE);
+    expect(loc.searchParams.get("scope")).toContain("auth/drive");
+    expect(loc.searchParams.get("scope")).not.toContain("drive.file");
+  });
+});
+
+describe("/c/<id>/admin/drive/share", () => {
+  const owner = () => signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "A" } }, SECRET);
+  // Seed the acting staff (admin1) with a connected Drive (full scope) token.
+  const connectAdminDrive = async (scope = STAFF_GOOGLE_SCOPE) => {
+    const enc = await encryptSecret("r_admin", "test-token-key");
+    await env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, github_id, google_sub, google_email, google_refresh_token, google_scope, google_token_updated_at, created_at, updated_at) VALUES ('admin1','A',NULL,'adminsub','admin@gmail.com',?,?, 't','t','t')",
+    ).bind(enc, scope).run();
+  };
+  const bindStudent = (id: string, email: string | null) =>
+    env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, github_id, google_sub, google_email, created_at, updated_at) VALUES (?,?,NULL,?,?,'t','t')",
+    ).bind(id, id, `sub-${id}`, email).run();
+  const enroll = (id: string) =>
+    env.DB.prepare(
+      "INSERT INTO enrollments (course_id, student_id, role, created_at) VALUES ('ds-2026',?,'student','t')",
+    ).bind(id).run();
+  const post = (fields: Record<string, string>, session: string) =>
+    call("/c/ds-2026/admin/drive/share", {
+      method: "POST",
+      headers: { ...cookie(session), "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(fields).toString(),
+    });
+
+  it("shares the file with each enrolled+bound student by Google email", async () => {
+    await connectAdminDrive();
+    await bindStudent("s1", "s1@gmail.com");
+    await enroll("s1");
+    const calls: { url: string; body: unknown }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("oauth2.googleapis.com/token"))
+        return new Response(JSON.stringify({ access_token: "fresh" }), { headers: { "Content-Type": "application/json" } });
+      if (url.includes("/permissions")) {
+        calls.push({ url, body: JSON.parse(String(init?.body)) });
+        return new Response(JSON.stringify({ id: "p1" }), { headers: { "Content-Type": "application/json" } });
+      }
+      throw new Error("unexpected fetch " + url);
+    }));
+    const res = await post({ file_id: "https://drive.google.com/drive/folders/FOLDER1", role: "reader" }, await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?drive_msg=done%3A1%3A0%3A0");
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toContain("/files/FOLDER1/permissions"); // id parsed from the folder URL
+    expect(calls[0].body).toEqual({ role: "reader", type: "user", emailAddress: "s1@gmail.com" });
+  });
+
+  it("skips enrolled students with no bound Google account", async () => {
+    await connectAdminDrive();
+    await bindStudent("s1", "s1@gmail.com");
+    await bindStudent("s2", null); // bound github only, no google
+    await enroll("s1");
+    await enroll("s2");
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("oauth2.googleapis.com/token"))
+        return new Response(JSON.stringify({ access_token: "fresh" }), { headers: { "Content-Type": "application/json" } });
+      if (url.includes("/permissions")) { calls.push(url); return new Response("{}", { headers: { "Content-Type": "application/json" } }); }
+      throw new Error("unexpected " + url);
+    }));
+    const res = await post({ file_id: "FILE1" }, await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?drive_msg=done%3A1%3A0%3A1"); // shared 1, skipped 1
+    expect(calls).toHaveLength(1);
+  });
+
+  it("flashes no-drive (and makes no Drive calls) when the staff hasn't connected full-scope Drive", async () => {
+    await connectAdminDrive("openid email https://www.googleapis.com/auth/drive.file"); // drive.file only
+    await bindStudent("s1", "s1@gmail.com");
+    await enroll("s1");
+    const fetchSpy = vi.fn(async () => new Response("{}", { headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchSpy);
+    const res = await post({ file_id: "FILE1" }, await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?drive_msg=no-drive");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("flashes no-file when no file id is given", async () => {
+    await connectAdminDrive();
+    const res = await post({ file_id: "  " }, await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?drive_msg=no-file");
+  });
+
+  it("forbids a logged-in non-staff (403)", async () => {
+    const session = await signSession({ exp: Date.now() + 60000, nycu: { id: "0856001", name: "王" } }, SECRET);
+    const res = await post({ file_id: "FILE1" }, session);
+    expect(res.status).toBe(403);
+  });
+
+  it("redirects an anonymous request to NYCU login", async () => {
+    const res = await post({ file_id: "FILE1" }, "");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
+  });
+});
+
+describe("/auth/google/callback (bind happy path)", () => {
+  const stubGoogle = (sub: number | string, email: string, refresh: string | null = "r_tok") =>
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("oauth2.googleapis.com/token"))
+        return new Response(JSON.stringify({
+          access_token: "g_tok", scope: "openid email https://www.googleapis.com/auth/drive.file",
+          ...(refresh ? { refresh_token: refresh } : {}),
+        }), { headers: { "Content-Type": "application/json" } });
+      if (url.includes("userinfo"))
+        return new Response(JSON.stringify({ sub: String(sub), email }), { headers: { "Content-Type": "application/json" } });
+      throw new Error("unexpected fetch " + url);
+    }));
+
+  it("upserts a google binding and redirects to /me?gbound=1", async () => {
+    stubGoogle("108sub", "ming@gmail.com");
+    const session = await signSession(
+      { exp: Date.now() + 60000, nycu: { id: "0856001", name: "王小明" }, gostate: "GO" },
+      SECRET,
+    );
+    const res = await call("/auth/google/callback?code=abc&state=GO", { headers: cookie(session) });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/me?gbound=1");
+    const row = await env.DB.prepare("SELECT google_sub, google_email FROM bindings WHERE nycu_id='0856001'").first();
+    expect(row).toMatchObject({ google_sub: "108sub", google_email: "ming@gmail.com" });
+  });
+
+  it("stores the refresh token encrypted (not plaintext) + the granted scope, and it decrypts back", async () => {
+    stubGoogle("108sub", "ming@gmail.com", "r_tok");
+    const session = await signSession(
+      { exp: Date.now() + 60000, nycu: { id: "0856001", name: "王小明" }, gostate: "GO" },
+      SECRET,
+    );
+    await call("/auth/google/callback?code=abc&state=GO", { headers: cookie(session) });
+    const row = await env.DB
+      .prepare("SELECT google_refresh_token, google_scope, google_token_updated_at FROM bindings WHERE nycu_id='0856001'")
+      .first<{ google_refresh_token: string; google_scope: string; google_token_updated_at: string }>();
+    expect(row?.google_refresh_token).toBeTruthy();
+    expect(row?.google_refresh_token).not.toBe("r_tok"); // encrypted at rest
+    expect(row?.google_scope).toContain("drive.file");
+    expect(row?.google_token_updated_at).toBeTruthy();
+    const { decryptSecret } = await import("../src/crypto");
+    expect(await decryptSecret(row!.google_refresh_token, "test-token-key")).toBe("r_tok");
+  });
+
+  it("a re-consent without a refresh token keeps the previously stored one (COALESCE)", async () => {
+    stubGoogle("108sub", "ming@gmail.com", "r_tok"); // first bind: stores token
+    const session = await signSession(
+      { exp: Date.now() + 60000, nycu: { id: "0856001", name: "王小明" }, gostate: "GO" },
+      SECRET,
+    );
+    await call("/auth/google/callback?code=abc&state=GO", { headers: cookie(session) });
+    const first = await env.DB.prepare("SELECT google_refresh_token FROM bindings WHERE nycu_id='0856001'").first<{ google_refresh_token: string }>();
+    stubGoogle("108sub", "ming@gmail.com", null); // re-bind: Google returns no refresh token
+    await call("/auth/google/callback?code=abc&state=GO", { headers: cookie(session) });
+    const second = await env.DB.prepare("SELECT google_refresh_token FROM bindings WHERE nycu_id='0856001'").first<{ google_refresh_token: string }>();
+    expect(second?.google_refresh_token).toBe(first?.google_refresh_token); // not wiped
+  });
+
+  it("redirects with error when the google account is already bound elsewhere", async () => {
+    await env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, github_id, google_sub, google_email, created_at, updated_at) VALUES ('other','x',NULL,'108sub','ming@gmail.com','t','t')",
+    ).run();
+    stubGoogle("108sub", "ming@gmail.com");
+    const session = await signSession(
+      { exp: Date.now() + 60000, nycu: { id: "0856001", name: "王" }, gostate: "GO" },
+      SECRET,
+    );
+    const res = await call("/auth/google/callback?code=abc&state=GO", { headers: cookie(session) });
+    expect(res.headers.get("Location")).toBe("/me?error=google_already_bound");
+  });
+
+  it("surfaces a Google OAuth error to the done page", async () => {
+    const res = await call("/auth/google/callback?error=access_denied&state=x");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe(
+      "https://skhuang.github.io/maccount/done.html?status=err&reason=google_access_denied",
+    );
+  });
+
+  it("rejects a state mismatch", async () => {
+    const session = await signSession(
+      { exp: Date.now() + 60000, nycu: { id: "x", name: "x" }, gostate: "GO" },
+      SECRET,
+    );
+    const res = await call("/auth/google/callback?code=abc&state=WRONG", { headers: cookie(session) });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("sign in with GitHub / Google (login via an existing binding)", () => {
+  const sessionToken = (res: Response) => {
+    const setc = res.headers.get("Set-Cookie") ?? "";
+    return setc.split(";")[0].split("=").slice(1).join("=");
+  };
+
+  it("/auth/github/login redirects to GitHub with a state-only session (no NYCU needed)", async () => {
+    const res = await call("/auth/github/login");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toContain("github.com/login/oauth/authorize");
+    expect(res.headers.get("Set-Cookie")).toContain(SESSION_COOKIE);
+  });
+
+  it("/auth/google/login requests identity only (no Drive/offline)", async () => {
+    const res = await call("/auth/google/login");
+    const loc = new URL(res.headers.get("Location")!);
+    expect(loc.origin + loc.pathname).toBe("https://accounts.google.com/o/oauth2/v2/auth");
+    expect(loc.searchParams.get("scope")).toBe("openid email");
+    expect(loc.searchParams.get("access_type")).toBe(null);
+  });
+
+  it("GitHub login resolves the binding and logs in as that NYCU account", async () => {
+    await env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, created_at, updated_at) VALUES ('0856001','王小明',999,'octo','t','t')",
+    ).run();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("access_token"))
+        return new Response(JSON.stringify({ access_token: "t" }), { headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ id: 999, login: "octo" }), { headers: { "Content-Type": "application/json" } });
+    }));
+    const session = await signSession({ exp: Date.now() + 60000, gstate: "GS" }, SECRET); // NO nycu
+    const res = await call("/auth/github/callback?code=abc&state=GS", { headers: cookie(session) });
+    expect(res.headers.get("Location")).toBe("/me");
+    // the issued session is logged in as the bound NYCU account
+    const me = await call("/me", { headers: cookie(sessionToken(res)) });
+    expect(me.status).toBe(200);
+    expect(await me.text()).toContain("0856001");
+  });
+
+  it("GitHub login with an unbound account → done page error", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("access_token"))
+        return new Response(JSON.stringify({ access_token: "t" }), { headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ id: 555, login: "stranger" }), { headers: { "Content-Type": "application/json" } });
+    }));
+    const session = await signSession({ exp: Date.now() + 60000, gstate: "GS" }, SECRET);
+    const res = await call("/auth/github/callback?code=abc&state=GS", { headers: cookie(session) });
+    expect(res.headers.get("Location")).toBe(
+      "https://skhuang.github.io/maccount/done.html?status=err&reason=github_not_bound",
+    );
+  });
+
+  it("GitHub login rejects a state mismatch", async () => {
+    const session = await signSession({ exp: Date.now() + 60000, gstate: "GS" }, SECRET);
+    const res = await call("/auth/github/callback?code=abc&state=WRONG", { headers: cookie(session) });
+    expect(res.status).toBe(400);
+  });
+
+  it("Google login resolves the binding and logs in as that NYCU account", async () => {
+    await env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, github_id, google_sub, google_email, created_at, updated_at) VALUES ('0856001','王小明',NULL,'108sub','m@gmail.com','t','t')",
+    ).run();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("oauth2.googleapis.com/token"))
+        return new Response(JSON.stringify({ access_token: "t" }), { headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ sub: "108sub", email: "m@gmail.com" }), { headers: { "Content-Type": "application/json" } });
+    }));
+    const session = await signSession({ exp: Date.now() + 60000, gostate: "GO" }, SECRET); // NO nycu
+    const res = await call("/auth/google/callback?code=abc&state=GO", { headers: cookie(session) });
+    expect(res.headers.get("Location")).toBe("/me");
+    const me = await call("/me", { headers: cookie(sessionToken(res)) });
+    expect(await me.text()).toContain("0856001");
+  });
+
+  it("Google login with an unbound account → done page error", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("oauth2.googleapis.com/token"))
+        return new Response(JSON.stringify({ access_token: "t" }), { headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ sub: "unknown", email: "x@gmail.com" }), { headers: { "Content-Type": "application/json" } });
+    }));
+    const session = await signSession({ exp: Date.now() + 60000, gostate: "GO" }, SECRET);
+    const res = await call("/auth/google/callback?code=abc&state=GO", { headers: cookie(session) });
+    expect(res.headers.get("Location")).toBe(
+      "https://skhuang.github.io/maccount/done.html?status=err&reason=google_not_bound",
+    );
   });
 });
 
@@ -620,6 +934,8 @@ describe("/me dashboard", () => {
     expect(res.status).toBe(200);
     const body = await res.text();
     expect(body).toContain("/auth/github/start"); // bind action
+    expect(body).toContain("/auth/google/start"); // google bind action
+    expect(body).toContain("綁定 Google");
     expect(body).toContain("尚未綁定");
     expect(body).not.toContain("管理功能"); // 314561004 is not in ADMIN_IDS
     // org-join CTA from COURSE_ORG
@@ -720,6 +1036,20 @@ describe("/me dashboard", () => {
     );
     const res = await call("/me?bound=1", { headers: cookie(session) });
     expect(await res.text()).toContain("綁定成功");
+  });
+
+  it("shows a success flash after binding google (?gbound=1), and the bound email", async () => {
+    await env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, github_id, google_sub, google_email, created_at, updated_at) VALUES ('314561004','甲',NULL,'108sub','ming@gmail.com','t','t')",
+    ).run();
+    const session = await signSession(
+      { exp: Date.now() + 60000, nycu: { id: "314561004", name: "甲" } },
+      SECRET,
+    );
+    const res = await call("/me?gbound=1", { headers: cookie(session) });
+    const body = await res.text();
+    expect(body).toContain("Google 綁定成功");
+    expect(body).toContain("ming@gmail.com"); // shows the bound google email
   });
 
   it("renders English and sets a lang cookie with ?lang=en", async () => {

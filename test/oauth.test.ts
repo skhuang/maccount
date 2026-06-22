@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { githubAuthorizeUrl, exchangeGithubCode, fetchGithubUser } from "../src/oauth/github";
+import {
+  googleAuthorizeUrl, exchangeGoogleCode, fetchGoogleUser, refreshGoogleAccessToken,
+  DEFAULT_GOOGLE_SCOPE,
+} from "../src/oauth/google";
 import { nycuAuthorizeUrl, exchangeNycuCode, fetchNycuUser, type NycuConfig } from "../src/oauth/nycu";
 import { isAdmin } from "../src/env";
 
@@ -40,6 +44,62 @@ describe("github oauth", () => {
   it("fetches github user id + login", async () => {
     const user = await fetchGithubUser("gh_tok", jsonFetcher({ id: 42, login: "octo" }));
     expect(user).toEqual({ id: 42, login: "octo" });
+  });
+});
+
+describe("google oauth", () => {
+  it("builds authorize url with offline access, forced consent + the given scope", () => {
+    const u = new URL(googleAuthorizeUrl("cid", "https://api.example/cb", "st8", DEFAULT_GOOGLE_SCOPE));
+    expect(u.origin + u.pathname).toBe("https://accounts.google.com/o/oauth2/v2/auth");
+    expect(u.searchParams.get("client_id")).toBe("cid");
+    expect(u.searchParams.get("redirect_uri")).toBe("https://api.example/cb");
+    expect(u.searchParams.get("response_type")).toBe("code");
+    expect(u.searchParams.get("scope")).toBe(DEFAULT_GOOGLE_SCOPE);
+    expect(u.searchParams.get("scope")).toContain("drive.file");
+    expect(u.searchParams.get("state")).toBe("st8");
+    expect(u.searchParams.get("access_type")).toBe("offline");
+    expect(u.searchParams.get("prompt")).toBe("consent select_account");
+  });
+
+  it("login mode (offline:false) skips access_type/consent, keeps account chooser", () => {
+    const u = new URL(googleAuthorizeUrl("cid", "https://api.example/cb", "st8", "openid email", { offline: false }));
+    expect(u.searchParams.get("scope")).toBe("openid email");
+    expect(u.searchParams.get("access_type")).toBe(null);
+    expect(u.searchParams.get("prompt")).toBe("select_account");
+  });
+
+  it("exchanges code for access + refresh token", async () => {
+    const tokens = await exchangeGoogleCode(
+      { clientId: "c", clientSecret: "s", code: "x", redirectUri: "https://api/cb" },
+      jsonFetcher({ access_token: "g_tok", refresh_token: "r_tok", scope: "openid email", expires_in: 3599 }),
+    );
+    expect(tokens).toEqual({ accessToken: "g_tok", refreshToken: "r_tok", scope: "openid email", expiresIn: 3599 });
+  });
+
+  it("tolerates a token response with no refresh token", async () => {
+    const tokens = await exchangeGoogleCode(
+      { clientId: "c", clientSecret: "s", code: "x", redirectUri: "https://api/cb" },
+      jsonFetcher({ access_token: "g_tok" }),
+    );
+    expect(tokens.accessToken).toBe("g_tok");
+    expect(tokens.refreshToken).toBe(null);
+  });
+
+  it("refreshes an access token from a refresh token", async () => {
+    const got = await refreshGoogleAccessToken(
+      { clientId: "c", clientSecret: "s", refreshToken: "r_tok" },
+      jsonFetcher({ access_token: "fresh_tok", expires_in: 3599 }),
+    );
+    expect(got).toEqual({ accessToken: "fresh_tok", expiresIn: 3599 });
+  });
+
+  it("fetches google sub + email", async () => {
+    const user = await fetchGoogleUser("g_tok", jsonFetcher({ sub: "108x", email: "a@gmail.com" }));
+    expect(user).toEqual({ sub: "108x", email: "a@gmail.com" });
+  });
+
+  it("throws when userinfo lacks sub/email", async () => {
+    await expect(fetchGoogleUser("g_tok", jsonFetcher({ sub: "108x" }))).rejects.toThrow(/missing/);
   });
 });
 

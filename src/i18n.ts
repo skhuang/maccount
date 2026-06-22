@@ -19,10 +19,12 @@ export interface Strings {
   acct_heading: string;
   student_id: string;
   github: string;
+  google: string;
   bound: string;
   rebind: string;
   not_bound: string;
   bind_action: string;
+  bind_google_action: string;
   grades_heading: string;
   col_problem: string;
   col_result: string;
@@ -35,6 +37,7 @@ export interface Strings {
   join_org_prompt: string;
   join_org_link: string;
   flash_bound_ok: string;
+  flash_gbound_ok: string;
   flash_error_prefix: string;
   admin_title: string;
   admin_bindings: string; // "{n}" placeholder
@@ -89,6 +92,19 @@ export interface Strings {
   staff_sync_ok: string;
   staff_sync_nobinding: string;
   staff_sync_error: string;
+  drive_heading: string;
+  drive_note: string;
+  drive_connect: string;
+  drive_file_placeholder: string;
+  drive_role_reader: string;
+  drive_role_commenter: string;
+  drive_role_writer: string;
+  drive_notify: string;
+  drive_share_btn: string;
+  drive_msg_done: string; // {shared} {errors} {skipped}
+  drive_msg_nofile: string;
+  drive_msg_nodrive: string;
+  drive_msg_tokenerror: string;
 }
 
 export const T: Record<Lang, Strings> = {
@@ -97,10 +113,12 @@ export const T: Record<Lang, Strings> = {
     acct_heading: "我的帳號",
     student_id: "學號",
     github: "GitHub",
+    google: "Google",
     bound: "已綁定",
     rebind: "重新綁定",
     not_bound: "尚未綁定",
     bind_action: "綁定 GitHub →",
+    bind_google_action: "綁定 Google →",
     grades_heading: "我的成績",
     col_problem: "題目",
     col_result: "結果",
@@ -113,6 +131,7 @@ export const T: Record<Lang, Strings> = {
     join_org_prompt: "尚未加入課程 GitHub 組織?（需先用你綁定的 GitHub 登入;已加入可忽略）",
     join_org_link: "接受邀請加入課程組織 →",
     flash_bound_ok: "GitHub 綁定成功。",
+    flash_gbound_ok: "Google 綁定成功。",
     flash_error_prefix: "操作未完成：",
     admin_title: "maccount 管理",
     admin_bindings: "綁定名單 ({n})",
@@ -167,16 +186,31 @@ export const T: Record<Lang, Strings> = {
     staff_sync_ok: "已同步到 GitHub org 與 staff team。",
     staff_sync_nobinding: "此助教尚未綁定 GitHub；請他先到 /me 綁定，再加入一次以同步。",
     staff_sync_error: "GitHub org/team 同步失敗（請檢查 ORG_INVITE_TOKEN 權限與 STAFF_TEAM）。",
+    drive_heading: "用 Google Drive 分享檔案給全班",
+    drive_note: "以你自己的 Google Drive 將檔案／資料夾分享給「選課∩已綁 Google」的學生（用其綁定的 Google email）。需先連結你的 Drive（完整權限）：",
+    drive_connect: "連結我的 Google Drive（完整權限）→",
+    drive_file_placeholder: "Drive 檔案／資料夾 ID 或分享連結",
+    drive_role_reader: "檢視者（reader）",
+    drive_role_commenter: "可註解（commenter）",
+    drive_role_writer: "編輯者（writer）",
+    drive_notify: "寄送通知 email",
+    drive_share_btn: "分享給全班",
+    drive_msg_done: "已分享 {shared} 人；失敗 {errors}；略過（未綁 Google）{skipped}。",
+    drive_msg_nofile: "請填入 Drive 檔案／資料夾 ID 或連結。",
+    drive_msg_nodrive: "尚未連結你的 Google Drive（完整權限）。請先點上方「連結我的 Google Drive」並授權。",
+    drive_msg_tokenerror: "無法取得 Google 存取權杖（請重新連結 Drive）。",
   },
   en: {
     acct_title: "My Account",
     acct_heading: "My Account",
     student_id: "Student ID",
     github: "GitHub",
+    google: "Google",
     bound: "Bound",
     rebind: "Re-bind",
     not_bound: "Not bound yet",
     bind_action: "Bind GitHub →",
+    bind_google_action: "Bind Google →",
     grades_heading: "My Grades",
     col_problem: "Problem",
     col_result: "Result",
@@ -189,6 +223,7 @@ export const T: Record<Lang, Strings> = {
     join_org_prompt: "Not in the course GitHub org yet? (sign in with your linked GitHub first; ignore if already joined)",
     join_org_link: "Accept the invite to join the course org →",
     flash_bound_ok: "GitHub bound successfully.",
+    flash_gbound_ok: "Google bound successfully.",
     flash_error_prefix: "Action not completed: ",
     admin_title: "maccount Admin",
     admin_bindings: "Bindings ({n})",
@@ -243,6 +278,19 @@ export const T: Record<Lang, Strings> = {
     staff_sync_ok: "Synced to the GitHub org and staff team.",
     staff_sync_nobinding: "This TA hasn't bound GitHub yet; have them bind at /me, then add again to sync.",
     staff_sync_error: "GitHub org/team sync failed (check ORG_INVITE_TOKEN permissions and STAFF_TEAM).",
+    drive_heading: "Share a Drive file with the class",
+    drive_note: "Share a file/folder from your own Google Drive with enrolled students who bound Google (by their bound Google email). Connect your Drive (full access) first:",
+    drive_connect: "Connect my Google Drive (full access) →",
+    drive_file_placeholder: "Drive file/folder ID or share link",
+    drive_role_reader: "Viewer (reader)",
+    drive_role_commenter: "Commenter",
+    drive_role_writer: "Editor (writer)",
+    drive_notify: "Send notification email",
+    drive_share_btn: "Share with the class",
+    drive_msg_done: "Shared with {shared}; failed {errors}; skipped (no Google) {skipped}.",
+    drive_msg_nofile: "Enter a Drive file/folder ID or link.",
+    drive_msg_nodrive: "Your Google Drive (full access) isn't connected. Click “Connect my Google Drive” above and authorize first.",
+    drive_msg_tokenerror: "Couldn't get a Google access token (please reconnect Drive).",
   },
 };
 

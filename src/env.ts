@@ -8,6 +8,16 @@ export interface Env {
   ADMIN_IDS: string;
   GITHUB_CLIENT_ID: string;
   GITHUB_CLIENT_SECRET: string;
+  // Google OAuth client (for binding a Google account + offline Drive access).
+  // CLIENT_ID in wrangler.toml [vars]; CLIENT_SECRET via secret put.
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
+  // OAuth scope requested at consent. Empty → DEFAULT_GOOGLE_SCOPE
+  // (openid email + drive.file). wrangler.toml [vars] (not a secret).
+  GOOGLE_SCOPE: string;
+  // Symmetric key used to encrypt Google refresh tokens at rest in D1 (AES-GCM,
+  // see crypto.ts). Any long random string. `wrangler secret put GOOGLE_TOKEN_KEY`.
+  GOOGLE_TOKEN_KEY: string;
   NYCU_AUTHORIZE_URL: string;
   NYCU_TOKEN_URL: string;
   NYCU_USERINFO_URL: string;

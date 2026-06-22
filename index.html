@@ -13,6 +13,11 @@
     <li id="t-li3"></li>
   </ul>
   <p><a id="start" style="display:inline-block;padding:.7rem 1.4rem;background:#0b5;color:#fff;border-radius:8px;text-decoration:none"></a></p>
+  <p id="alt-label" style="color:#777;font-size:.9em;margin-bottom:.3rem"></p>
+  <p style="display:flex;gap:.6rem;flex-wrap:wrap">
+    <a id="login-github" style="display:inline-block;padding:.5rem 1rem;border:1px solid #ccc;border-radius:8px;text-decoration:none;color:#333"></a>
+    <a id="login-google" style="display:inline-block;padding:.5rem 1rem;border:1px solid #ccc;border-radius:8px;text-decoration:none;color:#333"></a>
+  </p>
   <script>
     // 部署後把這裡換成你的 Worker 網址
     const WORKER_BASE = "https://maccount-api.skhuang.workers.dev";
@@ -25,6 +30,9 @@
         li2: "查詢你的成績",
         li3: "具管理權限者可使用管理功能",
         btn: "用 NYCU 帳號登入 →",
+        alt: "已綁定過的人，也可以改用：",
+        btn_github: "用 GitHub 登入",
+        btn_google: "用 Google 登入",
       },
       en: {
         title: "Course Account / Grades",
@@ -34,6 +42,9 @@
         li2: "Check your grades",
         li3: "Admins can use admin functions",
         btn: "Sign in with NYCU →",
+        alt: "Already linked? You can also use:",
+        btn_github: "Sign in with GitHub",
+        btn_google: "Sign in with Google",
       },
     };
     function getLang() {
@@ -54,6 +65,13 @@
       a.textContent = s.btn;
       // carry the choice into the Worker so the dashboard matches
       a.href = WORKER_BASE + "/auth/nycu/start?lang=" + lang;
+      document.getElementById("alt-label").textContent = s.alt;
+      const gh = document.getElementById("login-github");
+      gh.textContent = s.btn_github;
+      gh.href = WORKER_BASE + "/auth/github/login?lang=" + lang;
+      const gg = document.getElementById("login-google");
+      gg.textContent = s.btn_google;
+      gg.href = WORKER_BASE + "/auth/google/login?lang=" + lang;
     }
     function setLang(l) { localStorage.setItem("lang", l); render(l); }
     document.getElementById("lang-zh").onclick = (e) => { e.preventDefault(); setLang("zh"); };

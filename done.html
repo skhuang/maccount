@@ -16,6 +16,7 @@
         ok_msg: "你的 NYCU 與 GitHub 帳號已建立對應。",
         err_title: "⚠️ 未完成",
         already: "這個 GitHub 帳號已被其他 NYCU 帳號綁定，請聯絡管理員。",
+        notbound: "這個帳號尚未綁定任何 NYCU 帳號。請先用 NYCU 帳號登入並完成綁定，之後才能用 GitHub／Google 登入。",
         denied: "授權未完成，請回首頁重試。",
         generic: "發生錯誤，請回首頁重試。",
         home: "回首頁",
@@ -26,6 +27,7 @@
         ok_msg: "Your NYCU and GitHub accounts are now linked.",
         err_title: "⚠️ Not completed",
         already: "This GitHub account is already bound to another NYCU account — please contact an admin.",
+        notbound: "This account isn't linked to any NYCU account yet. Sign in with NYCU and link it first, then you can use GitHub/Google to sign in.",
         denied: "Authorization was not completed; please return home and try again.",
         generic: "Something went wrong; please return home and try again.",
         home: "Home",
@@ -51,6 +53,7 @@
         title.textContent = s.err_title;
         const reason = q.get("reason");
         msg.textContent = reason === "github_already_bound" ? s.already
+          : (reason === "github_not_bound" || reason === "google_not_bound") ? s.notbound
           : reason ? s.denied + " (" + reason + ")"
           : s.generic;
       }

@@ -14,8 +14,13 @@ describe("toCsv", () => {
   it("emits header + row", () => {
     const csv = toCsv([row]);
     const lines = csv.trimEnd().split("\n");
-    expect(lines[0]).toBe("nycu_id,nycu_name,github_id,github_login,created_at,updated_at");
-    expect(lines[1]).toBe("0856001,王小明,12345,xiaoming,2026-06-16T00:00:00.000Z,2026-06-16T00:00:00.000Z");
+    expect(lines[0]).toBe("nycu_id,nycu_name,github_id,github_login,google_email,created_at,updated_at");
+    expect(lines[1]).toBe("0856001,王小明,12345,xiaoming,,2026-06-16T00:00:00.000Z,2026-06-16T00:00:00.000Z");
+  });
+
+  it("includes a bound google email", () => {
+    const csv = toCsv([{ ...row, google_email: "ming@gmail.com" }]);
+    expect(csv).toContain("xiaoming,ming@gmail.com,");
   });
 
   it("escapes commas, quotes and newlines", () => {

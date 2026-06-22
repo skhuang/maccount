@@ -44,14 +44,22 @@ npx wrangler deploy
 - **GitHub**（Settings → Developer settings → OAuth Apps → New）：
   - **Authorization callback URL：`<worker>/auth/github/callback`**
   - 取得 Client ID / Client secret。
+- **Google**（[console.cloud.google.com](https://console.cloud.google.com) → APIs & Services → Credentials → Create OAuth client ID → Web application）：
+  - **Authorized redirect URI：`<worker>/auth/google/callback`**
+  - 取得 Client ID / Client secret。**學生**綁定的預設 scope = `openid email` + `drive.file`（`GOOGLE_SCOPE` 可調；分享給學生其實只需 email）。**staff**「連結 Drive」(`/auth/google/start?drive=1`) 會自動要求完整 `drive` scope，才能分享自己既有的檔案。
+  - 在 **Enabled APIs** 啟用 **Google Drive API**。
+  - OAuth consent screen 設 External。完整 `drive` 為**受限 scope**：自用／少量帳號可加「測試使用者」直接用；要對外大量使用才需送 Google 審查。
+  - 綁定流程要求 offline 存取（`access_type=offline`+`prompt=consent`），取得並**加密存下** refresh token。
 
 ### 4. 設定 vars 與 secrets
-編輯 `wrangler.toml` 的 `[vars]`：`PUBLIC_BASE_URL = "<worker>"`、`FRONTEND_DONE_URL = "https://skhuang.github.io/maccount/done.html"`、`GITHUB_CLIENT_ID`、`NYCU_CLIENT_ID`、`ADMIN_IDS`（以逗號分隔的 NYCU 帳號）。
+編輯 `wrangler.toml` 的 `[vars]`：`PUBLIC_BASE_URL = "<worker>"`、`FRONTEND_DONE_URL = "https://skhuang.github.io/maccount/done.html"`、`GITHUB_CLIENT_ID`、`GOOGLE_CLIENT_ID`、`NYCU_CLIENT_ID`、`ADMIN_IDS`（以逗號分隔的 NYCU 帳號）。
 NYCU 端點（`NYCU_AUTHORIZE_URL`、`NYCU_TOKEN_URL`、`NYCU_USERINFO_URL = /api/profile/`、`NYCU_SCOPE = profile`）已依官方文件填好，一般不需更動。
 secrets 用指令設定（不進版控）：
 ```bash
 npx wrangler secret put SESSION_SECRET        # 隨機長字串
 npx wrangler secret put GITHUB_CLIENT_SECRET
+npx wrangler secret put GOOGLE_CLIENT_SECRET
+npx wrangler secret put GOOGLE_TOKEN_KEY     # 隨機長字串；用來加密存放 Google refresh token（換金鑰會讓既存 token 失效）
 npx wrangler secret put NYCU_CLIENT_SECRET
 npx wrangler secret put GRADES_INGEST_TOKEN   # 隨機長字串；OJ runner 推成績時帶在 Authorization: Bearer
 ```
@@ -72,7 +80,9 @@ repo Settings → Pages → 由 `main` 分支根目錄發佈 → 服務在 `http
 
 ## 使用
 - 學生：開 `https://skhuang.github.io/maccount/` → 開始綁定；綁定後可「查詢我的上傳/評分狀態」(`/me`，NYCU 登入後只顯示自己的分數與判定)。
+- **替代登入**：已綁定過 GitHub／Google 的人，首頁也可改用「用 GitHub 登入／用 Google 登入」，免再走 NYCU。系統用該 OAuth 帳號反查綁定，登入成同一個 NYCU 身分（含 admin 權限）。尚未綁定的帳號會被導到 done 頁提示「請先用 NYCU 登入並綁定」。
 - 管理員（`ADMIN_IDS` 內的 NYCU 帳號）：開 `https://<worker>/admin` → 用 NYCU 登入 → 看名單 / 匯出 CSV / 匯出 `roster.csv`（`github_login,student_id`，給 dsjudge P4）/ 刪除綁定。
+- **用 Google Drive 分享檔案給全班**：在課程後台（`/c/<course_id>/admin`）的「用 Google Drive 分享檔案給全班」區，staff 先點「連結我的 Google Drive（完整權限）」授權一次，再貼上檔案／資料夾的 ID 或分享連結、選權限（reader/commenter/writer）送出。系統以該 staff 自己的 Drive，把檔案分享給「選課∩已綁 Google」學生的 email（未綁 Google 的學生略過）。若該檔案是資料夾，學生會一併取得夾內檔案的存取。
 
 ## OJ 成績整合（與 dsjudge）
 - **roster**：`maccount` 是 `github_login ↔ 學號` 的權威來源（兩邊都驗證過）。`/admin/roster.csv` 直接產生 dsjudge `app/roster.py` 讀的 `roster.csv`，取代原本的 GitHub Classroom 匯出。
