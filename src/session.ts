@@ -2,6 +2,7 @@ export interface SessionData {
   exp: number;
   nstate?: string; // CSRF state for the NYCU leg (pre-login)
   gstate?: string; // CSRF state for the GitHub leg (while binding)
+  gostate?: string; // CSRF state for the Google leg (while binding)
   nycu?: { id: string; name: string }; // present once logged in; admin is derived via isAdmin()
 }
 

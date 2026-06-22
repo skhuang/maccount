@@ -15,12 +15,25 @@ import {
   listOrgMembers, listPendingOrgInvites,
 } from "./oauth/github";
 import {
+  googleAuthorizeUrl, exchangeGoogleCode, fetchGoogleUser, refreshGoogleAccessToken,
+  DEFAULT_GOOGLE_SCOPE,
+} from "./oauth/google";
+import {
+  shareFileWithUser, asDriveRole, scopeHasFullDrive, parseDriveFileId, STAFF_GOOGLE_SCOPE,
+} from "./oauth/drive";
+import { encryptSecret, decryptSecret } from "./crypto";
+import {
   upsertBinding,
+  upsertGoogleBinding,
+  getGoogleTokenRow,
   listBindings,
   deleteBinding,
   getBinding,
+  getBindingByGithubId,
+  getBindingByGoogleSub,
   orgBindingView,
   GithubConflictError,
+  GoogleConflictError,
 } from "./db/bindings";
 import {
   upsertGrades, listGradesFor, listGradesForProblem, listGradesForStudentAssignment, GradeInput,
@@ -47,7 +60,11 @@ export default {
       if (p === "/auth/nycu/start") return await startNycu(req, env, url);
       if (p === "/auth/nycu/callback") return await nycuCallback(req, env, url);
       if (p === "/auth/github/start") return await startGithub(req, env);
+      if (p === "/auth/github/login") return await startOAuthLogin(req, env, url, "github");
       if (p === "/auth/github/callback") return await githubCallback(req, env, url);
+      if (p === "/auth/google/start") return await startGoogle(req, env, url);
+      if (p === "/auth/google/login") return await startOAuthLogin(req, env, url, "google");
+      if (p === "/auth/google/callback") return await googleCallback(req, env, url);
       if (p === "/logout") return logout(env);
       if (p === "/me" && req.method === "GET") return await mePage(req, env, url);
       const em = p.match(/^\/me\/exam\/([A-Za-z0-9._-]+)$/);
@@ -135,6 +152,35 @@ async function startGithub(req: Request, env: Env): Promise<Response> {
   return redirect(ghUrl, setCookie(token));
 }
 
+// "Sign in with GitHub / Google" — an alternative to NYCU login for users who
+// already bound that account. Unlike the bind flow, it needs NO existing
+// session: it sets only a CSRF state, and the shared callback detects login
+// mode by the absence of `nycu` in the session, then resolves the binding back
+// to its NYCU identity. Google login requests just identity (no Drive/offline).
+async function startOAuthLogin(
+  req: Request, env: Env, url: URL, provider: "github" | "google",
+): Promise<Response> {
+  const state = randomState();
+  const session: SessionData =
+    provider === "github"
+      ? { exp: Date.now() + TTL_MS, gstate: state }
+      : { exp: Date.now() + TTL_MS, gostate: state };
+  const cookies = [setCookie(await signSession(session, env.SESSION_SECRET))];
+  const lang = url.searchParams.get("lang");
+  if (lang === "en" || lang === "zh") cookies.push(langCookie(lang));
+  const authUrl =
+    provider === "github"
+      ? githubAuthorizeUrl(env.GITHUB_CLIENT_ID, `${env.PUBLIC_BASE_URL}/auth/github/callback`, state)
+      : googleAuthorizeUrl(
+          env.GOOGLE_CLIENT_ID,
+          `${env.PUBLIC_BASE_URL}/auth/google/callback`,
+          state,
+          "openid email",
+          { offline: false },
+        );
+  return redirect(authUrl, cookies);
+}
+
 function redirectDone(env: Env, status: string, reason?: string): Response {
   const u = new URL(env.FRONTEND_DONE_URL);
   u.searchParams.set("status", status);
@@ -149,7 +195,7 @@ async function githubCallback(req: Request, env: Env, url: URL): Promise<Respons
   // GitHub returned an OAuth error (e.g. access_denied) instead of a code.
   const oauthError = url.searchParams.get("error");
   if (oauthError) return redirectDone(env, "err", `github_${oauthError}`);
-  if (!session || !session.nycu || !session.gstate || session.gstate !== state || !code) {
+  if (!session || !session.gstate || session.gstate !== state || !code) {
     return new Response("Invalid GitHub callback", { status: 400 });
   }
   const accessToken = await exchangeGithubCode({
@@ -159,6 +205,22 @@ async function githubCallback(req: Request, env: Env, url: URL): Promise<Respons
     redirectUri: `${env.PUBLIC_BASE_URL}/auth/github/callback`,
   });
   const gh = await fetchGithubUser(accessToken);
+
+  // LOGIN mode (no NYCU in session): identify the user via their bound GitHub
+  // account and start a logged-in session as that NYCU identity.
+  if (!session.nycu) {
+    const b = await getBindingByGithubId(env.DB, gh.id);
+    if (!b) return redirectDone(env, "err", "github_not_bound");
+    return redirect(
+      "/me",
+      setCookie(await signSession(
+        { exp: Date.now() + TTL_MS, nycu: { id: b.nycu_id, name: b.nycu_name ?? b.nycu_id } },
+        env.SESSION_SECRET,
+      )),
+    );
+  }
+
+  // BIND mode (logged-in NYCU session): link this GitHub to the current account.
   const now = new Date(Date.now()).toISOString();
   try {
     await upsertBinding(env.DB, {
@@ -188,6 +250,89 @@ async function githubCallback(req: Request, env: Env, url: URL): Promise<Respons
   }
   // Stay logged in; back to the dashboard with a success flash.
   return redirect("/me?bound=1");
+}
+
+// The Google scope requested at consent (configurable; default = identity +
+// drive.file). Single place so authorize stays in sync with what's stored.
+function googleScope(env: Env): string {
+  return env.GOOGLE_SCOPE?.trim() || DEFAULT_GOOGLE_SCOPE;
+}
+
+// Bind a Google account, started from the logged-in dashboard. Requests offline
+// access so we get a refresh token (encrypted, stored) for later Drive ops.
+// `?drive=1` (staff "connect Drive") requests the full drive scope so the token
+// can share existing staff files; the normal student bind uses GOOGLE_SCOPE.
+async function startGoogle(req: Request, env: Env, url: URL): Promise<Response> {
+  const s = await requireLogin(req, env);
+  if (s instanceof Response) return s;
+  const gostate = randomState();
+  const next: SessionData = { exp: Date.now() + TTL_MS, nycu: s.nycu, gostate };
+  const token = await signSession(next, env.SESSION_SECRET);
+  const scope = url.searchParams.get("drive") === "1" ? STAFF_GOOGLE_SCOPE : googleScope(env);
+  const gUrl = googleAuthorizeUrl(
+    env.GOOGLE_CLIENT_ID,
+    `${env.PUBLIC_BASE_URL}/auth/google/callback`,
+    gostate,
+    scope,
+  );
+  return redirect(gUrl, setCookie(token));
+}
+
+async function googleCallback(req: Request, env: Env, url: URL): Promise<Response> {
+  const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
+  const code = url.searchParams.get("code");
+  const state = url.searchParams.get("state");
+  // Google returned an OAuth error (e.g. access_denied) instead of a code.
+  const oauthError = url.searchParams.get("error");
+  if (oauthError) return redirectDone(env, "err", `google_${oauthError}`);
+  if (!session || !session.gostate || session.gostate !== state || !code) {
+    return new Response("Invalid Google callback", { status: 400 });
+  }
+  const tokens = await exchangeGoogleCode({
+    clientId: env.GOOGLE_CLIENT_ID,
+    clientSecret: env.GOOGLE_CLIENT_SECRET,
+    code,
+    redirectUri: `${env.PUBLIC_BASE_URL}/auth/google/callback`,
+  });
+  const g = await fetchGoogleUser(tokens.accessToken);
+
+  // LOGIN mode (no NYCU in session): identify via the bound google_sub. Do NOT
+  // touch the stored tokens (this flow has no refresh token to save).
+  if (!session.nycu) {
+    const b = await getBindingByGoogleSub(env.DB, g.sub);
+    if (!b) return redirectDone(env, "err", "google_not_bound");
+    return redirect(
+      "/me",
+      setCookie(await signSession(
+        { exp: Date.now() + TTL_MS, nycu: { id: b.nycu_id, name: b.nycu_name ?? b.nycu_id } },
+        env.SESSION_SECRET,
+      )),
+    );
+  }
+
+  // BIND mode (logged-in NYCU session): link this Google account + store tokens.
+  const now = new Date(Date.now()).toISOString();
+  // Encrypt the refresh token before it touches D1 (null if Google withheld one
+  // this round → upsert keeps any previously stored token).
+  const refreshEnc = tokens.refreshToken
+    ? await encryptSecret(tokens.refreshToken, env.GOOGLE_TOKEN_KEY)
+    : null;
+  try {
+    await upsertGoogleBinding(env.DB, {
+      nycu_id: session.nycu.id,
+      nycu_name: session.nycu.name,
+      google_sub: g.sub,
+      google_email: g.email,
+      refresh_token: refreshEnc,
+      scope: tokens.scope,
+      now,
+    });
+  } catch (e) {
+    if (e instanceof GoogleConflictError) return redirect("/me?error=google_already_bound");
+    throw e;
+  }
+  // Stay logged in; back to the dashboard with a success flash.
+  return redirect("/me?gbound=1");
 }
 
 // Clear the maccount session and bounce to the landing page so the user can log
@@ -246,6 +391,7 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
   for (const c of courses) courseNames[c.course_id] = c.name;
   const flash = {
     bound: url.searchParams.get("bound") === "1",
+    gbound: url.searchParams.get("gbound") === "1",
     error: url.searchParams.get("error"),
   };
   // Join link(s) for the org(s) of the student's enrolled courses (deduped;
@@ -496,6 +642,7 @@ async function courseAdminRouter(
   if (sub === "/staff/add" && m === "POST") return await staffAdd(req, env, courseId);
   if (sub === "/staff/remove" && m === "POST") return await staffRemove(req, env, courseId);
   if (sub === "/enroll" && m === "POST") return await courseEnroll(req, env, courseId);
+  if (sub === "/drive/share" && m === "POST") return await driveShare(req, env, courseId);
   return new Response("Not found", { status: 404 });
 }
 
@@ -515,8 +662,9 @@ async function courseAdmin(req: Request, env: Env, url: URL, courseId: string): 
   // (enrolled ∩ bound); before that it shows the global registry (back-compat).
   const scoped = enrolled.length ? rows.filter((r) => enrolled.some((e) => e.student_id === r.nycu_id)) : rows;
   const staffMsg = url.searchParams.get("staff_msg") ?? "";
+  const driveMsg = url.searchParams.get("drive_msg") ?? "";
   return new Response(
-    adminPage(lang, course, scoped, { isOwner, staff, staffMsg, enrolled }),
+    adminPage(lang, course, scoped, { isOwner, staff, staffMsg, driveMsg, enrolled }),
     { headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) } },
   );
 }
@@ -571,6 +719,68 @@ async function courseEnroll(req: Request, env: Env, courseId: string): Promise<R
   if (replace) await replaceEnrollments(env.DB, courseId, ids, now);
   else await bulkEnroll(env.DB, courseId, ids, now);
   return redirect(`/c/${encodeURIComponent(courseId)}/admin`);
+}
+
+function driveRedirect(courseId: string, msg: string): Response {
+  const base = `/c/${encodeURIComponent(courseId)}/admin`;
+  return redirect(`${base}?drive_msg=${encodeURIComponent(msg)}`);
+}
+
+// POST /c/<id>/admin/drive/share — share a staff-owned Drive file/folder with
+// the course's enrolled+bound students by their Google email. Acts as the
+// logged-in staff member via their own connected Google token (full drive
+// scope). Per-student failures are counted, not fatal; students with no bound
+// Google account are skipped.
+async function driveShare(req: Request, env: Env, courseId: string): Promise<Response> {
+  const s = await requireCourseStaff(req, env, courseId);
+  if (s instanceof Response) return s;
+  if (!(await getCourse(env.DB, courseId))) return new Response("Course not found", { status: 404 });
+  const form = await req.formData();
+  const fileId = parseDriveFileId(String(form.get("file_id") ?? ""));
+  const role = asDriveRole(String(form.get("role") ?? "reader"));
+  const notify = form.get("notify") != null;
+  if (!fileId) return driveRedirect(courseId, "no-file");
+
+  // Acting staff must have connected Drive (full scope) and have a stored token.
+  const tok = await getGoogleTokenRow(env.DB, s.nycu!.id);
+  if (!tok?.google_refresh_token || !scopeHasFullDrive(tok.google_scope)) {
+    return driveRedirect(courseId, "no-drive");
+  }
+  let accessToken: string;
+  try {
+    const refresh = await decryptSecret(tok.google_refresh_token, env.GOOGLE_TOKEN_KEY);
+    accessToken = (
+      await refreshGoogleAccessToken({
+        clientId: env.GOOGLE_CLIENT_ID,
+        clientSecret: env.GOOGLE_CLIENT_SECRET,
+        refreshToken: refresh,
+      })
+    ).accessToken;
+  } catch (e) {
+    console.error("drive share: token refresh failed:", (e as Error).message);
+    return driveRedirect(courseId, "token-error");
+  }
+
+  // Recipients: bound students, scoped to the enrolled roster once one exists
+  // (else all bound — back-compat with the other course views). Students with no
+  // bound Google account can't be shared with → skipped.
+  const set = await enrolledSet(env, courseId);
+  const bound = (await listBindings(env.DB)).filter((b) => !set || set.has(b.nycu_id));
+  const recipients = bound.filter((b) => b.google_email);
+  const skipped = bound.length - recipients.length;
+
+  let shared = 0;
+  let errors = 0;
+  for (const r of recipients) {
+    try {
+      await shareFileWithUser(accessToken, fileId, r.google_email!, role, { notify });
+      shared++;
+    } catch (e) {
+      errors++;
+      console.error(`drive share failed for ${r.google_email}:`, (e as Error).message);
+    }
+  }
+  return driveRedirect(courseId, `done:${shared}:${errors}:${skipped}`);
 }
 
 // Split a pasted blob of 學號 on commas / whitespace / newlines.

@@ -202,6 +202,7 @@ export function adminPage(
     isOwner: boolean;
     staff: StaffLite[];
     staffMsg?: string;
+    driveMsg?: string;
     enrolled?: EnrolledLite[];
   } = { isOwner: false, staff: [] },
 ): string {
@@ -284,6 +285,35 @@ export function adminPage(
   }
 ${enrollImport}`;
 
+  // Share a staff-owned Drive file with the class (any course staff). Acts as
+  // the logged-in staff's own connected Google Drive; recipients are the
+  // enrolled+bound students' Google emails.
+  const dm = opts.driveMsg ?? "";
+  let driveBannerText = "";
+  if (dm.startsWith("done:")) {
+    const [, shared = "0", errors = "0", skipped = "0"] = dm.split(":");
+    driveBannerText = t.drive_msg_done
+      .replace("{shared}", shared).replace("{errors}", errors).replace("{skipped}", skipped);
+  } else if (dm === "no-file") driveBannerText = t.drive_msg_nofile;
+  else if (dm === "no-drive") driveBannerText = t.drive_msg_nodrive;
+  else if (dm === "token-error") driveBannerText = t.drive_msg_tokenerror;
+  const driveBanner = driveBannerText
+    ? `<p style="padding:8px;border:1px solid #ccc;background:#f6f6f6">${driveBannerText}</p>`
+    : "";
+  const driveSection = `<h2>${t.drive_heading}</h2>
+<p style="color:#777;font-size:.9em">${t.drive_note} <a href="/auth/google/start?drive=1">${t.drive_connect}</a></p>
+${driveBanner}
+<form method="post" action="${base}/drive/share" style="display:grid;gap:6px;max-width:440px">
+  <input name="file_id" placeholder="${t.drive_file_placeholder}" required>
+  <select name="role">
+    <option value="reader">${t.drive_role_reader}</option>
+    <option value="commenter">${t.drive_role_commenter}</option>
+    <option value="writer">${t.drive_role_writer}</option>
+  </select>
+  <label><input type="checkbox" name="notify" value="1"> ${t.drive_notify}</label>
+  <button type="submit">${t.drive_share_btn}</button>
+</form>`;
+
   // Course settings — owner edits name/term/Moodle/org/status (re-submits the
   // upsert with the same course_id).
   const settingsSection = isOwner
@@ -318,6 +348,7 @@ ${banner}
 ${trs}
 </tbody></table>
 ${enrollSection}
+${driveSection}
 ${staffSection}
 ${settingsSection}
 </body></html>`;
@@ -332,7 +363,7 @@ export function dashboardPage(
   binding: BindingRow | null,
   grades: GradeRow[],
   admin: boolean,
-  flash: { bound?: boolean; error?: string | null },
+  flash: { bound?: boolean; gbound?: boolean; error?: string | null },
   orgJoins: { org: string; url: string }[] = [],
   courseNames: Record<string, string> = {},
 ): string {
@@ -340,6 +371,9 @@ export function dashboardPage(
   const gh = binding?.github_login
     ? `${t.bound} <b>${h(binding.github_login)}</b> — <a href="/auth/github/start">${t.rebind}</a>`
     : `<span style="color:#b00">${t.not_bound}</span> — <a href="/auth/github/start"><b>${t.bind_action}</b></a>`;
+  const goog = binding?.google_email
+    ? `${t.bound} <b>${h(binding.google_email)}</b> — <a href="/auth/google/start">${t.rebind}</a>`
+    : `<span style="color:#b00">${t.not_bound}</span> — <a href="/auth/google/start"><b>${t.bind_google_action}</b></a>`;
 
   // The student's own repo for the problem; link to it when present. A bare
   // owner/name → github.com; a full http(s) URL is used as-is.
@@ -400,8 +434,9 @@ ${courseBlock(grp.rows)}`,
         .join("\n")
     : `<p style="color:#666">${t.no_grades}</p>`;
 
-  const flashHtml = flash.bound
-    ? `<p style="padding:.5rem .8rem;border-radius:6px;background:#d4edda">${t.flash_bound_ok}</p>`
+  const okFlash = flash.bound ? t.flash_bound_ok : flash.gbound ? t.flash_gbound_ok : "";
+  const flashHtml = okFlash
+    ? `<p style="padding:.5rem .8rem;border-radius:6px;background:#d4edda">${okFlash}</p>`
     : flash.error
       ? `<p style="padding:.5rem .8rem;border-radius:6px;background:#f8d7da">${t.flash_error_prefix}${h(flash.error)}</p>`
       : "";
@@ -428,6 +463,7 @@ ${langToggle("/me", lang)}
 ${flashHtml}
 <p>${t.student_id}：<b>${h(nycu.id)}</b>${nycu.name ? `（${h(nycu.name)}）` : ""}</p>
 <p>${t.github}：${gh}</p>
+<p>${t.google}：${goog}</p>
 ${orgHtml}
 <h2>${t.grades_heading}</h2>
 ${table}
