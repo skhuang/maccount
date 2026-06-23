@@ -635,6 +635,7 @@ async function courseUpsert(req: Request, env: Env): Promise<Response> {
       term: String(form.get("term") ?? "").trim() || null,
       moodle_course_id: String(form.get("moodle_course_id") ?? "").trim() || null,
       github_org: String(form.get("github_org") ?? "").trim() || null,
+      google_classroom_id: String(form.get("google_classroom_id") ?? "").trim() || null,
       status: statusIn === "archived" ? "archived" : "active",
     },
     new Date(Date.now()).toISOString(),

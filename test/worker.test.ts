@@ -852,6 +852,16 @@ describe("course edit + enrollment", () => {
     await post("/admin/courses", { course_id: "ds-2026", name: "資料結構 2026", status: "active" }, await owner());
   });
 
+  it("owner sets an optional google_classroom_id (persists + prefills the form)", async () => {
+    const res = await post("/admin/courses", { course_id: "ds-2026", name: "資料結構 2026", google_classroom_id: "CR-789" }, await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin");
+    const row = await env.DB.prepare("SELECT google_classroom_id FROM courses WHERE course_id='ds-2026'").first();
+    expect(row).toMatchObject({ google_classroom_id: "CR-789" });
+    const body = await (await call("/c/ds-2026/admin", { headers: cookie(await owner()) })).text();
+    expect(body).toContain('name="google_classroom_id" value="CR-789"');
+    await post("/admin/courses", { course_id: "ds-2026", name: "資料結構 2026" }, await owner()); // restore
+  });
+
   it("owner imports enrollment by paste (additive)", async () => {
     const res = await post("/c/ds-2026/admin/enroll", { student_ids: "a01, a02\n a03" }, await owner());
     expect(res.headers.get("Location")).toBe("/c/ds-2026/admin");

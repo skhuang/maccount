@@ -94,6 +94,7 @@ export function adminHomePage(
   <input name="term" placeholder="${t.ph_course_term}">
   <input name="moodle_course_id" placeholder="${t.ph_course_moodle}">
   <input name="github_org" placeholder="${t.ph_course_org}">
+  <input name="google_classroom_id" placeholder="${t.ph_course_classroom}">
   <button type="submit">${t.course_create}</button>
 </form>
 <p style="color:#777;font-size:.9em">${t.course_create_note}</p>`
@@ -211,6 +212,7 @@ export function adminPage(
     term?: string | null;
     moodle_course_id?: string | null;
     github_org?: string | null;
+    google_classroom_id?: string | null;
     status?: string;
   },
   rows: BindingRow[],
@@ -385,6 +387,7 @@ ${formsRows}
   <label>${t.ph_course_term}<input name="term" value="${h(course.term ?? "")}"></label>
   <label>${t.ph_course_moodle}<input name="moodle_course_id" value="${h(course.moodle_course_id ?? "")}"></label>
   <label>${t.ph_course_org}<input name="github_org" value="${h(course.github_org ?? "")}"></label>
+  <label>${t.ph_course_classroom}<input name="google_classroom_id" value="${h(course.google_classroom_id ?? "")}"></label>
   <label>${t.course_status}
     <select name="status">
       <option value="active"${course.status !== "archived" ? " selected" : ""}>active</option>

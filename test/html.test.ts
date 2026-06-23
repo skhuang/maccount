@@ -56,7 +56,7 @@ describe("adminPage", () => {
   it("renders the enrollment section (bound/unbound) and a prefilled settings form for owners", () => {
     const html = adminPage(
       "zh",
-      { ...course, term: "2026", moodle_course_id: "12345", status: "archived" },
+      { ...course, term: "2026", moodle_course_id: "12345", google_classroom_id: "CR-789", status: "archived" },
       [],
       {
         isOwner: true,
@@ -73,6 +73,7 @@ describe("adminPage", () => {
     expect(html).toContain(`action="/c/ds-2026/admin/enroll"`);
     // settings form prefilled
     expect(html).toContain('name="moodle_course_id" value="12345"');
+    expect(html).toContain('name="google_classroom_id" value="CR-789"');
     expect(html).toContain('<option value="archived" selected>');
   });
 
