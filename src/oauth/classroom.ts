@@ -5,6 +5,26 @@
 // google_classroom_id (numeric id or alias).
 export const CLASSROOM_SCOPE = "https://www.googleapis.com/auth/classroom.rosters";
 
+// Normalize whatever a teacher pastes into the Classroom API's numeric course
+// id. The Classroom *URL* is classroom.google.com/c/<token>, where <token> is
+// base64(numericId) — the API rejects that token (404) and wants the digits.
+// Accepts: the numeric id as-is, a `/c/<token>` (or full URL), or a bare token.
+export function parseClassroomId(input: string): string {
+  let s = input.trim();
+  const m = s.match(/\/c\/([A-Za-z0-9_-]+)/); // full URL or /c/<token>
+  if (m) s = m[1];
+  if (/^\d+$/.test(s)) return s; // already the numeric API course id
+  try {
+    const b64 = s.replace(/-/g, "+").replace(/_/g, "/");
+    const pad = b64.length % 4 ? "=".repeat(4 - (b64.length % 4)) : "";
+    const decoded = atob(b64 + pad);
+    if (/^\d+$/.test(decoded)) return decoded; // the /c/ token decodes to digits
+  } catch {
+    /* not base64 → leave as typed */
+  }
+  return s;
+}
+
 export type InviteResult = { invited: true } | { already: true };
 
 export async function inviteToClassroom(

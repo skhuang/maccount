@@ -1,5 +1,26 @@
 import { describe, it, expect } from "vitest";
-import { inviteToClassroom, CLASSROOM_SCOPE } from "../src/oauth/classroom";
+import { inviteToClassroom, parseClassroomId, CLASSROOM_SCOPE } from "../src/oauth/classroom";
+
+describe("parseClassroomId", () => {
+  it("keeps a numeric API course id as-is", () => {
+    expect(parseClassroomId("855288151786")).toBe("855288151786");
+    expect(parseClassroomId("  855288151786 ")).toBe("855288151786");
+  });
+
+  it("decodes the /c/ URL token (base64 of the numeric id)", () => {
+    expect(parseClassroomId("ODU1Mjg4MTUxNzg2")).toBe("855288151786");
+  });
+
+  it("extracts + decodes from a full Classroom URL", () => {
+    expect(parseClassroomId("https://classroom.google.com/c/ODU1Mjg4MTUxNzg2")).toBe("855288151786");
+    expect(parseClassroomId("https://classroom.google.com/c/ODU1Mjg4MTUxNzg2/details")).toBe("855288151786");
+  });
+
+  it("leaves an unrecognized value untouched", () => {
+    expect(parseClassroomId("not-an-id")).toBe("not-an-id");
+    expect(parseClassroomId("")).toBe("");
+  });
+});
 
 describe("inviteToClassroom", () => {
   it("POSTs a STUDENT invitation and returns invited", async () => {

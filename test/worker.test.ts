@@ -1402,6 +1402,25 @@ describe("course Google Classroom invite", () => {
     await setClassroom(null); // restore
   });
 
+  it("decodes a pasted /c/ URL token to the numeric course id before inviting", async () => {
+    await setClassroom("ODU1Mjg4MTUxNzg2"); // the classroom.google.com/c/<token> form
+    await connectAdminDrive();
+    await bindStudent("s1", "s1@gmail.com");
+    await enroll("s1");
+    const invites: { courseId?: string }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("oauth2.googleapis.com/token"))
+        return new Response(JSON.stringify({ access_token: "fresh" }), { headers: { "Content-Type": "application/json" } });
+      invites.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ id: "inv" }), { headers: { "Content-Type": "application/json" } });
+    }));
+    const res = await post("/c/ds-2026/admin/classroom/invite", await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?classroom_msg=done%3A1%3A0%3A0%3A0");
+    expect(invites[0].courseId).toBe("855288151786"); // decoded from the URL token
+    await setClassroom(null);
+  });
+
   it("counts an already-member (409) separately", async () => {
     await setClassroom("CR-789");
     await connectAdminDrive();
