@@ -21,6 +21,7 @@ import {
 import {
   shareFileWithUser, asDriveRole, scopeHasFullDrive, parseDriveFileId, STAFF_GOOGLE_SCOPE,
 } from "./oauth/drive";
+import { createGoogleForm } from "./oauth/google_forms";
 import { encryptSecret, decryptSecret } from "./crypto";
 import {
   upsertBinding,
@@ -657,6 +658,7 @@ async function courseAdminRouter(
   if (sub === "/enroll" && m === "POST") return await courseEnroll(req, env, courseId);
   if (sub === "/drive/share" && m === "POST") return await driveShare(req, env, courseId);
   if (sub === "/forms/add" && m === "POST") return await formAdd(req, env, courseId);
+  if (sub === "/forms/create" && m === "POST") return await formCreate(req, env, courseId);
   if (sub === "/forms/remove" && m === "POST") return await formRemove(req, env, courseId);
   return new Response("Not found", { status: 404 });
 }
@@ -743,6 +745,28 @@ function driveRedirect(courseId: string, msg: string): Response {
   return redirect(`${base}?drive_msg=${encodeURIComponent(msg)}`);
 }
 
+// A fresh Google access token for the acting staff member, from their connected
+// Drive (full scope) token. Shared by Drive sharing + Forms creation. Returns an
+// error code instead of throwing so callers can flash it.
+async function staffGoogleAccessToken(
+  env: Env, nycuId: string,
+): Promise<{ token: string } | { error: "no-drive" | "token-error" }> {
+  const tok = await getGoogleTokenRow(env.DB, nycuId);
+  if (!tok?.google_refresh_token || !scopeHasFullDrive(tok.google_scope)) return { error: "no-drive" };
+  try {
+    const refresh = await decryptSecret(tok.google_refresh_token, env.GOOGLE_TOKEN_KEY);
+    const { accessToken } = await refreshGoogleAccessToken({
+      clientId: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
+      refreshToken: refresh,
+    });
+    return { token: accessToken };
+  } catch (e) {
+    console.error("staff google token:", (e as Error).message);
+    return { error: "token-error" };
+  }
+}
+
 // POST /c/<id>/admin/drive/share — share a staff-owned Drive file/folder with
 // the course's enrolled+bound students by their Google email. Acts as the
 // logged-in staff member via their own connected Google token (full drive
@@ -759,24 +783,9 @@ async function driveShare(req: Request, env: Env, courseId: string): Promise<Res
   if (!fileId) return driveRedirect(courseId, "no-file");
 
   // Acting staff must have connected Drive (full scope) and have a stored token.
-  const tok = await getGoogleTokenRow(env.DB, s.nycu!.id);
-  if (!tok?.google_refresh_token || !scopeHasFullDrive(tok.google_scope)) {
-    return driveRedirect(courseId, "no-drive");
-  }
-  let accessToken: string;
-  try {
-    const refresh = await decryptSecret(tok.google_refresh_token, env.GOOGLE_TOKEN_KEY);
-    accessToken = (
-      await refreshGoogleAccessToken({
-        clientId: env.GOOGLE_CLIENT_ID,
-        clientSecret: env.GOOGLE_CLIENT_SECRET,
-        refreshToken: refresh,
-      })
-    ).accessToken;
-  } catch (e) {
-    console.error("drive share: token refresh failed:", (e as Error).message);
-    return driveRedirect(courseId, "token-error");
-  }
+  const at = await staffGoogleAccessToken(env, s.nycu!.id);
+  if ("error" in at) return driveRedirect(courseId, at.error);
+  const accessToken = at.token;
 
   // Recipients: bound students, scoped to the enrolled roster once one exists
   // (else all bound — back-compat with the other course views). Students with no
@@ -827,6 +836,28 @@ async function formRemove(req: Request, env: Env, courseId: string): Promise<Res
   const form = await req.formData();
   const id = Number(form.get("id"));
   if (Number.isInteger(id)) await removeCourseForm(env.DB, id, courseId);
+  return formsRedirect(courseId);
+}
+
+// POST /c/<id>/admin/forms/create — create a NEW Google Form via the Forms API
+// (as the acting staff's connected Google account) and attach it to the course.
+// Staff then edit it in Google to add questions; students fill the responderUri.
+async function formCreate(req: Request, env: Env, courseId: string): Promise<Response> {
+  const s = await requireCourseStaff(req, env, courseId);
+  if (s instanceof Response) return s;
+  if (!(await getCourse(env.DB, courseId))) return new Response("Course not found", { status: 404 });
+  const form = await req.formData();
+  const title = String(form.get("title") ?? "").trim();
+  if (!title) return formsRedirect(courseId, "bad");
+  const at = await staffGoogleAccessToken(env, s.nycu!.id);
+  if ("error" in at) return formsRedirect(courseId, at.error); // "no-drive" | "token-error"
+  try {
+    const { formId, responderUri } = await createGoogleForm(at.token, title);
+    await addCourseForm(env.DB, courseId, title, responderUri, new Date(Date.now()).toISOString(), formId);
+  } catch (e) {
+    console.error("form create failed:", (e as Error).message);
+    return formsRedirect(courseId, "create-error");
+  }
   return formsRedirect(courseId);
 }
 

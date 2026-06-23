@@ -192,6 +192,7 @@ interface FormLite {
   id: number;
   title: string;
   url: string;
+  form_id?: string | null; // present when created via the Forms API → edit link
 }
 
 // Only render a clickable link for an http(s) URL; otherwise show plain text.
@@ -338,16 +339,25 @@ ${driveBanner}
   // Google Forms attached to the course (any course staff). Students see these
   // on /me under the matching course and answer signed into Google.
   const forms = opts.forms ?? [];
-  const formsBanner = opts.formsMsg === "bad"
-    ? `<p style="padding:8px;border:1px solid #c00;background:#fee">${t.forms_msg_bad}</p>`
+  const formsMsgText: Record<string, string> = {
+    bad: t.forms_msg_bad,
+    "no-drive": t.forms_msg_nodrive,
+    "token-error": t.forms_msg_tokenerror,
+    "create-error": t.forms_msg_createerror,
+  };
+  const formsBanner = opts.formsMsg && formsMsgText[opts.formsMsg]
+    ? `<p style="padding:8px;border:1px solid #c00;background:#fee">${formsMsgText[opts.formsMsg]}</p>`
     : "";
   const formsRows = forms.length
     ? `<ul>${forms
-        .map(
-          (f) => `<li>${linkOrText(f.url, f.title)}
+        .map((f) => {
+          const editLink = f.form_id
+            ? ` — <a href="https://docs.google.com/forms/d/${encodeURIComponent(f.form_id)}/edit" target="_blank" rel="noopener">${t.forms_edit} ↗</a>`
+            : "";
+          return `<li>${linkOrText(f.url, f.title)}${editLink}
   <form method="post" action="${base}/forms/remove" style="display:inline" onsubmit="return confirm('${t.forms_remove_confirm}')">
-    <input type="hidden" name="id" value="${h(f.id)}"><button type="submit">${t.forms_remove}</button></form></li>`,
-        )
+    <input type="hidden" name="id" value="${h(f.id)}"><button type="submit">${t.forms_remove}</button></form></li>`;
+        })
         .join("\n")}</ul>`
     : `<p style="color:#666">${t.forms_none}</p>`;
   const formsSection = `<h2>${t.forms_heading}</h2>
@@ -358,6 +368,11 @@ ${formsRows}
   <input name="title" placeholder="${t.forms_title_ph}" required>
   <input name="url" type="url" placeholder="${t.forms_url_ph}" required>
   <button type="submit">${t.forms_add}</button>
+</form>
+<p style="color:#777;font-size:.9em;margin-top:.8rem">${t.forms_create_note}</p>
+<form method="post" action="${base}/forms/create" style="display:grid;gap:6px;max-width:440px">
+  <input name="title" placeholder="${t.forms_create_title_ph}" required>
+  <button type="submit">${t.forms_create_btn}</button>
 </form>`;
 
   // Course settings — owner edits name/term/Moodle/org/status (re-submits the

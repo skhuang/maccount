@@ -1271,6 +1271,60 @@ describe("course Google Forms", () => {
     expect(body).toContain("期末回饋");
     expect(body).toContain('href="https://forms.gle/feedback"');
   });
+
+  // Seed the acting staff (admin1) with a connected Drive (full scope) token so
+  // the Forms API create can act as them.
+  const connectAdminDrive = async () => {
+    const enc = await encryptSecret("r_admin", "test-token-key");
+    await env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, github_id, google_sub, google_email, google_refresh_token, google_scope, google_token_updated_at, created_at, updated_at) VALUES ('admin1','A',NULL,'adminsub','admin@gmail.com',?,?, 't','t','t')",
+    ).bind(enc, STAFF_GOOGLE_SCOPE).run();
+  };
+
+  it("creates a Google Form via the API and attaches it (stores form_id + responderUri)", async () => {
+    await connectAdminDrive();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("oauth2.googleapis.com/token"))
+        return new Response(JSON.stringify({ access_token: "fresh" }), { headers: { "Content-Type": "application/json" } });
+      if (url.includes("forms.googleapis.com/v1/forms"))
+        return new Response(JSON.stringify({ formId: "F123", responderUri: "https://docs.google.com/forms/d/e/F123/viewform" }), { headers: { "Content-Type": "application/json" } });
+      throw new Error("unexpected fetch " + url);
+    }));
+    const res = await post("/c/ds-2026/admin/forms/create", { title: "第一週小考" }, await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin");
+    const row = await env.DB.prepare("SELECT title, url, form_id FROM course_forms WHERE course_id='ds-2026'").first();
+    expect(row).toMatchObject({
+      title: "第一週小考",
+      url: "https://docs.google.com/forms/d/e/F123/viewform",
+      form_id: "F123",
+    });
+    // admin page exposes the edit link for an API-created form
+    const body = await (await call("/c/ds-2026/admin", { headers: cookie(await owner()) })).text();
+    expect(body).toContain("https://docs.google.com/forms/d/F123/edit");
+  });
+
+  it("create flashes no-drive when the staff hasn't connected Google Drive", async () => {
+    const fetchSpy = vi.fn(async () => new Response("{}", { headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchSpy);
+    const res = await post("/c/ds-2026/admin/forms/create", { title: "x" }, await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?forms_msg=no-drive");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(await env.DB.prepare("SELECT 1 FROM course_forms").first()).toBe(null);
+  });
+
+  it("create flashes create-error when the Forms API fails (no row stored)", async () => {
+    await connectAdminDrive();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("oauth2.googleapis.com/token"))
+        return new Response(JSON.stringify({ access_token: "fresh" }), { headers: { "Content-Type": "application/json" } });
+      return new Response("nope", { status: 500 }); // forms create fails
+    }));
+    const res = await post("/c/ds-2026/admin/forms/create", { title: "x" }, await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?forms_msg=create-error");
+    expect(await env.DB.prepare("SELECT 1 FROM course_forms").first()).toBe(null);
+  });
 });
 
 describe("/c/<id>/admin/roster.csv", () => {
