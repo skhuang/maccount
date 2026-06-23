@@ -95,6 +95,7 @@ export function adminHomePage(
   <input name="moodle_course_id" placeholder="${t.ph_course_moodle}">
   <input name="github_org" placeholder="${t.ph_course_org}">
   <input name="google_classroom_id" placeholder="${t.ph_course_classroom}">
+  <input name="google_meet_url" placeholder="${t.ph_course_meet}">
   <button type="submit">${t.course_create}</button>
 </form>
 <p style="color:#777;font-size:.9em">${t.course_create_note}</p>`
@@ -213,6 +214,7 @@ export function adminPage(
     moodle_course_id?: string | null;
     github_org?: string | null;
     google_classroom_id?: string | null;
+    google_meet_url?: string | null;
     status?: string;
   },
   rows: BindingRow[],
@@ -416,6 +418,7 @@ ${
   <label>${t.ph_course_moodle}<input name="moodle_course_id" value="${h(course.moodle_course_id ?? "")}"></label>
   <label>${t.ph_course_org}<input name="github_org" value="${h(course.github_org ?? "")}"></label>
   <label>${t.ph_course_classroom}<input name="google_classroom_id" value="${h(course.google_classroom_id ?? "")}"></label>
+  <label>${t.ph_course_meet}<input name="google_meet_url" value="${h(course.google_meet_url ?? "")}"></label>
   <label>${t.course_status}
     <select name="status">
       <option value="active"${course.status !== "archived" ? " selected" : ""}>active</option>
@@ -462,6 +465,7 @@ export function dashboardPage(
   courseNames: Record<string, string> = {},
   enrolledCourses: { course_id: string; name: string }[] = [],
   formsByCourse: Record<string, { title: string; url: string }[]> = {},
+  meetByCourse: Record<string, string> = {},
 ): string {
   const t = T[lang];
   const gh = binding?.github_login
@@ -550,6 +554,8 @@ ${courseTable(labRows)}`
         .map((cid) => {
           const rs = gradesByCourse.get(cid) ?? [];
           const parts: string[] = [];
+          const meet = meetByCourse[cid];
+          if (meet) parts.push(`<p>${linkOrText(meet, t.meet_join)}</p>`);
           if (rs.length) parts.push(courseBlock(rs));
           const fhtml = formsFor(cid);
           if (fhtml) parts.push(fhtml);

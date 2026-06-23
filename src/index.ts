@@ -404,6 +404,9 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
   for (const f of await listFormsForCourses(env.DB, displayIds)) {
     (formsByCourse[f.course_id] ??= []).push({ title: f.title, url: f.url });
   }
+  // Per-course Google Meet link (manually set in course settings).
+  const meetByCourse: Record<string, string> = {};
+  for (const c of courses) if (c.google_meet_url) meetByCourse[c.course_id] = c.google_meet_url;
   const flash = {
     bound: url.searchParams.get("bound") === "1",
     gbound: url.searchParams.get("gbound") === "1",
@@ -417,7 +420,7 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
   }));
   // Show the admin link to owners AND staff-table members (of any course).
   const staff = isAdmin(env, studentId) || (await isStaffAnywhere(env.DB, studentId));
-  const html = dashboardPage(lang, s.nycu!, binding, grades, staff, flash, orgJoins, courseNames, enrolledCourses, formsByCourse);
+  const html = dashboardPage(lang, s.nycu!, binding, grades, staff, flash, orgJoins, courseNames, enrolledCourses, formsByCourse, meetByCourse);
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
   });
@@ -637,6 +640,7 @@ async function courseUpsert(req: Request, env: Env): Promise<Response> {
       moodle_course_id: String(form.get("moodle_course_id") ?? "").trim() || null,
       github_org: String(form.get("github_org") ?? "").trim() || null,
       google_classroom_id: String(form.get("google_classroom_id") ?? "").trim() || null,
+      google_meet_url: String(form.get("google_meet_url") ?? "").trim() || null,
       status: statusIn === "archived" ? "archived" : "active",
     },
     new Date(Date.now()).toISOString(),

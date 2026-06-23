@@ -862,6 +862,16 @@ describe("course edit + enrollment", () => {
     await post("/admin/courses", { course_id: "ds-2026", name: "資料結構 2026" }, await owner()); // restore
   });
 
+  it("owner sets an optional google_meet_url (persists + prefills the form)", async () => {
+    const res = await post("/admin/courses", { course_id: "ds-2026", name: "資料結構 2026", google_meet_url: "https://meet.google.com/abc-defg-hij" }, await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin");
+    const row = await env.DB.prepare("SELECT google_meet_url FROM courses WHERE course_id='ds-2026'").first();
+    expect(row).toMatchObject({ google_meet_url: "https://meet.google.com/abc-defg-hij" });
+    const body = await (await call("/c/ds-2026/admin", { headers: cookie(await owner()) })).text();
+    expect(body).toContain('name="google_meet_url" value="https://meet.google.com/abc-defg-hij"');
+    await post("/admin/courses", { course_id: "ds-2026", name: "資料結構 2026" }, await owner()); // restore
+  });
+
   it("owner imports enrollment by paste (additive)", async () => {
     const res = await post("/c/ds-2026/admin/enroll", { student_ids: "a01, a02\n a03" }, await owner());
     expect(res.headers.get("Location")).toBe("/c/ds-2026/admin");
@@ -1041,6 +1051,18 @@ describe("/me dashboard", () => {
     expect(body).toContain("我的課程");                    // course-list heading
     expect(body).toContain("資料結構 2026");                // enrolled course name (seeded)
     expect(body).toContain("此課程目前沒有作業或成績");        // empty-course note
+  });
+
+  it("shows the course's Google Meet link on /me for an enrolled student", async () => {
+    await env.DB.prepare("UPDATE courses SET google_meet_url='https://meet.google.com/abc-defg-hij' WHERE course_id='ds-2026'").run();
+    await env.DB.prepare(
+      "INSERT INTO enrollments (course_id, student_id, role, created_at) VALUES ('ds-2026','314561004','student','t')",
+    ).run();
+    const session = await signSession({ exp: Date.now() + 60000, nycu: { id: "314561004", name: "甲" } }, SECRET);
+    const body = await (await call("/me", { headers: cookie(session) })).text();
+    expect(body).toContain("加入 Google Meet");
+    expect(body).toContain('href="https://meet.google.com/abc-defg-hij"');
+    await env.DB.prepare("UPDATE courses SET google_meet_url=NULL WHERE course_id='ds-2026'").run(); // restore
   });
 
   it("groups a student's grades by course on /me", async () => {

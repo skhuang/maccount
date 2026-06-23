@@ -44,14 +44,14 @@
 | `db/forms.ts` | D1：課程的 Google 問卷 `course_forms`（`id,course_id,title,url,form_id`，遷移 `0011`+`0012`）— `listCourseForms` / `listFormsForCourses`(IN 查多課，給 /me) / `addCourseForm`(可帶 `form_id`) / `removeCourseForm`(依 id+course_id 刪)。`form_id` 由 API 建立時填，用來組「編輯」連結 |
 | `oauth/classroom.ts` | Google Classroom API：`inviteToClassroom(accessToken, courseId, email)` → `POST classroom.googleapis.com/v1/invitations`（role=STUDENT；409→已在班）。`CLASSROOM_SCOPE` = `classroom.rosters`（已併入 `STAFF_GOOGLE_SCOPE`）。需啟用 Classroom API、且操作者為該班老師 |
 | `oauth/google_forms.ts` | Google Forms API：`createGoogleForm(accessToken, title)` → `POST forms.googleapis.com/v1/forms`，回 `{formId, responderUri}`。用 staff 連結的 Google token（完整 `drive` 即可建表，`STAFF_GOOGLE_SCOPE` 另含 `forms.body`）。需在 GCP 啟用 Forms API |
-| `db/courses.ts` | D1：開課登錄 `courses`（多租戶；`course_id`↔`moodle_course_id`↔`github_org`↔`google_classroom_id`）— `listCourses` / `getCourse` |
+| `db/courses.ts` | D1：開課登錄 `courses`（多租戶；`course_id`↔`moodle_course_id`↔`github_org`↔`google_classroom_id`↔`google_meet_url`）— `listCourses` / `getCourse` |
 | `db/enrollments.ts` | D1：每門課選課名單 `enrollments`（真相來源 = Moodle）— `listEnrollments` / `isEnrolled` / `coursesForStudent` / `enroll` / `bulkEnroll` / `replaceEnrollments`(同步) / `removeEnrollment` / `enrollmentCount` / `listEnrolledWithBinding`(join 綁定看已綁/未綁) |
 | `csv.ts` | `BindingRow` + `toCsv`（完整綁定）+ `toRosterCsv`（`github_login,student_id`） |
 | `html.ts` | 管理後台 + **學生 `/me` 儀表板** HTML（已做 XSS 跳脫；字串走 i18n） |
 | `i18n.ts` | 雙語（zh-Hant 預設 / en）：`pickLang`（?lang>cookie>zh）、`langCookie`、字串表 `T`、`langToggle` |
 
 ### 端點（新增）
-- `GET /me` — 登入後的**儀表板**：自己的綁定（GitHub + Google 兩條，各有綁定/重綁按鈕）、**「我的課程」清單**、admin 連結（若是 admin）、以及（若 `COURSE_ORG` 有設）「加入課程 org」邀請連結。**課程清單 = 選課（enrollment）∪ 有成績的課**：被放進某課選課名單者，即使還沒有成績也會列出該課；每門課底下分「作業」(lab 平面表，含每題 repo「去解題」連結+分數)、「考試」(連 `/me/exam/<id>`) 與「問卷」(該課的 Google 表單連結)；沒資料的課顯示「目前沒有作業或成績」。只顯示分數與判定（OJ 鐵則 2）。`COURSE_ORG` 放 `wrangler.toml [vars]`（非機密）。
+- `GET /me` — 登入後的**儀表板**：自己的綁定（GitHub + Google 兩條，各有綁定/重綁按鈕）、**「我的課程」清單**、admin 連結（若是 admin）、以及（若 `COURSE_ORG` 有設）「加入課程 org」邀請連結。**課程清單 = 選課（enrollment）∪ 有成績的課**：被放進某課選課名單者，即使還沒有成績也會列出該課；每門課底下分「加入 Google Meet」(若設 `google_meet_url`)、「作業」(lab 平面表，含每題 repo「去解題」連結+分數)、「考試」(連 `/me/exam/<id>`) 與「問卷」(該課的 Google 表單連結)；沒資料的課顯示「目前沒有作業或成績」。只顯示分數與判定（OJ 鐵則 2）。`COURSE_ORG` 放 `wrangler.toml [vars]`（非機密）。
 - `GET /auth/github/start` — 從 `/me` 發動 GitHub 綁定（需登入 session）。
 - `GET /auth/github/login`、`GET /auth/google/login` — **替代登入**入口（免 session，設 gstate/gostate）。共用 `/auth/{github,google}/callback`，callback 無 `nycu` 時走登入分支（`getBindingByGithubId`/`getBindingByGoogleSub` 反查 → 開 session）。`db/bindings.ts` 加了這兩個反查函式。
 - `GET /auth/google/start`、`GET /auth/google/callback` — 從 `/me` 發動 **Google 綁定**（需登入 session，CSRF state = `gostate`）。start 帶 `access_type=offline`+`prompt=consent select_account` 取得 refresh token；callback 驗 state、換 token、取 `sub`+`email`，**refresh token 先用 `GOOGLE_TOKEN_KEY` 加密**再 `upsertGoogleBinding` 進 D1（連同 granted scope）→ 成功回 `/me?gbound=1`（同一 Google 已綁他人 → `/me?error=google_already_bound`）。存下的 refresh token 供日後 Drive/Cloud 檔案操作（用 `refreshGoogleAccessToken` 換 access token）。config：`GOOGLE_CLIENT_ID`／`GOOGLE_SCOPE` 放 `wrangler.toml [vars]`；`GOOGLE_CLIENT_SECRET`、`GOOGLE_TOKEN_KEY` 用 `wrangler secret put`。
@@ -62,7 +62,8 @@
 - **`/admin` 課程選擇器 + `/c/<course_id>/admin`（Phase 1b）**：`GET /admin` 列課程（owner 看全部 + 建立課程表單；staff 只看自己的課）；`POST /admin/courses`（owner）建立/更新一門課（`course_id,name,term,moodle_course_id,github_org,google_classroom_id`）。每門課的後台在 `/c/<course_id>/admin`，含綁定名單 + 選課名單(enrollment) + 該課 staff 管理 + 課程設定 + 匯出；子端點 `GET …/export.csv`(`bindings-<course>.csv`)、`GET …/roster.csv`(`roster-<course>.csv`)、`POST …/delete`(owner)、`POST …/staff/{add,remove}`(owner)、`POST …/enroll`(owner)。檢視/匯出 = owner 或該課 staff（`requireCourseStaff`）；刪除/管理 staff/建課/匯入選課 = owner（`requireAdmin`）。`/c/<id>/...` 會 `getCourse` 驗證課程存在（不存在→404）。
 - **查詢綁定（兩種:依課程 / 依 GitHub org）**：`/admin` 除了課程列表,另有「查詢綁定」區。`GET /admin/bindings`＝**全部綁定總表**(學號/姓名/github_login,與選課無關 → 綁定後還沒選課的學生也查得到)。`GET /admin/org/<org>`(org 限 effective orgs：各課 `github_org` 或 `COURSE_ORG`)＝**依 org 查**:即時抓該 org 的 GitHub 成員+待接受邀請(`listOrgMembers`/`listPendingOrgInvites`,各一次分頁呼叫,需 `ORG_INVITE_TOKEN`),用 `orgBindingView`(純函式)以 github_login join 綁定 → 每筆標 `已加入/待接受/未加入`,並另列「已在 org、未在 maccount 綁定」的帳號。皆 `requireStaff`。
 - **編輯課程**：`POST /admin/courses` 是 upsert（同 `course_id` 再送即更新；`created_at` 只在新建時設）。課程後台的「課程設定」表單(owner)預填 `name/term/moodle_course_id/github_org/google_classroom_id/status(active|archived)` → 再送即改。`google_classroom_id` 選填（遷移 `0013_courses_classroom`）。
-- **邀請學生加入 Google Classroom**：課程後台「Google Classroom」區，`POST /c/<id>/admin/classroom/invite`（`requireCourseStaff`）→ 以 staff 連結的 Google（須為該 Classroom 老師）對「選課∩已綁 Google」學生逐一 `invitations.create`（role=STUDENT）。需 `course.google_classroom_id`（未設→`classroom_msg=no-classroom`）+ 已連結 Drive（`staffGoogleAccessToken` 共用那把 token；未連結→`no-drive`）。409=已在班（計入 already）。flash `done:invited:already:errors:skipped`。`STAFF_GOOGLE_SCOPE` 已含 `classroom.rosters`；GCP 需啟用 **Classroom API**。**待辦**：在 /me 露出該 classroom 的 Google Meet 連結（Classroom API 的 Course resource 未直接提供 Meet link，需另存欄位或連到 classroom `alternateLink`）。
+- **邀請學生加入 Google Classroom**：課程後台「Google Classroom」區，`POST /c/<id>/admin/classroom/invite`（`requireCourseStaff`）→ 以 staff 連結的 Google（須為該 Classroom 老師）對「選課∩已綁 Google」學生逐一 `invitations.create`（role=STUDENT）。需 `course.google_classroom_id`（未設→`classroom_msg=no-classroom`）+ 已連結 Drive（`staffGoogleAccessToken` 共用那把 token；未連結→`no-drive`）。409=已在班（計入 already）。flash `done:invited:already:errors:skipped`。`STAFF_GOOGLE_SCOPE` 已含 `classroom.rosters`；GCP 需啟用 **Classroom API**。
+- **課程 Google Meet 連結**：因 Classroom API 不提供班級 Meet link，改用**選填欄位** `google_meet_url`（課程設定填，遷移 `0014_courses_meet`）。學生在 `/me` 對應課程下看到「加入 Google Meet」連結（只渲染 http(s)）。
 - **匯入選課名單（enrollment）**：真相來源 = Moodle。兩條路徑：(1) **手動**：課程後台「選課名單」貼上學號(逗號/空白/換行分隔)`POST /c/<id>/admin/enroll`，勾「取代整份名單」= `replaceEnrollments`(與 Moodle 同步、未列出者移除)，否則 `bulkEnroll`(累加、idempotent)。(2) **API**：`POST /api/enrollments/ingest`(`Authorization: Bearer <GRADES_INGEST_TOKEN>`，body `{course_id, student_ids:[…], replace?}`)供 seminar-moodle 自動把 Moodle 參與者推進來。**一旦某課有選課名單,該課的綁定名單表/`export.csv`/`roster.csv` 會縮到「選課∩已綁」**(空名單則 fall back 全域,向後相容)。選課名單會顯示每位學號的「已綁/未綁 **GitHub 與 Google**」狀態（`listEnrolledWithBinding` join 出 `github_login`+`google_email`）。綁定總表（`/admin/bindings`）與各課綁定名單也都多了 **Google** 欄（`google_email`）。
 - **課程 Google 問卷**：課程後台「Google 問卷」區，課程 staff（`requireCourseStaff`）可：
   - **貼連結**：`POST /c/<id>/admin/forms/add`（僅收 `http(s)`，非法→`?forms_msg=bad`）。
@@ -76,7 +77,7 @@
 
 ```bash
 npm install
-npm test            # vitest，全部測試（目前 203 passed）
+npm test            # vitest，全部測試（目前 205 passed）
 npx tsc --noEmit    # 型別檢查
 npm run dev         # wrangler dev（本機，預設埠 8787）
 npx wrangler deploy # 部署 Worker（vars 變更也要重新 deploy 才生效）
