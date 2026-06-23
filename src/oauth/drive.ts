@@ -8,7 +8,10 @@ export const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
 // Google Forms via the Forms API. (Full `drive` alone already authorizes
 // forms.create, so staff connected before this still work.)
 export const FORMS_SCOPE = "https://www.googleapis.com/auth/forms.body";
-export const STAFF_GOOGLE_SCOPE = `openid email ${DRIVE_SCOPE} ${FORMS_SCOPE}`;
+// Manage a Classroom's roster (invite students). Re-connect picks it up; staff
+// connected earlier re-authorize once to gain it.
+export const CLASSROOM_SCOPE = "https://www.googleapis.com/auth/classroom.rosters";
+export const STAFF_GOOGLE_SCOPE = `openid email ${DRIVE_SCOPE} ${FORMS_SCOPE} ${CLASSROOM_SCOPE}`;
 
 export type DriveRole = "reader" | "commenter" | "writer";
 

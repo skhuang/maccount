@@ -113,6 +113,16 @@ describe("adminPage", () => {
     expect(html).toContain('href="https://docs.google.com/forms/d/F9/edit"');
   });
 
+  it("shows the Classroom invite form when a classroom id is set, else a notice", () => {
+    const withId = adminPage("zh", { ...course, google_classroom_id: "CR-789" }, [], { isOwner: true, staff: [] });
+    expect(withId).toContain("Google Classroom");
+    expect(withId).toContain("CR-789");
+    expect(withId).toContain('action="/c/ds-2026/admin/classroom/invite"');
+    const noId = adminPage("zh", course, [], { isOwner: true, staff: [] });
+    expect(noId).not.toContain('action="/c/ds-2026/admin/classroom/invite"');
+    expect(noId).toContain("尚未設定 Google Classroom ID");
+  });
+
   it("hides import + settings from non-owner staff", () => {
     const html = adminPage("zh", course, [], {
       isOwner: false,
