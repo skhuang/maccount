@@ -1337,6 +1337,94 @@ describe("course Google Forms", () => {
   });
 });
 
+describe("course Google Classroom invite", () => {
+  const owner = () => signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "A" } }, SECRET);
+  const post = (path: string, session: string) =>
+    call(path, { method: "POST", headers: { ...cookie(session), "Content-Type": "application/x-www-form-urlencoded" }, body: "" });
+  const connectAdminDrive = async () => {
+    const enc = await encryptSecret("r_admin", "test-token-key");
+    await env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, github_id, google_sub, google_email, google_refresh_token, google_scope, google_token_updated_at, created_at, updated_at) VALUES ('admin1','A',NULL,'adminsub','admin@gmail.com',?,?, 't','t','t')",
+    ).bind(enc, STAFF_GOOGLE_SCOPE).run();
+  };
+  const setClassroom = (id: string | null) =>
+    env.DB.prepare("UPDATE courses SET google_classroom_id=? WHERE course_id='ds-2026'").bind(id).run();
+  const bindStudent = (sid: string, email: string | null) =>
+    env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, github_id, google_sub, google_email, created_at, updated_at) VALUES (?,?,NULL,?,?,'t','t')",
+    ).bind(sid, sid, `sub-${sid}`, email).run();
+  const enroll = (sid: string) =>
+    env.DB.prepare("INSERT INTO enrollments (course_id, student_id, role, created_at) VALUES ('ds-2026',?,'student','t')").bind(sid).run();
+
+  it("invites enrolled+bound students into the Classroom; skips no-Google", async () => {
+    await setClassroom("CR-789");
+    await connectAdminDrive();
+    await bindStudent("s1", "s1@gmail.com");
+    await bindStudent("s2", null); // bound github only
+    await enroll("s1");
+    await enroll("s2");
+    const invites: unknown[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("oauth2.googleapis.com/token"))
+        return new Response(JSON.stringify({ access_token: "fresh" }), { headers: { "Content-Type": "application/json" } });
+      if (url.includes("classroom.googleapis.com/v1/invitations")) {
+        invites.push(JSON.parse(String(init?.body)));
+        return new Response(JSON.stringify({ id: "inv" }), { headers: { "Content-Type": "application/json" } });
+      }
+      throw new Error("unexpected fetch " + url);
+    }));
+    const res = await post("/c/ds-2026/admin/classroom/invite", await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?classroom_msg=done%3A1%3A0%3A0%3A1");
+    expect(invites).toEqual([{ courseId: "CR-789", userId: "s1@gmail.com", role: "STUDENT" }]);
+    await setClassroom(null); // restore
+  });
+
+  it("counts an already-member (409) separately", async () => {
+    await setClassroom("CR-789");
+    await connectAdminDrive();
+    await bindStudent("s1", "s1@gmail.com");
+    await enroll("s1");
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("oauth2.googleapis.com/token"))
+        return new Response(JSON.stringify({ access_token: "fresh" }), { headers: { "Content-Type": "application/json" } });
+      return new Response("conflict", { status: 409 }); // already invited/member
+    }));
+    const res = await post("/c/ds-2026/admin/classroom/invite", await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?classroom_msg=done%3A0%3A1%3A0%3A0");
+    await setClassroom(null);
+  });
+
+  it("flashes no-classroom when the course has no Classroom id", async () => {
+    await setClassroom(null);
+    await connectAdminDrive();
+    const fetchSpy = vi.fn(async () => new Response("{}", { headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchSpy);
+    const res = await post("/c/ds-2026/admin/classroom/invite", await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?classroom_msg=no-classroom");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("flashes no-drive when the staff hasn't connected Google", async () => {
+    await setClassroom("CR-789");
+    const fetchSpy = vi.fn(async () => new Response("{}", { headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchSpy);
+    const res = await post("/c/ds-2026/admin/classroom/invite", await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?classroom_msg=no-drive");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    await setClassroom(null);
+  });
+
+  it("forbids a logged-in non-staff (403)", async () => {
+    await setClassroom("CR-789");
+    const session = await signSession({ exp: Date.now() + 60000, nycu: { id: "0856001", name: "王" } }, SECRET);
+    const res = await post("/c/ds-2026/admin/classroom/invite", session);
+    expect(res.status).toBe(403);
+    await setClassroom(null);
+  });
+});
+
 describe("/c/<id>/admin/roster.csv", () => {
   it("emits github_login,student_id for admins (only bound rows)", async () => {
     await env.DB.batch([

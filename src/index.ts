@@ -22,6 +22,7 @@ import {
   shareFileWithUser, asDriveRole, scopeHasFullDrive, parseDriveFileId, STAFF_GOOGLE_SCOPE,
 } from "./oauth/drive";
 import { createGoogleForm } from "./oauth/google_forms";
+import { inviteToClassroom } from "./oauth/classroom";
 import { encryptSecret, decryptSecret } from "./crypto";
 import {
   upsertBinding,
@@ -661,6 +662,7 @@ async function courseAdminRouter(
   if (sub === "/forms/add" && m === "POST") return await formAdd(req, env, courseId);
   if (sub === "/forms/create" && m === "POST") return await formCreate(req, env, courseId);
   if (sub === "/forms/remove" && m === "POST") return await formRemove(req, env, courseId);
+  if (sub === "/classroom/invite" && m === "POST") return await classroomInvite(req, env, courseId);
   return new Response("Not found", { status: 404 });
 }
 
@@ -683,8 +685,9 @@ async function courseAdmin(req: Request, env: Env, url: URL, courseId: string): 
   const staffMsg = url.searchParams.get("staff_msg") ?? "";
   const driveMsg = url.searchParams.get("drive_msg") ?? "";
   const formsMsg = url.searchParams.get("forms_msg") ?? "";
+  const classroomMsg = url.searchParams.get("classroom_msg") ?? "";
   return new Response(
-    adminPage(lang, course, scoped, { isOwner, staff, staffMsg, driveMsg, formsMsg, enrolled, forms }),
+    adminPage(lang, course, scoped, { isOwner, staff, staffMsg, driveMsg, formsMsg, classroomMsg, enrolled, forms }),
     { headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) } },
   );
 }
@@ -860,6 +863,48 @@ async function formCreate(req: Request, env: Env, courseId: string): Promise<Res
     return formsRedirect(courseId, "create-error");
   }
   return formsRedirect(courseId);
+}
+
+function classroomRedirect(courseId: string, msg: string): Response {
+  const base = `/c/${encodeURIComponent(courseId)}/admin`;
+  return redirect(`${base}?classroom_msg=${encodeURIComponent(msg)}`);
+}
+
+// POST /c/<id>/admin/classroom/invite — invite the course's enrolled+bound
+// students (by Google email) into the course's Google Classroom as students.
+// Acts as the logged-in staff's connected Google account (must be a teacher of
+// that Classroom). Needs the course's google_classroom_id set. Per-student
+// failures counted; students with no bound Google account are skipped; ones
+// already invited/enrolled count as "already".
+async function classroomInvite(req: Request, env: Env, courseId: string): Promise<Response> {
+  const s = await requireCourseStaff(req, env, courseId);
+  if (s instanceof Response) return s;
+  const course = await getCourse(env.DB, courseId);
+  if (!course) return new Response("Course not found", { status: 404 });
+  const classroomId = (course.google_classroom_id ?? "").trim();
+  if (!classroomId) return classroomRedirect(courseId, "no-classroom");
+  const at = await staffGoogleAccessToken(env, s.nycu!.id);
+  if ("error" in at) return classroomRedirect(courseId, at.error); // no-drive | token-error
+
+  const set = await enrolledSet(env, courseId);
+  const bound = (await listBindings(env.DB)).filter((b) => !set || set.has(b.nycu_id));
+  const recipients = bound.filter((b) => b.google_email);
+  const skipped = bound.length - recipients.length;
+
+  let invited = 0;
+  let already = 0;
+  let errors = 0;
+  for (const r of recipients) {
+    try {
+      const res = await inviteToClassroom(at.token, classroomId, r.google_email!);
+      if ("already" in res) already++;
+      else invited++;
+    } catch (e) {
+      errors++;
+      console.error(`classroom invite failed for ${r.google_email}:`, (e as Error).message);
+    }
+  }
+  return classroomRedirect(courseId, `done:${invited}:${already}:${errors}:${skipped}`);
 }
 
 // Split a pasted blob of 學號 on commas / whitespace / newlines.

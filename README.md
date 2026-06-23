@@ -88,6 +88,7 @@ repo Settings → Pages → 由 `main` 分支根目錄發佈 → 服務在 `http
 - **用 Google Drive 分享檔案給全班**：在課程後台（`/c/<course_id>/admin`）的「用 Google Drive 分享檔案給全班」區，staff 先點「連結我的 Google Drive（完整權限）」授權一次，再貼上檔案／資料夾的 ID 或分享連結、選權限（reader/commenter/writer）送出。系統以該 staff 自己的 Drive，把檔案分享給「選課∩已綁 Google」學生的 email（未綁 Google 的學生略過）。若該檔案是資料夾，學生會一併取得夾內檔案的存取。
 - **課程 Google 問卷**：課程後台「Google 問卷」區，兩種方式加入：(1) **貼連結**——貼上現成 Google 表單的標題與連結；(2) **直接建立**——填標題按「直接新增 Google 表單」，系統用你連結的 Google 帳號透過 Forms API 建立新表單（需先「連結我的 Google Drive（完整權限）」一次），建立後點「編輯」到 Google 加題目。學生在 `/me` 對應課程下會看到並開啟填寫。請在 Google 表單設定開啟「收集電子郵件地址／需登入」，學生即以綁定的 Google 帳號作答，回應可用 email 對應回學號。
   - **直接建立**需在 Google Cloud 專案啟用 **Google Forms API**（Console → APIs & Services → Enable APIs → Google Forms API）。
+- **邀請學生加入 Google Classroom**：先在「課程設定」填 `google_classroom_id`，再到課程後台「Google Classroom」區按「邀請學生加入 Classroom」。系統用你連結的 Google（須先「連結我的 Google Drive（完整權限）」一次，且你本人是該 Classroom 老師）把「選課∩已綁 Google」學生以 email 邀請加入；已在班者計為「已在班」、未綁 Google 者略過。需在專案啟用 **Google Classroom API**。
 
 ## OJ 成績整合（與 dsjudge）
 - **roster**：`maccount` 是 `github_login ↔ 學號` 的權威來源（兩邊都驗證過）。`/admin/roster.csv` 直接產生 dsjudge `app/roster.py` 讀的 `roster.csv`，取代原本的 GitHub Classroom 匯出。

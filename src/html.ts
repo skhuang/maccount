@@ -222,6 +222,7 @@ export function adminPage(
     staffMsg?: string;
     driveMsg?: string;
     formsMsg?: string;
+    classroomMsg?: string;
     enrolled?: EnrolledLite[];
     forms?: FormLite[];
   } = { isOwner: false, staff: [] },
@@ -377,6 +378,33 @@ ${formsRows}
   <button type="submit">${t.forms_create_btn}</button>
 </form>`;
 
+  // Google Classroom — invite enrolled+bound students into the course's
+  // Classroom (acts as the staff's connected Google account; needs the
+  // google_classroom_id set in course settings).
+  const classroomId = (course.google_classroom_id ?? "").trim();
+  const cm = opts.classroomMsg ?? "";
+  let classroomBannerText = "";
+  if (cm.startsWith("done:")) {
+    const [, invited = "0", already = "0", errors = "0", skipped = "0"] = cm.split(":");
+    classroomBannerText = t.classroom_msg_done
+      .replace("{invited}", invited).replace("{already}", already)
+      .replace("{errors}", errors).replace("{skipped}", skipped);
+  } else if (cm === "no-classroom") classroomBannerText = t.classroom_msg_noid;
+  else if (cm === "no-drive") classroomBannerText = t.classroom_msg_nodrive;
+  else if (cm === "token-error") classroomBannerText = t.classroom_msg_tokenerror;
+  const classroomBanner = classroomBannerText
+    ? `<p style="padding:8px;border:1px solid #ccc;background:#f6f6f6">${classroomBannerText}</p>`
+    : "";
+  const classroomSection = `<h2>${t.classroom_heading}</h2>
+<p style="color:#777;font-size:.9em">${t.classroom_note}</p>
+${classroomBanner}
+${
+    classroomId
+      ? `<p>Classroom ID：<code>${h(classroomId)}</code></p>
+<form method="post" action="${base}/classroom/invite"><button type="submit">${t.classroom_invite_btn}</button></form>`
+      : `<p style="color:#b00">${t.classroom_no_id}</p>`
+  }`;
+
   // Course settings — owner edits name/term/Moodle/org/status (re-submits the
   // upsert with the same course_id).
   const settingsSection = isOwner
@@ -414,6 +442,7 @@ ${trs}
 ${enrollSection}
 ${driveSection}
 ${formsSection}
+${classroomSection}
 ${staffSection}
 ${settingsSection}
 </body></html>`;
