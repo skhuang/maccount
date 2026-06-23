@@ -102,6 +102,7 @@ export interface EnrolledStudent {
   nycu_name: string | null;
   github_login: string | null; // null = enrolled but hasn't bound GitHub yet
   github_id: number | null;
+  google_email: string | null;  // null = enrolled but hasn't bound Google yet
 }
 
 // A course's roster joined to bindings, so the admin sees who hasn't bound yet.
@@ -110,7 +111,7 @@ export async function listEnrolledWithBinding(
 ): Promise<EnrolledStudent[]> {
   const { results } = await db
     .prepare(
-      `SELECT e.student_id, b.nycu_name, b.github_login, b.github_id
+      `SELECT e.student_id, b.nycu_name, b.github_login, b.github_id, b.google_email
        FROM enrollments e LEFT JOIN bindings b ON b.nycu_id = e.student_id
        WHERE e.course_id = ? ORDER BY e.student_id`,
     )

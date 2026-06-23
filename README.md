@@ -83,6 +83,7 @@ repo Settings → Pages → 由 `main` 分支根目錄發佈 → 服務在 `http
 - **替代登入**：已綁定過 GitHub／Google 的人，首頁也可改用「用 GitHub 登入／用 Google 登入」，免再走 NYCU。系統用該 OAuth 帳號反查綁定，登入成同一個 NYCU 身分（含 admin 權限）。尚未綁定的帳號會被導到 done 頁提示「請先用 NYCU 登入並綁定」。
 - 管理員（`ADMIN_IDS` 內的 NYCU 帳號）：開 `https://<worker>/admin` → 用 NYCU 登入 → 看名單 / 匯出 CSV / 匯出 `roster.csv`（`github_login,student_id`，給 dsjudge P4）/ 刪除綁定。
 - **用 Google Drive 分享檔案給全班**：在課程後台（`/c/<course_id>/admin`）的「用 Google Drive 分享檔案給全班」區，staff 先點「連結我的 Google Drive（完整權限）」授權一次，再貼上檔案／資料夾的 ID 或分享連結、選權限（reader/commenter/writer）送出。系統以該 staff 自己的 Drive，把檔案分享給「選課∩已綁 Google」學生的 email（未綁 Google 的學生略過）。若該檔案是資料夾，學生會一併取得夾內檔案的存取。
+- **課程 Google 問卷**：課程後台「Google 問卷」區，貼上 Google 表單標題與連結即可加入；學生在 `/me` 對應課程下會看到並開啟填寫。請在 Google 表單設定開啟「收集電子郵件地址／需登入」，學生即以綁定的 Google 帳號作答，回應可用 email 對應回學號。（maccount 只存連結，不經 Forms API。）
 
 ## OJ 成績整合（與 dsjudge）
 - **roster**：`maccount` 是 `github_login ↔ 學號` 的權威來源（兩邊都驗證過）。`/admin/roster.csv` 直接產生 dsjudge `app/roster.py` 讀的 `roster.csv`，取代原本的 GitHub Classroom 匯出。

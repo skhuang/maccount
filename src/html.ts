@@ -117,7 +117,7 @@ export function bindingsPage(lang: Lang, rows: BindingRow[], orgs: string[] = []
   const trs = rows
     .map(
       (r) => `<tr><td>${h(r.nycu_id)}</td><td>${h(r.nycu_name)}</td>
-  <td>${h(r.github_login)}</td><td>${h(r.github_id)}</td><td>${h(fmtTime(r.updated_at))}</td></tr>`,
+  <td>${h(r.github_login)}</td><td>${h(r.github_id)}</td><td>${h(r.google_email)}</td><td>${h(fmtTime(r.updated_at))}</td></tr>`,
     )
     .join("\n");
   const orgLinks = orgs
@@ -131,7 +131,7 @@ ${langToggle("/admin/bindings", lang)}
 <h1>${t.bindings_all_link}（${rows.length}）</h1>
 ${orgs.length ? `<p>${t.bindings_query_heading}：${orgLinks}</p>` : ""}
 <table border="1" cellpadding="6" cellspacing="0">
-<thead><tr><th>NYCU id</th><th>${t.th_name}</th><th>GitHub</th><th>${t.th_github_id}</th><th>${t.th_updated}</th></tr></thead>
+<thead><tr><th>NYCU id</th><th>${t.th_name}</th><th>GitHub</th><th>${t.th_github_id}</th><th>${t.google}</th><th>${t.th_updated}</th></tr></thead>
 <tbody>
 ${trs}
 </tbody></table>
@@ -185,6 +185,21 @@ ${unbound}
 interface EnrolledLite {
   student_id: string;
   github_login: string | null;
+  google_email?: string | null;
+}
+
+interface FormLite {
+  id: number;
+  title: string;
+  url: string;
+}
+
+// Only render a clickable link for an http(s) URL; otherwise show plain text.
+// Defense-in-depth on top of the http(s) check at insert time.
+function linkOrText(url: string, label: string): string {
+  return /^https?:\/\//i.test(url)
+    ? `<a href="${h(url)}" target="_blank" rel="noopener">${h(label)} ↗</a>`
+    : h(label);
 }
 
 export function adminPage(
@@ -203,7 +218,9 @@ export function adminPage(
     staff: StaffLite[];
     staffMsg?: string;
     driveMsg?: string;
+    formsMsg?: string;
     enrolled?: EnrolledLite[];
+    forms?: FormLite[];
   } = { isOwner: false, staff: [] },
 ): string {
   const t = T[lang];
@@ -225,6 +242,7 @@ export function adminPage(
       (r) => `<tr>
   <td>${h(r.nycu_id)}</td><td>${h(r.nycu_name)}</td>
   <td>${h(r.github_login)}</td><td>${h(r.github_id)}</td>
+  <td>${h(r.google_email)}</td>
   <td>${h(fmtTime(r.updated_at))}</td>${
     isOwner
       ? `
@@ -259,10 +277,13 @@ export function adminPage(
   // Enrollment (course roster). Bound = has a GitHub binding; unbound students
   // still need to bind. Import is owner-only.
   const bound = enrolled.filter((e) => e.github_login).length;
+  const gbound = enrolled.filter((e) => e.google_email).length;
   const enrolledRows = enrolled
     .map(
       (e) => `<tr><td>${h(e.student_id)}</td><td>${
         e.github_login ? h(e.github_login) : `<span style="color:#b00">${t.enroll_unbound}</span>`
+      }</td><td>${
+        e.google_email ? h(e.google_email) : `<span style="color:#b00">${t.enroll_unbound}</span>`
       }</td></tr>`,
     )
     .join("\n");
@@ -274,12 +295,12 @@ export function adminPage(
 </form>`
     : "";
   const enrollSection = `<h2>${t.enroll_heading.replace("{n}", String(enrolled.length))}</h2>
-<p style="color:#777;font-size:.9em">${t.enroll_note.replace("{bound}", String(bound))}</p>${
+<p style="color:#777;font-size:.9em">${t.enroll_note.replace("{bound}", String(bound)).replace("{gbound}", String(gbound))}</p>${
     enrolled.length
       ? `
 <details><summary>${t.enroll_show_list}</summary>
 <table border="1" cellpadding="6" cellspacing="0">
-<thead><tr><th>NYCU id</th><th>GitHub</th></tr></thead>
+<thead><tr><th>NYCU id</th><th>GitHub</th><th>Google</th></tr></thead>
 <tbody>${enrolledRows}</tbody></table></details>`
       : ""
   }
@@ -314,6 +335,31 @@ ${driveBanner}
   <button type="submit">${t.drive_share_btn}</button>
 </form>`;
 
+  // Google Forms attached to the course (any course staff). Students see these
+  // on /me under the matching course and answer signed into Google.
+  const forms = opts.forms ?? [];
+  const formsBanner = opts.formsMsg === "bad"
+    ? `<p style="padding:8px;border:1px solid #c00;background:#fee">${t.forms_msg_bad}</p>`
+    : "";
+  const formsRows = forms.length
+    ? `<ul>${forms
+        .map(
+          (f) => `<li>${linkOrText(f.url, f.title)}
+  <form method="post" action="${base}/forms/remove" style="display:inline" onsubmit="return confirm('${t.forms_remove_confirm}')">
+    <input type="hidden" name="id" value="${h(f.id)}"><button type="submit">${t.forms_remove}</button></form></li>`,
+        )
+        .join("\n")}</ul>`
+    : `<p style="color:#666">${t.forms_none}</p>`;
+  const formsSection = `<h2>${t.forms_heading}</h2>
+<p style="color:#777;font-size:.9em">${t.forms_note}</p>
+${formsBanner}
+${formsRows}
+<form method="post" action="${base}/forms/add" style="display:grid;gap:6px;max-width:440px">
+  <input name="title" placeholder="${t.forms_title_ph}" required>
+  <input name="url" type="url" placeholder="${t.forms_url_ph}" required>
+  <button type="submit">${t.forms_add}</button>
+</form>`;
+
   // Course settings — owner edits name/term/Moodle/org/status (re-submits the
   // upsert with the same course_id).
   const settingsSection = isOwner
@@ -343,12 +389,13 @@ ${langToggle(base, lang)}
 ${banner}
 <p><a href="${base}/export.csv">${t.export_full}</a>　|　<a href="${base}/roster.csv">${t.export_roster}</a></p>
 <table border="1" cellpadding="6" cellspacing="0">
-<thead><tr><th>NYCU id</th><th>${t.th_name}</th><th>GitHub</th><th>${t.th_github_id}</th><th>${t.th_updated}</th>${isOwner ? `<th>${t.th_actions}</th>` : ""}</tr></thead>
+<thead><tr><th>NYCU id</th><th>${t.th_name}</th><th>GitHub</th><th>${t.th_github_id}</th><th>${t.google}</th><th>${t.th_updated}</th>${isOwner ? `<th>${t.th_actions}</th>` : ""}</tr></thead>
 <tbody>
 ${trs}
 </tbody></table>
 ${enrollSection}
 ${driveSection}
+${formsSection}
 ${staffSection}
 ${settingsSection}
 </body></html>`;
@@ -366,6 +413,8 @@ export function dashboardPage(
   flash: { bound?: boolean; gbound?: boolean; error?: string | null },
   orgJoins: { org: string; url: string }[] = [],
   courseNames: Record<string, string> = {},
+  enrolledCourses: { course_id: string; name: string }[] = [],
+  formsByCourse: Record<string, { title: string; url: string }[]> = {},
 ): string {
   const t = T[lang];
   const gh = binding?.github_login
@@ -394,12 +443,12 @@ export function dashboardPage(
       )
       .join("\n");
 
-  // Group by course (grades arrive ordered by course_id from listGradesFor).
-  const byCourse: { cid: string; rows: GradeRow[] }[] = [];
+  // Grades grouped by course (arrive ordered by course_id from listGradesFor).
+  const gradesByCourse = new Map<string, GradeRow[]>();
   for (const g of grades) {
-    let grp = byCourse.find((x) => x.cid === g.course_id);
-    if (!grp) byCourse.push((grp = { cid: g.course_id, rows: [] }));
-    grp.rows.push(g);
+    const arr = gradesByCourse.get(g.course_id) ?? [];
+    arr.push(g);
+    gradesByCourse.set(g.course_id, arr);
   }
   const courseTable = (rs: GradeRow[]) => `<table border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>${t.col_problem}</th><th>${t.col_result}</th><th>${t.col_score}</th><th>${t.col_updated}</th></tr></thead>
@@ -407,8 +456,8 @@ export function dashboardPage(
 ${renderRows(rs)}
 </tbody></table>`;
 
-  // Within a course: labs (and untyped) shown flat; exams grouped into an exam
-  // list the student enters at /me/exam/<assignment_id>.
+  // Within a course: labs/assignments (and untyped) shown flat; exams grouped
+  // into an exam list the student enters at /me/exam/<assignment_id>.
   const courseBlock = (rs: GradeRow[]) => {
     const labRows = rs.filter((g) => g.assignment_type !== "exam");
     const exams = new Map<string, string>(); // assignment_id -> title
@@ -417,20 +466,49 @@ ${renderRows(rs)}
         exams.set(g.assignment_id, g.assignment_title || g.assignment_id);
       }
     }
+    const labs = labRows.length
+      ? `<p style="margin:.3rem 0 .2rem;font-weight:600">${t.assignments_heading}</p>
+${courseTable(labRows)}`
+      : "";
     const examList = exams.size
       ? `<p style="margin:.3rem 0 .2rem;font-weight:600">${t.exam_list_heading}</p>
 <ul>${[...exams].map(([aid, title]) =>
           `<li><a href="/me/exam/${encodeURIComponent(aid)}">${h(title)} ↗</a></li>`).join("")}</ul>`
       : "";
-    return `${labRows.length ? courseTable(labRows) : ""}${examList}`;
+    return labs + examList;
   };
 
-  const table = grades.length
-    ? byCourse
-        .map(
-          (grp) => `<h3 style="margin:1rem 0 .3rem">${h(courseNames[grp.cid] || grp.cid)}</h3>
-${courseBlock(grp.rows)}`,
-        )
+  // Course list = enrolled courses (Moodle roster, shown even with no data yet)
+  // ∪ any course the student has grades in (back-compat when not yet enrolled).
+  const courseOrder: string[] = [];
+  const seenCourse = new Set<string>();
+  for (const c of enrolledCourses) {
+    if (!seenCourse.has(c.course_id)) { courseOrder.push(c.course_id); seenCourse.add(c.course_id); }
+  }
+  for (const cid of [...gradesByCourse.keys()].sort()) {
+    if (!seenCourse.has(cid)) { courseOrder.push(cid); seenCourse.add(cid); }
+  }
+  const courseName = (cid: string) =>
+    enrolledCourses.find((c) => c.course_id === cid)?.name || courseNames[cid] || cid;
+  // Google Forms attached to the course; the student opens them and answers
+  // signed into Google (the form enforces sign-in / email collection).
+  const formsFor = (cid: string) => {
+    const fs = formsByCourse[cid] ?? [];
+    if (!fs.length) return "";
+    return `<p style="margin:.3rem 0 .2rem;font-weight:600">${t.forms_student_heading}</p>
+<ul>${fs.map((f) => `<li>${linkOrText(f.url, f.title)}</li>`).join("")}</ul>`;
+  };
+  const table = courseOrder.length
+    ? courseOrder
+        .map((cid) => {
+          const rs = gradesByCourse.get(cid) ?? [];
+          const parts: string[] = [];
+          if (rs.length) parts.push(courseBlock(rs));
+          const fhtml = formsFor(cid);
+          if (fhtml) parts.push(fhtml);
+          const inner = parts.length ? parts.join("") : `<p style="color:#666">${t.course_no_data}</p>`;
+          return `<h3 style="margin:1rem 0 .3rem">${h(courseName(cid))}</h3>\n${inner}`;
+        })
         .join("\n")
     : `<p style="color:#666">${t.no_grades}</p>`;
 
@@ -465,7 +543,7 @@ ${flashHtml}
 <p>${t.github}：${gh}</p>
 <p>${t.google}：${goog}</p>
 ${orgHtml}
-<h2>${t.grades_heading}</h2>
+<h2>${t.my_courses_heading}</h2>
 ${table}
 <p style="color:#888;font-size:.9em">${t.privacy_note}</p>
 ${adminHtml}

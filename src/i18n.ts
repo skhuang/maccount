@@ -26,6 +26,9 @@ export interface Strings {
   bind_action: string;
   bind_google_action: string;
   grades_heading: string;
+  my_courses_heading: string;
+  assignments_heading: string;
+  course_no_data: string;
   col_problem: string;
   col_result: string;
   col_score: string;
@@ -105,6 +108,16 @@ export interface Strings {
   drive_msg_nofile: string;
   drive_msg_nodrive: string;
   drive_msg_tokenerror: string;
+  forms_heading: string;
+  forms_note: string;
+  forms_title_ph: string;
+  forms_url_ph: string;
+  forms_add: string;
+  forms_remove: string;
+  forms_remove_confirm: string;
+  forms_none: string;
+  forms_msg_bad: string;
+  forms_student_heading: string;
 }
 
 export const T: Record<Lang, Strings> = {
@@ -120,6 +133,9 @@ export const T: Record<Lang, Strings> = {
     bind_action: "綁定 GitHub →",
     bind_google_action: "綁定 Google →",
     grades_heading: "我的成績",
+    my_courses_heading: "我的課程",
+    assignments_heading: "作業",
+    course_no_data: "此課程目前沒有作業或成績。",
     col_problem: "題目",
     col_result: "結果",
     col_score: "分數",
@@ -162,7 +178,7 @@ export const T: Record<Lang, Strings> = {
     course_status: "狀態",
     course_save: "儲存課程設定",
     enroll_heading: "選課名單（{n}）",
-    enroll_note: "已綁定 GitHub：{bound}。匯入後，此課的綁定名單與 roster 匯出會縮到「選課∩已綁」。",
+    enroll_note: "已綁定 GitHub：{bound}／Google：{gbound}。匯入後，此課的綁定名單與 roster 匯出會縮到「選課∩已綁」。",
     enroll_show_list: "顯示選課名單",
     enroll_unbound: "未綁定",
     enroll_placeholder: "貼上學號，一行一個（或以逗號／空白分隔）",
@@ -199,6 +215,16 @@ export const T: Record<Lang, Strings> = {
     drive_msg_nofile: "請填入 Drive 檔案／資料夾 ID 或連結。",
     drive_msg_nodrive: "尚未連結你的 Google Drive（完整權限）。請先點上方「連結我的 Google Drive」並授權。",
     drive_msg_tokenerror: "無法取得 Google 存取權杖（請重新連結 Drive）。",
+    forms_heading: "Google 問卷",
+    forms_note: "貼上 Google 表單的連結，學生會在 /me 對應課程看到並填寫。請在表單設定開啟「收集電子郵件地址／需登入」，學生即以綁定的 Google 帳號作答、可對應回學號。",
+    forms_title_ph: "問卷標題（如 課程意見調查）",
+    forms_url_ph: "Google 表單連結（https://docs.google.com/forms/…）",
+    forms_add: "新增問卷",
+    forms_remove: "移除",
+    forms_remove_confirm: "確定移除此問卷？",
+    forms_none: "目前沒有問卷。",
+    forms_msg_bad: "請填標題與有效的 https 連結。",
+    forms_student_heading: "問卷",
   },
   en: {
     acct_title: "My Account",
@@ -212,6 +238,9 @@ export const T: Record<Lang, Strings> = {
     bind_action: "Bind GitHub →",
     bind_google_action: "Bind Google →",
     grades_heading: "My Grades",
+    my_courses_heading: "My Courses",
+    assignments_heading: "Assignments",
+    course_no_data: "No assignments or grades in this course yet.",
     col_problem: "Problem",
     col_result: "Result",
     col_score: "Score",
@@ -254,7 +283,7 @@ export const T: Record<Lang, Strings> = {
     course_status: "Status",
     course_save: "Save course settings",
     enroll_heading: "Enrollment ({n})",
-    enroll_note: "Bound to GitHub: {bound}. Once imported, this course's bindings list and roster export narrow to enrolled ∩ bound.",
+    enroll_note: "Bound to GitHub: {bound} / Google: {gbound}. Once imported, this course's bindings list and roster export narrow to enrolled ∩ bound.",
     enroll_show_list: "Show roster",
     enroll_unbound: "not bound",
     enroll_placeholder: "Paste 學號, one per line (or comma/space separated)",
@@ -291,6 +320,16 @@ export const T: Record<Lang, Strings> = {
     drive_msg_nofile: "Enter a Drive file/folder ID or link.",
     drive_msg_nodrive: "Your Google Drive (full access) isn't connected. Click “Connect my Google Drive” above and authorize first.",
     drive_msg_tokenerror: "Couldn't get a Google access token (please reconnect Drive).",
+    forms_heading: "Google Forms",
+    forms_note: "Paste a Google Form link; enrolled students see it under the matching course on /me. In the form's settings enable “Collect email addresses / require sign-in” so students answer with their bound Google account and responses map back to a student id.",
+    forms_title_ph: "Form title (e.g. Course feedback)",
+    forms_url_ph: "Google Form link (https://docs.google.com/forms/…)",
+    forms_add: "Add form",
+    forms_remove: "Remove",
+    forms_remove_confirm: "Remove this form?",
+    forms_none: "No forms yet.",
+    forms_msg_bad: "Enter a title and a valid https link.",
+    forms_student_heading: "Forms",
   },
 };
 

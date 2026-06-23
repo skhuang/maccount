@@ -23,6 +23,12 @@ describe("adminPage", () => {
     expect(html).toContain("資料結構 2026");
   });
 
+  it("shows the Google column with the bound email", () => {
+    const html = adminPage("zh", course, [{ ...rows[0], google_email: "octo@gmail.com" }]);
+    expect(html).toContain("<th>Google</th>");
+    expect(html).toContain("octo@gmail.com");
+  });
+
   it("escapes HTML in user-controlled fields", () => {
     const html = adminPage("zh", course, rows);
     expect(html).not.toContain("<script>x</script>");
@@ -68,6 +74,32 @@ describe("adminPage", () => {
     // settings form prefilled
     expect(html).toContain('name="moodle_course_id" value="12345"');
     expect(html).toContain('<option value="archived" selected>');
+  });
+
+  it("enrollment roster shows Google bound/unbound per student", () => {
+    const html = adminPage("zh", course, [], {
+      isOwner: true,
+      staff: [],
+      enrolled: [
+        { student_id: "a01", github_login: "alice", google_email: "a01@gmail.com" },
+        { student_id: "b02", github_login: null, google_email: null },
+      ],
+    });
+    expect(html).toContain("<th>Google</th>");
+    expect(html).toContain("a01@gmail.com"); // a01's bound Google
+    expect(html).toContain("未綁定"); // b02 unbound (github + google)
+  });
+
+  it("shows the Google Forms section with attached forms + add form", () => {
+    const html = adminPage("zh", course, [], {
+      isOwner: true,
+      staff: [],
+      forms: [{ id: 1, title: "意見調查", url: "https://docs.google.com/forms/d/abc/viewform" }],
+    });
+    expect(html).toContain("Google 問卷");
+    expect(html).toContain("意見調查");
+    expect(html).toContain('href="https://docs.google.com/forms/d/abc/viewform"');
+    expect(html).toContain('action="/c/ds-2026/admin/forms/add"');
   });
 
   it("hides import + settings from non-owner staff", () => {

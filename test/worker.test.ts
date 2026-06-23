@@ -42,6 +42,7 @@ beforeEach(async () => {
   await env.DB.prepare("DELETE FROM grades").run();
   await env.DB.prepare("DELETE FROM staff").run();
   await env.DB.prepare("DELETE FROM enrollments").run();
+  await env.DB.prepare("DELETE FROM course_forms").run();
 });
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -788,7 +789,16 @@ describe("binding queries (總表 + by GitHub org)", () => {
     expect(body).toContain("所有綁定");
     expect(body).toContain("ming");
     expect(body).toContain("0856001");
+    expect(body).toContain("<th>Google</th>"); // google column in the correspondence table
     expect(body).toContain('href="/admin/org/nycu-cs-course-ds"'); // effective org link
+  });
+
+  it("/admin/bindings shows a bound student's Google email", async () => {
+    await env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, google_sub, google_email, created_at, updated_at) VALUES ('0856009','陳',9,'chen','sub9','chen@gmail.com','t','t')",
+    ).run();
+    const body = await (await call("/admin/bindings", { headers: cookie(await owner()) })).text();
+    expect(body).toContain("chen@gmail.com");
   });
 
   it("/admin/bindings is auth-gated", async () => {
@@ -1012,6 +1022,17 @@ describe("/me dashboard", () => {
     expect(body).toContain("管理功能"); // admin1 ∈ ADMIN_IDS → admin link
   });
 
+  it("lists an enrolled course on /me even before any grade/assignment exists", async () => {
+    await env.DB.prepare(
+      "INSERT INTO enrollments (course_id, student_id, role, created_at) VALUES ('ds-2026','314561004','student','t')",
+    ).run();
+    const session = await signSession({ exp: Date.now() + 60000, nycu: { id: "314561004", name: "甲" } }, SECRET);
+    const body = await (await call("/me", { headers: cookie(session) })).text();
+    expect(body).toContain("我的課程");                    // course-list heading
+    expect(body).toContain("資料結構 2026");                // enrolled course name (seeded)
+    expect(body).toContain("此課程目前沒有作業或成績");        // empty-course note
+  });
+
   it("groups a student's grades by course on /me", async () => {
     await env.DB.batch([
       env.DB.prepare(
@@ -1185,6 +1206,70 @@ describe("/api/grades/ingest", () => {
     const session = await signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "A" } }, SECRET);
     const body = await (await call("/me", { headers: cookie(session) })).text();
     expect(body).toContain('href="https://github.com/nycu-cs-course-ds/lab01-stack-skhuang"');
+  });
+});
+
+describe("course Google Forms", () => {
+  const owner = () => signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "A" } }, SECRET);
+  const post = (path: string, fields: Record<string, string>, session: string) =>
+    call(path, {
+      method: "POST",
+      headers: { ...cookie(session), "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(fields).toString(),
+    });
+
+  it("staff adds a form; it persists and shows in the admin page", async () => {
+    const res = await post(
+      "/c/ds-2026/admin/forms/add",
+      { title: "課程意見調查", url: "https://docs.google.com/forms/d/abc/viewform" },
+      await owner(),
+    );
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin");
+    const row = await env.DB.prepare("SELECT title, url FROM course_forms WHERE course_id='ds-2026'").first();
+    expect(row).toMatchObject({ title: "課程意見調查", url: "https://docs.google.com/forms/d/abc/viewform" });
+    const body = await (await call("/c/ds-2026/admin", { headers: cookie(await owner()) })).text();
+    expect(body).toContain("課程意見調查");
+    expect(body).toContain('href="https://docs.google.com/forms/d/abc/viewform"');
+  });
+
+  it("rejects a non-http(s) url (flash, no insert)", async () => {
+    const res = await post(
+      "/c/ds-2026/admin/forms/add",
+      { title: "x", url: "javascript:alert(1)" },
+      await owner(),
+    );
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?forms_msg=bad");
+    expect(await env.DB.prepare("SELECT 1 FROM course_forms").first()).toBe(null);
+  });
+
+  it("removes a form (scoped by id)", async () => {
+    await env.DB.prepare(
+      "INSERT INTO course_forms (course_id, title, url, created_at) VALUES ('ds-2026','A','https://forms.gle/a','t')",
+    ).run();
+    const id = (await env.DB.prepare("SELECT id FROM course_forms").first<{ id: number }>())!.id;
+    const res = await post("/c/ds-2026/admin/forms/remove", { id: String(id) }, await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin");
+    expect(await env.DB.prepare("SELECT 1 FROM course_forms").first()).toBe(null);
+  });
+
+  it("forbids a logged-in non-staff from adding a form (403)", async () => {
+    const session = await signSession({ exp: Date.now() + 60000, nycu: { id: "0856001", name: "王" } }, SECRET);
+    const res = await post("/c/ds-2026/admin/forms/add", { title: "x", url: "https://forms.gle/a" }, session);
+    expect(res.status).toBe(403);
+    expect(await env.DB.prepare("SELECT 1 FROM course_forms").first()).toBe(null);
+  });
+
+  it("shows a course's forms to an enrolled student on /me", async () => {
+    await env.DB.prepare(
+      "INSERT INTO enrollments (course_id, student_id, role, created_at) VALUES ('ds-2026','314561004','student','t')",
+    ).run();
+    await env.DB.prepare(
+      "INSERT INTO course_forms (course_id, title, url, created_at) VALUES ('ds-2026','期末回饋','https://forms.gle/feedback','t')",
+    ).run();
+    const session = await signSession({ exp: Date.now() + 60000, nycu: { id: "314561004", name: "甲" } }, SECRET);
+    const body = await (await call("/me", { headers: cookie(session) })).text();
+    expect(body).toContain("期末回饋");
+    expect(body).toContain('href="https://forms.gle/feedback"');
   });
 });
 

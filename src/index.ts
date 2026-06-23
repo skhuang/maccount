@@ -43,6 +43,9 @@ import {
 } from "./db/staff";
 import { listCourses, getCourse, getCourseByMoodleId, upsertCourse } from "./db/courses";
 import {
+  listCourseForms, listFormsForCourses, addCourseForm, removeCourseForm,
+} from "./db/forms";
+import {
   bulkEnroll, replaceEnrollments, enrollmentCount, listEnrolledWithBinding, listEnrollments,
   coursesForStudent,
 } from "./db/enrollments";
@@ -382,13 +385,23 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
   if (s instanceof Response) return s;
   const studentId = s.nycu!.id; // == 學號
   const lang = pickLang(url, req.headers.get("Cookie"));
-  const [binding, grades, courses] = await Promise.all([
+  const [binding, grades, courses, enrolledIds] = await Promise.all([
     getBinding(env.DB, studentId),
     listGradesFor(env.DB, studentId),
     listCourses(env.DB),
+    coursesForStudent(env.DB, studentId),
   ]);
   const courseNames: Record<string, string> = {};
   for (const c of courses) courseNames[c.course_id] = c.name;
+  // Courses the student is enrolled in (Moodle roster), so /me lists them even
+  // before any grade/assignment exists. Names from the courses table, else id.
+  const enrolledCourses = enrolledIds.map((id) => ({ course_id: id, name: courseNames[id] ?? id }));
+  // Google Forms for the courses shown (enrolled ∪ has-grades), grouped per course.
+  const displayIds = [...new Set([...enrolledIds, ...grades.map((g) => g.course_id)])];
+  const formsByCourse: Record<string, { title: string; url: string }[]> = {};
+  for (const f of await listFormsForCourses(env.DB, displayIds)) {
+    (formsByCourse[f.course_id] ??= []).push({ title: f.title, url: f.url });
+  }
   const flash = {
     bound: url.searchParams.get("bound") === "1",
     gbound: url.searchParams.get("gbound") === "1",
@@ -402,7 +415,7 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
   }));
   // Show the admin link to owners AND staff-table members (of any course).
   const staff = isAdmin(env, studentId) || (await isStaffAnywhere(env.DB, studentId));
-  const html = dashboardPage(lang, s.nycu!, binding, grades, staff, flash, orgJoins, courseNames);
+  const html = dashboardPage(lang, s.nycu!, binding, grades, staff, flash, orgJoins, courseNames, enrolledCourses, formsByCourse);
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
   });
@@ -643,6 +656,8 @@ async function courseAdminRouter(
   if (sub === "/staff/remove" && m === "POST") return await staffRemove(req, env, courseId);
   if (sub === "/enroll" && m === "POST") return await courseEnroll(req, env, courseId);
   if (sub === "/drive/share" && m === "POST") return await driveShare(req, env, courseId);
+  if (sub === "/forms/add" && m === "POST") return await formAdd(req, env, courseId);
+  if (sub === "/forms/remove" && m === "POST") return await formRemove(req, env, courseId);
   return new Response("Not found", { status: 404 });
 }
 
@@ -653,18 +668,20 @@ async function courseAdmin(req: Request, env: Env, url: URL, courseId: string): 
   if (!course) return new Response("Course not found", { status: 404 });
   const isOwner = isAdmin(env, s.nycu!.id);
   const lang = pickLang(url, req.headers.get("Cookie"));
-  const [rows, staff, enrolled] = await Promise.all([
+  const [rows, staff, enrolled, forms] = await Promise.all([
     listBindings(env.DB),
     listStaff(env.DB, courseId),
     listEnrolledWithBinding(env.DB, courseId),
+    listCourseForms(env.DB, courseId),
   ]);
   // Once a course has an enrolled roster, the bindings table scopes to it
   // (enrolled ∩ bound); before that it shows the global registry (back-compat).
   const scoped = enrolled.length ? rows.filter((r) => enrolled.some((e) => e.student_id === r.nycu_id)) : rows;
   const staffMsg = url.searchParams.get("staff_msg") ?? "";
   const driveMsg = url.searchParams.get("drive_msg") ?? "";
+  const formsMsg = url.searchParams.get("forms_msg") ?? "";
   return new Response(
-    adminPage(lang, course, scoped, { isOwner, staff, staffMsg, driveMsg, enrolled }),
+    adminPage(lang, course, scoped, { isOwner, staff, staffMsg, driveMsg, formsMsg, enrolled, forms }),
     { headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) } },
   );
 }
@@ -781,6 +798,36 @@ async function driveShare(req: Request, env: Env, courseId: string): Promise<Res
     }
   }
   return driveRedirect(courseId, `done:${shared}:${errors}:${skipped}`);
+}
+
+function formsRedirect(courseId: string, msg?: string): Response {
+  const base = `/c/${encodeURIComponent(courseId)}/admin`;
+  return redirect(msg ? `${base}?forms_msg=${encodeURIComponent(msg)}` : base);
+}
+
+// POST /c/<id>/admin/forms/add — attach a Google Form (title + share URL) to the
+// course. Students see it on /me and answer signed into Google (the form's own
+// settings enforce sign-in / email collection). Course staff may manage forms.
+async function formAdd(req: Request, env: Env, courseId: string): Promise<Response> {
+  const s = await requireCourseStaff(req, env, courseId);
+  if (s instanceof Response) return s;
+  if (!(await getCourse(env.DB, courseId))) return new Response("Course not found", { status: 404 });
+  const form = await req.formData();
+  const title = String(form.get("title") ?? "").trim();
+  const url = String(form.get("url") ?? "").trim();
+  // Only http(s) links — blocks javascript:/data: ever reaching the stored href.
+  if (!title || !/^https?:\/\//i.test(url)) return formsRedirect(courseId, "bad");
+  await addCourseForm(env.DB, courseId, title, url, new Date(Date.now()).toISOString());
+  return formsRedirect(courseId);
+}
+
+async function formRemove(req: Request, env: Env, courseId: string): Promise<Response> {
+  const s = await requireCourseStaff(req, env, courseId);
+  if (s instanceof Response) return s;
+  const form = await req.formData();
+  const id = Number(form.get("id"));
+  if (Number.isInteger(id)) await removeCourseForm(env.DB, id, courseId);
+  return formsRedirect(courseId);
 }
 
 // Split a pasted blob of 學號 on commas / whitespace / newlines.
