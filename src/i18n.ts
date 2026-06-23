@@ -128,6 +128,10 @@ export interface Strings {
   forms_create_btn: string;
   forms_edit: string;
   forms_student_heading: string;
+  forms_pre_enroll_label: string;
+  forms_pre_enroll_badge: string;
+  prejoin_link_label: string;
+  prejoin_intro: string;
   classroom_heading: string;
   classroom_note: string;
   classroom_no_id: string;
@@ -253,6 +257,10 @@ export const T: Record<Lang, Strings> = {
     forms_create_btn: "直接新增 Google 表單",
     forms_edit: "編輯",
     forms_student_heading: "問卷",
+    forms_pre_enroll_label: "給尚未選課的學生（報到問卷，顯示於 /me/<課程>）",
+    forms_pre_enroll_badge: "（尚未選課）",
+    prejoin_link_label: "尚未選課學生入口",
+    prejoin_intro: "尚未選課也沒關係！請先綁定你的 GitHub / Google 帳號，並填寫下方問卷，老師會據此將你加入課程。",
     classroom_heading: "Google Classroom",
     classroom_note: "把「選課∩已綁 Google」的學生以其 Google email 邀請加入本課的 Google Classroom（你需先「連結我的 Google Drive（完整權限）」一次，且你本人須為該 Classroom 的老師）。Classroom ID 請於上方設定區填寫。",
     classroom_no_id: "尚未設定 Google Classroom ID（請於上方設定區填入後再邀請）。",
@@ -376,6 +384,10 @@ export const T: Record<Lang, Strings> = {
     forms_create_btn: "Create Google Form",
     forms_edit: "Edit",
     forms_student_heading: "Forms",
+    forms_pre_enroll_label: "For not-yet-enrolled students (shown on /me/<course>)",
+    forms_pre_enroll_badge: "(prospective)",
+    prejoin_link_label: "Prospective-student entry",
+    prejoin_intro: "Not enrolled yet? No problem — bind your GitHub / Google account and fill in the form below; the instructor will enroll you based on it.",
     classroom_heading: "Google Classroom",
     classroom_note: "Invite enrolled students who bound Google (by their Google email) into this course's Google Classroom. Connect your Google Drive (full access) once first, and you must be a teacher of that Classroom. Set the Classroom ID in “Course settings” above.",
     classroom_no_id: "No Google Classroom ID set yet (add one in “Course settings”, then invite).",

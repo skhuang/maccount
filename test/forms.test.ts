@@ -30,6 +30,13 @@ describe("course_forms db", () => {
     expect(await listFormsForCourses(env.DB, [])).toEqual([]);
   });
 
+  it("stores + reports the pre_enroll flag (default 0)", async () => {
+    await addCourseForm(env.DB, "ds-2026", "報到問卷", "https://forms.gle/pre", now, null, true);
+    await addCourseForm(env.DB, "ds-2026", "一般問卷", "https://forms.gle/reg", now);
+    const byTitle = Object.fromEntries((await listCourseForms(env.DB, "ds-2026")).map((f) => [f.title, f.pre_enroll]));
+    expect(byTitle).toEqual({ "報到問卷": 1, "一般問卷": 0 });
+  });
+
   it("removes a form scoped to its course (can't delete via another course id)", async () => {
     await addCourseForm(env.DB, "ds-2026", "A", "https://forms.gle/a", now);
     const [f] = await listCourseForms(env.DB, "ds-2026");

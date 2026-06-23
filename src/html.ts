@@ -195,6 +195,7 @@ interface FormLite {
   title: string;
   url: string;
   form_id?: string | null; // present when created via the Forms API → edit link
+  pre_enroll?: number;     // 1 = shown to not-yet-enrolled students on /me/<course_id>
 }
 
 // Only render a clickable link for an http(s) URL; otherwise show plain text.
@@ -359,24 +360,29 @@ ${driveBanner}
           const editLink = f.form_id
             ? ` — <a href="https://docs.google.com/forms/d/${encodeURIComponent(f.form_id)}/edit" target="_blank" rel="noopener">${t.forms_edit} ↗</a>`
             : "";
-          return `<li>${linkOrText(f.url, f.title)}${editLink}
+          const preBadge = f.pre_enroll ? ` <span style="color:#0a7">${t.forms_pre_enroll_badge}</span>` : "";
+          return `<li>${linkOrText(f.url, f.title)}${preBadge}${editLink}
   <form method="post" action="${base}/forms/remove" style="display:inline" onsubmit="return confirm('${t.forms_remove_confirm}')">
     <input type="hidden" name="id" value="${h(f.id)}"><button type="submit">${t.forms_remove}</button></form></li>`;
         })
         .join("\n")}</ul>`
     : `<p style="color:#666">${t.forms_none}</p>`;
+  const preEnrollLabel = `<label><input type="checkbox" name="pre_enroll" value="1"> ${t.forms_pre_enroll_label}</label>`;
   const formsSection = `<h2>${t.forms_heading}</h2>
 <p style="color:#777;font-size:.9em">${t.forms_note}</p>
+<p style="color:#777;font-size:.9em">${t.prejoin_link_label}：<code>/me/${h(course.course_id)}</code></p>
 ${formsBanner}
 ${formsRows}
 <form method="post" action="${base}/forms/add" style="display:grid;gap:6px;max-width:440px">
   <input name="title" placeholder="${t.forms_title_ph}" required>
   <input name="url" type="url" placeholder="${t.forms_url_ph}" required>
+  ${preEnrollLabel}
   <button type="submit">${t.forms_add}</button>
 </form>
 <p style="color:#777;font-size:.9em;margin-top:.8rem">${t.forms_create_note}</p>
 <form method="post" action="${base}/forms/create" style="display:grid;gap:6px;max-width:440px">
   <input name="title" placeholder="${t.forms_create_title_ph}" required>
+  ${preEnrollLabel}
   <button type="submit">${t.forms_create_btn}</button>
 </form>`;
 
@@ -633,5 +639,47 @@ ${langToggle(`/me/exam/${encodeURIComponent(assignmentId)}`, lang)}
 ${trs}
 </tbody></table>
 <p style="color:#888;font-size:.9em">${t.privacy_note}</p>
+</body></html>`;
+}
+
+// Per-course landing for (esp. not-yet-enrolled) students: bind GitHub/Google +
+// fill the course's pre-enrollment form(s). Reached at /me/<course_id>.
+export function coursePrejoinPage(
+  lang: Lang,
+  courseId: string,
+  courseName: string,
+  nycu: { id: string; name: string },
+  binding: BindingRow | null,
+  forms: { title: string; url: string }[],
+  flash: { bound?: boolean; gbound?: boolean } = {},
+): string {
+  const t = T[lang];
+  const gh = binding?.github_login
+    ? `${t.bound} <b>${h(binding.github_login)}</b> — <a href="/auth/github/start">${t.rebind}</a>`
+    : `<span style="color:#b00">${t.not_bound}</span> — <a href="/auth/github/start"><b>${t.bind_action}</b></a>`;
+  const goog = binding?.google_email
+    ? `${t.bound} <b>${h(binding.google_email)}</b> — <a href="/auth/google/start">${t.rebind}</a>`
+    : `<span style="color:#b00">${t.not_bound}</span> — <a href="/auth/google/start"><b>${t.bind_google_action}</b></a>`;
+  const okFlash = flash.bound ? t.flash_bound_ok : flash.gbound ? t.flash_gbound_ok : "";
+  const flashHtml = okFlash
+    ? `<p style="padding:.5rem .8rem;border-radius:6px;background:#d4edda">${okFlash}</p>`
+    : "";
+  const formsHtml = forms.length
+    ? `<ul>${forms.map((f) => `<li>${linkOrText(f.url, f.title)}</li>`).join("")}</ul>`
+    : `<p style="color:#666">${t.forms_none}</p>`;
+  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${h(courseName)}</title>
+<body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
+${langToggle(`/me/${encodeURIComponent(courseId)}`, lang)}
+<p style="text-align:right;font-size:.9em"><a href="/me">${t.acct_heading}</a>　|　<a href="/logout">${t.logout}</a></p>
+<h1>${h(courseName)}</h1>
+<p style="color:#555">${t.prejoin_intro}</p>
+${flashHtml}
+<p>${t.student_id}：<b>${h(nycu.id)}</b>${nycu.name ? `（${h(nycu.name)}）` : ""}</p>
+<p>${t.github}：${gh}</p>
+<p>${t.google}：${goog}</p>
+<h2>${t.forms_student_heading}</h2>
+${formsHtml}
 </body></html>`;
 }

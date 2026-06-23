@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { adminPage, adminHomePage } from "../src/html";
+import { adminPage, adminHomePage, coursePrejoinPage } from "../src/html";
 import type { BindingRow } from "../src/csv";
 
 const course = { course_id: "ds-2026", name: "資料結構 2026" };
@@ -123,6 +123,17 @@ describe("adminPage", () => {
     expect(noId).toContain("尚未設定 Google Classroom ID");
   });
 
+  it("forms section has the pre-enroll checkbox, prospective entry link + badge", () => {
+    const html = adminPage("zh", course, [], {
+      isOwner: true,
+      staff: [],
+      forms: [{ id: 1, title: "報到問卷", url: "https://forms.gle/pre", pre_enroll: 1 }],
+    });
+    expect(html).toContain('name="pre_enroll"');     // checkbox on the add/create forms
+    expect(html).toContain("/me/ds-2026");            // prospective-student entry link
+    expect(html).toContain("（尚未選課）");            // badge on the pre-enroll form
+  });
+
   it("hides import + settings from non-owner staff", () => {
     const html = adminPage("zh", course, [], {
       isOwner: false,
@@ -139,6 +150,21 @@ describe("adminPage", () => {
     expect(html).not.toContain("confirm('刪除");
     expect(html).toContain("confirm('確定刪除此綁定？')");
     expect(html).toContain('value="O&#39;Brien"');
+  });
+});
+
+describe("coursePrejoinPage", () => {
+  it("shows binding actions + the pre-enroll forms", () => {
+    const html = coursePrejoinPage(
+      "zh", "ds-2026", "資料結構 2026", { id: "S1", name: "生" }, null,
+      [{ title: "報到問卷", url: "https://forms.gle/pre" }], {},
+    );
+    expect(html).toContain("資料結構 2026");
+    expect(html).toContain("報到問卷");
+    expect(html).toContain('href="https://forms.gle/pre"');
+    expect(html).toContain("/auth/github/start");
+    expect(html).toContain("/auth/google/start");
+    expect(html).toContain("尚未綁定"); // not-bound state for both
   });
 });
 

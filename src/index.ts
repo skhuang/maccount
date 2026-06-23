@@ -52,7 +52,9 @@ import {
   coursesForStudent,
 } from "./db/enrollments";
 import { toCsv, toRosterCsv } from "./csv";
-import { adminPage, adminHomePage, bindingsPage, orgMembersPage, dashboardPage, examPage } from "./html";
+import {
+  adminPage, adminHomePage, bindingsPage, orgMembersPage, dashboardPage, examPage, coursePrejoinPage,
+} from "./html";
 import { pickLang, langCookie } from "./i18n";
 
 const TTL_MS = 15 * 60 * 1000;
@@ -74,6 +76,8 @@ export default {
       if (p === "/me" && req.method === "GET") return await mePage(req, env, url);
       const em = p.match(/^\/me\/exam\/([A-Za-z0-9._-]+)$/);
       if (em && req.method === "GET") return await meExam(req, env, url, em[1]);
+      const mc = p.match(/^\/me\/([A-Za-z0-9_-]+)$/);
+      if (mc && req.method === "GET") return await meCourse(req, env, url, mc[1]);
       if (p === "/api/grades/ingest" && req.method === "POST")
         return await gradesIngest(req, env);
       if (p === "/api/roster" && req.method === "GET") return await apiRoster(req, env);
@@ -106,11 +110,21 @@ function redirect(location: string, cookie?: string | string[]): Response {
   return new Response(null, { status: 302, headers });
 }
 
+// A safe post-login redirect target: only our own per-course landing path, so
+// `?next=` can't be used as an open redirect.
+function safeNext(next: string | null | undefined): string | null {
+  return next && /^\/me\/[A-Za-z0-9_-]+$/.test(next) ? next : null;
+}
+
 // Single entry point: log in with NYCU. The landing dashboard (/me) is where a
 // user then binds GitHub, sees grades, or (if admin) reaches admin functions.
 async function startNycu(req: Request, env: Env, url: URL): Promise<Response> {
   const nstate = randomState();
   const session: SessionData = { exp: Date.now() + TTL_MS, nstate };
+  // Carry an intended destination (e.g. a prospective student opening
+  // /me/<course_id> before logging in) through the OAuth flow.
+  const next = safeNext(url.searchParams.get("next"));
+  if (next) session.next = next;
   const token = await signSession(session, env.SESSION_SECRET);
   const redirectUri = `${env.PUBLIC_BASE_URL}/auth/nycu/callback`;
   // Carry a language choice from the static landing page through the OAuth flow.
@@ -137,9 +151,10 @@ async function nycuCallback(req: Request, env: Env, url: URL): Promise<Response>
   const user = await fetchNycuUser(cfg, accessToken);
 
   // Logged in. Admin-ness is derived from ADMIN_IDS at each admin request — no
-  // separate login. Land everyone on the dashboard.
+  // separate login. Land on the intended page (validated) or the dashboard.
   const loggedIn: SessionData = { exp: Date.now() + TTL_MS, nycu: user };
-  return redirect("/me", setCookie(await signSession(loggedIn, env.SESSION_SECRET)));
+  const dest = safeNext(session.next) ?? "/me";
+  return redirect(dest, setCookie(await signSession(loggedIn, env.SESSION_SECRET)));
 }
 
 // Bind GitHub, started from the logged-in dashboard (not chained off NYCU login).
@@ -401,7 +416,10 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
   // Google Forms for the courses shown (enrolled ∪ has-grades), grouped per course.
   const displayIds = [...new Set([...enrolledIds, ...grades.map((g) => g.course_id)])];
   const formsByCourse: Record<string, { title: string; url: string }[]> = {};
+  // Enrolled dashboard shows regular forms; pre-enrollment forms live on
+  // /me/<course_id> for not-yet-enrolled students.
   for (const f of await listFormsForCourses(env.DB, displayIds)) {
+    if (f.pre_enroll) continue;
     (formsByCourse[f.course_id] ??= []).push({ title: f.title, url: f.url });
   }
   // Per-course Google Meet link (manually set in course settings).
@@ -435,6 +453,30 @@ async function meExam(req: Request, env: Env, url: URL, assignmentId: string): P
   const rows = await listGradesForStudentAssignment(env.DB, s.nycu!.id, assignmentId);
   if (rows.length === 0) return new Response("Not found", { status: 404 });
   return new Response(examPage(lang, assignmentId, rows), {
+    headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
+  });
+}
+
+// GET /me/<course_id> — per-course landing for (esp. not-yet-enrolled) students:
+// bind GitHub/Google + fill the course's pre-enrollment form(s). The teacher
+// shares this link; an anonymous visitor is sent through NYCU login first and
+// returned here (?next=). Any logged-in student may view it.
+async function meCourse(req: Request, env: Env, url: URL, courseId: string): Promise<Response> {
+  const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
+  if (!session || !session.nycu) {
+    return redirect(`/auth/nycu/start?next=${encodeURIComponent(`/me/${courseId}`)}`);
+  }
+  const course = await getCourse(env.DB, courseId);
+  if (!course) return new Response("Not found", { status: 404 });
+  const lang = pickLang(url, req.headers.get("Cookie"));
+  const [binding, forms] = await Promise.all([
+    getBinding(env.DB, session.nycu.id),
+    listCourseForms(env.DB, courseId),
+  ]);
+  const preForms = forms.filter((f) => f.pre_enroll).map((f) => ({ title: f.title, url: f.url }));
+  const flash = { bound: url.searchParams.get("bound") === "1", gbound: url.searchParams.get("gbound") === "1" };
+  const html = coursePrejoinPage(lang, courseId, course.name, session.nycu, binding, preForms, flash);
+  return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
   });
 }
@@ -832,9 +874,10 @@ async function formAdd(req: Request, env: Env, courseId: string): Promise<Respon
   const form = await req.formData();
   const title = String(form.get("title") ?? "").trim();
   const url = String(form.get("url") ?? "").trim();
+  const preEnroll = form.get("pre_enroll") != null;
   // Only http(s) links — blocks javascript:/data: ever reaching the stored href.
   if (!title || !/^https?:\/\//i.test(url)) return formsRedirect(courseId, "bad");
-  await addCourseForm(env.DB, courseId, title, url, new Date(Date.now()).toISOString());
+  await addCourseForm(env.DB, courseId, title, url, new Date(Date.now()).toISOString(), null, preEnroll);
   return formsRedirect(courseId);
 }
 
@@ -856,12 +899,13 @@ async function formCreate(req: Request, env: Env, courseId: string): Promise<Res
   if (!(await getCourse(env.DB, courseId))) return new Response("Course not found", { status: 404 });
   const form = await req.formData();
   const title = String(form.get("title") ?? "").trim();
+  const preEnroll = form.get("pre_enroll") != null;
   if (!title) return formsRedirect(courseId, "bad");
   const at = await staffGoogleAccessToken(env, s.nycu!.id);
   if ("error" in at) return formsRedirect(courseId, at.error); // "no-drive" | "token-error"
   try {
     const { formId, responderUri } = await createGoogleForm(at.token, title);
-    await addCourseForm(env.DB, courseId, title, responderUri, new Date(Date.now()).toISOString(), formId);
+    await addCourseForm(env.DB, courseId, title, responderUri, new Date(Date.now()).toISOString(), formId, preEnroll);
   } catch (e) {
     console.error("form create failed:", (e as Error).message);
     return formsRedirect(courseId, "create-error");

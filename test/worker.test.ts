@@ -1241,6 +1241,49 @@ describe("/api/grades/ingest", () => {
   });
 });
 
+describe("pre-enrollment landing /me/<course_id>", () => {
+  it("anonymous visitor is sent to NYCU login carrying next", async () => {
+    const res = await call("/me/ds-2026");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/auth/nycu/start?next=%2Fme%2Fds-2026");
+  });
+
+  it("logged-in: shows binding + pre-enroll form, hides regular form; unknown course → 404", async () => {
+    await env.DB.prepare(
+      "INSERT INTO course_forms (course_id, title, url, pre_enroll, created_at) VALUES ('ds-2026','報到問卷','https://forms.gle/pre',1,'t')",
+    ).run();
+    await env.DB.prepare(
+      "INSERT INTO course_forms (course_id, title, url, pre_enroll, created_at) VALUES ('ds-2026','一般問卷','https://forms.gle/reg',0,'t')",
+    ).run();
+    const session = await signSession({ exp: Date.now() + 60000, nycu: { id: "S1", name: "生" } }, SECRET);
+    const res = await call("/me/ds-2026", { headers: cookie(session) });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("資料結構 2026");
+    expect(body).toContain("報到問卷");
+    expect(body).toContain('href="https://forms.gle/pre"');
+    expect(body).not.toContain("一般問卷");       // regular form is not on the prejoin page
+    expect(body).toContain("/auth/github/start"); // bind GitHub action
+    expect(body).toContain("/auth/google/start"); // bind Google action
+    expect((await call("/me/nope", { headers: cookie(session) })).status).toBe(404);
+  });
+
+  it("NYCU callback honors a safe next and rejects an unsafe one", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("token"))
+        return new Response(JSON.stringify({ access_token: "n_tok" }), { headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ username: "S1", name: "生" }), { headers: { "Content-Type": "application/json" } });
+    }));
+    const safe = await signSession({ exp: Date.now() + 60000, nstate: "NS", next: "/me/ds-2026" }, SECRET);
+    const r1 = await call("/auth/nycu/callback?code=x&state=NS", { headers: cookie(safe) });
+    expect(r1.headers.get("Location")).toBe("/me/ds-2026");
+    const unsafe = await signSession({ exp: Date.now() + 60000, nstate: "NS", next: "https://evil.example/x" }, SECRET);
+    const r2 = await call("/auth/nycu/callback?code=x&state=NS", { headers: cookie(unsafe) });
+    expect(r2.headers.get("Location")).toBe("/me"); // open-redirect rejected
+  });
+});
+
 describe("course Google Forms", () => {
   const owner = () => signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "A" } }, SECRET);
   const post = (path: string, fields: Record<string, string>, session: string) =>
@@ -1302,6 +1345,18 @@ describe("course Google Forms", () => {
     const body = await (await call("/me", { headers: cookie(session) })).text();
     expect(body).toContain("期末回饋");
     expect(body).toContain('href="https://forms.gle/feedback"');
+  });
+
+  it("excludes pre-enrollment forms from the enrolled /me dashboard", async () => {
+    await env.DB.prepare(
+      "INSERT INTO enrollments (course_id, student_id, role, created_at) VALUES ('ds-2026','314561004','student','t')",
+    ).run();
+    await env.DB.prepare(
+      "INSERT INTO course_forms (course_id, title, url, pre_enroll, created_at) VALUES ('ds-2026','報到問卷','https://forms.gle/pre',1,'t')",
+    ).run();
+    const session = await signSession({ exp: Date.now() + 60000, nycu: { id: "314561004", name: "甲" } }, SECRET);
+    const body = await (await call("/me", { headers: cookie(session) })).text();
+    expect(body).not.toContain("報到問卷"); // pre-enroll form only on /me/<course_id>
   });
 
   // Seed the acting staff (admin1) with a connected Drive (full scope) token so
