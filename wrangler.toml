@@ -16,6 +16,12 @@ NYCU_TOKEN_URL = "https://id.nycu.edu.tw/o/token/"
 NYCU_USERINFO_URL = "https://id.nycu.edu.tw/api/profile/"
 NYCU_SCOPE = "profile"
 GITHUB_CLIENT_ID = ""
+# Google OAuth client id (secrets GOOGLE_CLIENT_SECRET + GOOGLE_TOKEN_KEY via
+# `wrangler secret put`). Enable the Google Drive API + Forms API on this project.
+GOOGLE_CLIENT_ID = ""
+# OAuth scope at consent. Empty → identity + drive.file. Staff "connect Drive"
+# (/auth/google/start?drive=1) additionally requests full drive + forms.body.
+GOOGLE_SCOPE = "openid email https://www.googleapis.com/auth/drive.file"
 NYCU_CLIENT_ID = ""
 ADMIN_IDS = ""
 COURSE_ORG = "nycu-cs-course-ds"
