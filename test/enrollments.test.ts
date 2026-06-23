@@ -37,15 +37,15 @@ describe("enrollments db", () => {
     expect(await enrollmentCount(env.DB, "ds-2027")).toBe(1);
   });
 
-  it("listEnrolledWithBinding shows bound vs unbound", async () => {
+  it("listEnrolledWithBinding shows bound vs unbound (github + google)", async () => {
     await env.DB.prepare(
-      "INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, created_at, updated_at) VALUES ('a','甲',1,'alice','t','t')",
+      "INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, google_email, created_at, updated_at) VALUES ('a','甲',1,'alice','alice@gmail.com','t','t')",
     ).run();
     await bulkEnroll(env.DB, C, ["a", "b"], now);
     const rows = await listEnrolledWithBinding(env.DB, C);
     expect(rows).toEqual([
-      { student_id: "a", nycu_name: "甲", github_login: "alice", github_id: 1 },
-      { student_id: "b", nycu_name: null, github_login: null, github_id: null },
+      { student_id: "a", nycu_name: "甲", github_login: "alice", github_id: 1, google_email: "alice@gmail.com" },
+      { student_id: "b", nycu_name: null, github_login: null, github_id: null, google_email: null },
     ]);
   });
 
