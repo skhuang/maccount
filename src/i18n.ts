@@ -56,6 +56,8 @@ export interface Strings {
   ph_course_moodle: string;
   ph_course_org: string;
   ph_course_classroom: string;
+  ph_course_meet: string;
+  meet_join: string;
   bindings_query_heading: string;
   bindings_all_link: string;
   bindings_query_note: string;
@@ -177,6 +179,8 @@ export const T: Record<Lang, Strings> = {
     ph_course_moodle: "moodle_course_id（選填）",
     ph_course_org: "github_org（選填）",
     ph_course_classroom: "google_classroom_id（選填）",
+    ph_course_meet: "google_meet_url（選填，課程的 Meet 連結）",
+    meet_join: "加入 Google Meet",
     bindings_query_heading: "查詢綁定（依 GitHub org）",
     bindings_all_link: "所有綁定",
     bindings_query_note: "學生綁定 GitHub 後、還沒選課時，可由此查；點 org 可即時比對誰已加入該 org。",
@@ -298,6 +302,8 @@ export const T: Record<Lang, Strings> = {
     ph_course_moodle: "moodle_course_id (optional)",
     ph_course_org: "github_org (optional)",
     ph_course_classroom: "google_classroom_id (optional)",
+    ph_course_meet: "google_meet_url (optional, the course's Meet link)",
+    meet_join: "Join Google Meet",
     bindings_query_heading: "Query bindings (by GitHub org)",
     bindings_all_link: "All bindings",
     bindings_query_note: "For students who bound GitHub but aren't enrolled yet; click an org to cross-check who has joined it.",
