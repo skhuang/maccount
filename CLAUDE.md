@@ -41,7 +41,7 @@
 | `db/bindings.ts` | D1：`upsertBinding`（一 GitHub 只綁一 NYCU）/ `upsertGoogleBinding`（一 Google 只綁一 NYCU；只動 `google_*` 欄、不蓋 GitHub 綁定；refresh token 用 `COALESCE` 保留、無新 token 時不清掉）/ `getGoogleTokenRow`（讀加密 refresh token+scope，**刻意獨立**於 `getBinding`/`listBindings`，避免 token 漏進 CSV/admin）/ list / delete / `getBinding` / `getBindingByGithubId`+`getBindingByGoogleSub`（替代登入反查）。Google 欄位：`google_sub`(UNIQUE)+`google_email`（遷移 `0009_google`）；`google_refresh_token`(加密)+`google_scope`+`google_token_updated_at`（遷移 `0010_google_tokens`） |
 | `db/grades.ts` | D1：OJ 成績鏡像 `grades`（**score+verdict only**；鍵 `(course_id,student_id,problem_id)`）— `upsertGrades` / `listGradesFor` / `listGradesForProblem(…, course_id?)` |
 | `db/staff.ts` | D1：TA/助教名單 `staff`（per-course；owner 管理）— `listStaff(db,course)` / `addStaff` / `removeStaff` / `isStaffMember(db,course,id)` / `isStaffAnywhere(db,id)`（access gate） |
-| `db/forms.ts` | D1：課程的 Google 問卷 `course_forms`（`id,course_id,title,url,form_id`，遷移 `0011`+`0012`）— `listCourseForms` / `listFormsForCourses`(IN 查多課，給 /me) / `addCourseForm`(可帶 `form_id`) / `removeCourseForm`(依 id+course_id 刪)。`form_id` 由 API 建立時填，用來組「編輯」連結 |
+| `db/forms.ts` | D1：課程的 Google 問卷 `course_forms`（`id,course_id,title,url,form_id,pre_enroll`，遷移 `0011`/`0012`/`0015`）— `listCourseForms` / `listFormsForCourses`(IN 查多課，給 /me) / `addCourseForm`(可帶 `form_id`、`pre_enroll`) / `removeCourseForm`(依 id+course_id 刪)。`form_id` 由 API 建立時填(編輯連結)；`pre_enroll=1` = 給尚未選課學生(顯示於 `/me/<course_id>`、不在 enrolled `/me`) |
 | `oauth/classroom.ts` | Google Classroom API：`inviteToClassroom(accessToken, courseId, email)` → `POST classroom.googleapis.com/v1/invitations`（role=STUDENT；409→已在班）。`parseClassroomId`：把貼進來的值正規化為 API 的**數字 courseId**——接受數字 id、`/c/<token>`、或完整 classroom URL（URL 的 `/c/<token>` 是 `base64(數字id)`，會解碼；否則 404）。`CLASSROOM_SCOPE` = `classroom.rosters`（已併入 `STAFF_GOOGLE_SCOPE`）。需啟用 Classroom API、且操作者為該班老師 |
 | `oauth/google_forms.ts` | Google Forms API：`createGoogleForm(accessToken, title)` → `POST forms.googleapis.com/v1/forms`，回 `{formId, responderUri}`。用 staff 連結的 Google token（完整 `drive` 即可建表，`STAFF_GOOGLE_SCOPE` 另含 `forms.body`）。需在 GCP 啟用 Forms API |
 | `db/courses.ts` | D1：開課登錄 `courses`（多租戶；`course_id`↔`moodle_course_id`↔`github_org`↔`google_classroom_id`↔`google_meet_url`）— `listCourses` / `getCourse` |
@@ -52,6 +52,8 @@
 
 ### 端點（新增）
 - `GET /me` — 登入後的**儀表板**：自己的綁定（GitHub + Google 兩條，各有綁定/重綁按鈕）、**「我的課程」清單**、admin 連結（若是 admin）、以及（若 `COURSE_ORG` 有設）「加入課程 org」邀請連結。**課程清單 = 選課（enrollment）∪ 有成績的課**：被放進某課選課名單者，即使還沒有成績也會列出該課；每門課底下分「加入 Google Meet」(若設 `google_meet_url`)、「作業」(lab 平面表，含每題 repo「去解題」連結+分數)、「考試」(連 `/me/exam/<id>`) 與「問卷」(該課的 Google 表單連結)；沒資料的課顯示「目前沒有作業或成績」。只顯示分數與判定（OJ 鐵則 2）。`COURSE_ORG` 放 `wrangler.toml [vars]`（非機密）。
+- `GET /me/<course_id>` — **尚未選課學生的課程報到頁**（`coursePrejoinPage`）：顯示綁定 GitHub/Google 按鈕 + 該課 `pre_enroll=1` 的報到問卷。任何登入者可看；匿名訪客 → 導去 `/auth/nycu/start?next=/me/<course_id>`，登入後**自動回到此頁**。老師把此連結發給尚未選課的學生（綁定 + 填問卷後再加入課程）。route regex 為單段 `^/me/([A-Za-z0-9_-]+)$`，排在 `/me/exam/<id>` 之後。
+- **登入後導向 `next`**：`startNycu` 接受 `?next=`，僅允許 `^/me/[A-Za-z0-9_-]+$`（`safeNext`，防 open-redirect），存進 pre-login session；`nycuCallback` 登入後導向該 `next`（再驗一次）否則 `/me`。`SessionData.next`。
 - `GET /auth/github/start` — 從 `/me` 發動 GitHub 綁定（需登入 session）。
 - `GET /auth/github/login`、`GET /auth/google/login` — **替代登入**入口（免 session，設 gstate/gostate）。共用 `/auth/{github,google}/callback`，callback 無 `nycu` 時走登入分支（`getBindingByGithubId`/`getBindingByGoogleSub` 反查 → 開 session）。`db/bindings.ts` 加了這兩個反查函式。
 - `GET /auth/google/start`、`GET /auth/google/callback` — 從 `/me` 發動 **Google 綁定**（需登入 session，CSRF state = `gostate`）。start 帶 `access_type=offline`+`prompt=consent select_account` 取得 refresh token；callback 驗 state、換 token、取 `sub`+`email`，**refresh token 先用 `GOOGLE_TOKEN_KEY` 加密**再 `upsertGoogleBinding` 進 D1（連同 granted scope）→ 成功回 `/me?gbound=1`（同一 Google 已綁他人 → `/me?error=google_already_bound`）。存下的 refresh token 供日後 Drive/Cloud 檔案操作（用 `refreshGoogleAccessToken` 換 access token）。config：`GOOGLE_CLIENT_ID`／`GOOGLE_SCOPE` 放 `wrangler.toml [vars]`；`GOOGLE_CLIENT_SECRET`、`GOOGLE_TOKEN_KEY` 用 `wrangler secret put`。
@@ -69,7 +71,8 @@
   - **貼連結**：`POST /c/<id>/admin/forms/add`（僅收 `http(s)`，非法→`?forms_msg=bad`）。
   - **直接建立**：`POST /c/<id>/admin/forms/create`（標題）→ 用 staff 連結的 Google 帳號呼叫 Forms API 建表（`createGoogleForm`），存 `responderUri`(學生填)+`form_id`(編輯連結 `…/forms/d/<form_id>/edit`)。需先「連結 Google Drive（完整權限）」(`staffGoogleAccessToken` 共用 Drive 分享那套 token；未連結→`forms_msg=no-drive`、權杖失敗→`token-error`、API 失敗→`create-error`)。GCP 需啟用 **Forms API**。
   - **移除**：`POST /c/<id>/admin/forms/remove`（依 id+course_id）。
-  學生端在 `/me` 對應課程下看到問卷清單並開啟填寫；登入與收 email 由 Google 表單自身設定（「收集電子郵件／需登入」）負責，再以綁定的 Google email 對應回學號。貼連結模式不需 Forms API；建立模式才需要。
+  - 兩種新增表單都可勾「**給尚未選課的學生**」(`pre_enroll`)：勾了的問卷顯示在 `/me/<course_id>` 報到頁、不在 enrolled `/me`；未勾的相反。後台會列出「尚未選課學生入口 `/me/<course_id>`」連結讓老師轉發。
+  學生端在 `/me`（一般）或 `/me/<course_id>`（報到）看到問卷清單並開啟填寫；登入與收 email 由 Google 表單自身設定（「收集電子郵件／需登入」）負責，再以綁定的 Google email 對應回學號。貼連結模式不需 Forms API；建立模式才需要。
 - `GET /api/roster` — 同樣的 `github_login,student_id`，但用 `Authorization: Bearer <GRADES_INGEST_TOKEN>`（無需 NYCU session），供 OJ 主機的 roster-sync 定時器自動拉取。
 - `GET /api/grades?problem_id=<id>` — 該題所有學生的 `{student_id,problem_id,verdict,score,max_score,updated_at}`（Bearer token）。供 seminar-moodle 的「程式作業自動批改」拉取後填進 Moodle 評分表。只回分數+判定。
 
@@ -77,7 +80,7 @@
 
 ```bash
 npm install
-npm test            # vitest，全部測試（目前 210 passed）
+npm test            # vitest，全部測試（目前 217 passed）
 npx tsc --noEmit    # 型別檢查
 npm run dev         # wrangler dev（本機，預設埠 8787）
 npx wrangler deploy # 部署 Worker（vars 變更也要重新 deploy 才生效）
