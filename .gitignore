@@ -6,3 +6,6 @@ worker-configuration.d.ts
 
 # Claude Code local state
 .claude/
+
+# Local deploy config (copy from wrangler.toml.example, fill real values)
+wrangler.toml

@@ -17,6 +17,12 @@ npm run dev       # 本機 wrangler dev
 
 > **先後順序很重要（雞生蛋）**：OAuth 的 redirect URL 需要 Worker 的網址，但 `*.workers.dev` 網址要先部署一次才會由 Cloudflare 分配。因此順序是：**先部署拿到網址 → 再去註冊 OAuth client 填 redirect → 回填憑證後重新部署**。下面以 `<worker>` 代表 Worker 的 base URL（例如 `https://maccount-api.<你的子網域>.workers.dev`，或你綁定的自訂網域）。
 
+> **本機設定檔（每台機器各自保存）**：`wrangler.toml` **不進版控**（避免多機同步衝突）；版控的是 `wrangler.toml.example` 模板。在每台要部署的機器上先複製一份再填真實值：
+> ```bash
+> cp wrangler.toml.example wrangler.toml
+> ```
+> 之後 `git pull` 不會再因 `wrangler.toml` 修改而衝突。新增設定項時請同步更新 `wrangler.toml.example`（模板），各機器再手動補進自己的 `wrangler.toml`。
+
 ### 1. 建立 D1 並套用 schema
 ```bash
 npx wrangler d1 create maccount
