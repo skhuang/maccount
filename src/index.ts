@@ -22,7 +22,7 @@ import {
   shareFileWithUser, asDriveRole, scopeHasFullDrive, parseDriveFileId, STAFF_GOOGLE_SCOPE,
 } from "./oauth/drive";
 import { createGoogleForm } from "./oauth/google_forms";
-import { inviteToClassroom } from "./oauth/classroom";
+import { inviteToClassroom, parseClassroomId } from "./oauth/classroom";
 import { encryptSecret, decryptSecret } from "./crypto";
 import {
   upsertBinding,
@@ -885,7 +885,7 @@ async function classroomInvite(req: Request, env: Env, courseId: string): Promis
   if (s instanceof Response) return s;
   const course = await getCourse(env.DB, courseId);
   if (!course) return new Response("Course not found", { status: 404 });
-  const classroomId = (course.google_classroom_id ?? "").trim();
+  const classroomId = parseClassroomId(course.google_classroom_id ?? "");
   if (!classroomId) return classroomRedirect(courseId, "no-classroom");
   const at = await staffGoogleAccessToken(env, s.nycu!.id);
   if ("error" in at) return classroomRedirect(courseId, at.error); // no-drive | token-error
