@@ -90,7 +90,7 @@ describe("adminPage", () => {
     expect(html).toContain("未綁定"); // b02 unbound (github + google)
   });
 
-  it("shows the Google Forms section with attached forms + add form", () => {
+  it("shows the Google Forms section with attached forms, add + create forms", () => {
     const html = adminPage("zh", course, [], {
       isOwner: true,
       staff: [],
@@ -99,7 +99,17 @@ describe("adminPage", () => {
     expect(html).toContain("Google 問卷");
     expect(html).toContain("意見調查");
     expect(html).toContain('href="https://docs.google.com/forms/d/abc/viewform"');
-    expect(html).toContain('action="/c/ds-2026/admin/forms/add"');
+    expect(html).toContain('action="/c/ds-2026/admin/forms/add"');    // paste a link
+    expect(html).toContain('action="/c/ds-2026/admin/forms/create"'); // create via API
+  });
+
+  it("shows an edit link for an API-created form (has form_id)", () => {
+    const html = adminPage("zh", course, [], {
+      isOwner: true,
+      staff: [],
+      forms: [{ id: 2, title: "小考", url: "https://docs.google.com/forms/d/e/F9/viewform", form_id: "F9" }],
+    });
+    expect(html).toContain('href="https://docs.google.com/forms/d/F9/edit"');
   });
 
   it("hides import + settings from non-owner staff", () => {

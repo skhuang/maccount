@@ -7,10 +7,11 @@ export interface CourseForm {
   course_id: string;
   title: string;
   url: string;
+  form_id: string | null; // set when created via the Forms API → enables edit link
   created_at: string;
 }
 
-const COLS = "id, course_id, title, url, created_at";
+const COLS = "id, course_id, title, url, form_id, created_at";
 
 export async function listCourseForms(db: D1Database, course_id: string): Promise<CourseForm[]> {
   const { results } = await db
@@ -37,10 +38,11 @@ export async function listFormsForCourses(
 
 export async function addCourseForm(
   db: D1Database, course_id: string, title: string, url: string, now: string,
+  form_id: string | null = null,
 ): Promise<void> {
   await db
-    .prepare("INSERT INTO course_forms (course_id, title, url, created_at) VALUES (?1, ?2, ?3, ?4)")
-    .bind(course_id, title, url, now)
+    .prepare("INSERT INTO course_forms (course_id, title, url, form_id, created_at) VALUES (?1, ?2, ?3, ?4, ?5)")
+    .bind(course_id, title, url, form_id, now)
     .run();
 }
 

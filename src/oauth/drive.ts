@@ -4,7 +4,11 @@
 // the full `drive` scope, so staff "connect Drive" with STAFF_GOOGLE_SCOPE (the
 // per-student bindings stay on the minimal scope — only their email is used).
 export const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
-export const STAFF_GOOGLE_SCOPE = `openid email ${DRIVE_SCOPE}`;
+// Also request the Forms scope so a freshly-connected staff token can create
+// Google Forms via the Forms API. (Full `drive` alone already authorizes
+// forms.create, so staff connected before this still work.)
+export const FORMS_SCOPE = "https://www.googleapis.com/auth/forms.body";
+export const STAFF_GOOGLE_SCOPE = `openid email ${DRIVE_SCOPE} ${FORMS_SCOPE}`;
 
 export type DriveRole = "reader" | "commenter" | "writer";
 

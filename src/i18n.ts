@@ -117,6 +117,13 @@ export interface Strings {
   forms_remove_confirm: string;
   forms_none: string;
   forms_msg_bad: string;
+  forms_msg_nodrive: string;
+  forms_msg_tokenerror: string;
+  forms_msg_createerror: string;
+  forms_create_note: string;
+  forms_create_title_ph: string;
+  forms_create_btn: string;
+  forms_edit: string;
   forms_student_heading: string;
 }
 
@@ -224,6 +231,13 @@ export const T: Record<Lang, Strings> = {
     forms_remove_confirm: "確定移除此問卷？",
     forms_none: "目前沒有問卷。",
     forms_msg_bad: "請填標題與有效的 https 連結。",
+    forms_msg_nodrive: "尚未連結你的 Google（完整權限），無法建立表單。請先點上方「連結我的 Google Drive」並授權。",
+    forms_msg_tokenerror: "無法取得 Google 存取權杖（請重新連結 Drive）。",
+    forms_msg_createerror: "建立 Google 表單失敗（請確認 Google Cloud 專案已啟用 Forms API，並已連結 Drive）。",
+    forms_create_note: "或直接建立新的 Google 表單（用你連結的 Google 帳號建立；建立後點「編輯」到 Google 加題目）：",
+    forms_create_title_ph: "新表單標題（如 第一週小考）",
+    forms_create_btn: "直接新增 Google 表單",
+    forms_edit: "編輯",
     forms_student_heading: "問卷",
   },
   en: {
@@ -329,6 +343,13 @@ export const T: Record<Lang, Strings> = {
     forms_remove_confirm: "Remove this form?",
     forms_none: "No forms yet.",
     forms_msg_bad: "Enter a title and a valid https link.",
+    forms_msg_nodrive: "Your Google (full access) isn't connected, so a form can't be created. Click “Connect my Google Drive” above and authorize first.",
+    forms_msg_tokenerror: "Couldn't get a Google access token (please reconnect Drive).",
+    forms_msg_createerror: "Failed to create the Google Form (enable the Forms API in the Google Cloud project and connect Drive).",
+    forms_create_note: "Or create a new Google Form directly (created with your connected Google account; click “Edit” afterwards to add questions in Google):",
+    forms_create_title_ph: "New form title (e.g. Week 1 quiz)",
+    forms_create_btn: "Create Google Form",
+    forms_edit: "Edit",
     forms_student_heading: "Forms",
   },
 };
