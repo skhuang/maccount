@@ -74,7 +74,7 @@
 
 ```bash
 npm install
-npm test            # vitest，全部測試（目前 140 passed）
+npm test            # vitest，全部測試（目前 192 passed）
 npx tsc --noEmit    # 型別檢查
 npm run dev         # wrangler dev（本機，預設埠 8787）
 npx wrangler deploy # 部署 Worker（vars 變更也要重新 deploy 才生效）
