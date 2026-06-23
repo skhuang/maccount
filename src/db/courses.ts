@@ -8,11 +8,13 @@ export interface CourseRow {
   term: string | null;
   moodle_course_id: string | null;
   github_org: string | null;
+  google_classroom_id: string | null;
   status: string;
   created_at: string;
 }
 
-const COLS = "course_id, name, term, moodle_course_id, github_org, status, created_at";
+const COLS =
+  "course_id, name, term, moodle_course_id, github_org, google_classroom_id, status, created_at";
 
 export async function listCourses(db: D1Database): Promise<CourseRow[]> {
   const { results } = await db
@@ -46,6 +48,7 @@ export interface CourseInput {
   term?: string | null;
   moodle_course_id?: string | null;
   github_org?: string | null;
+  google_classroom_id?: string | null;
   status?: string;
 }
 
@@ -53,14 +56,16 @@ export interface CourseInput {
 export async function upsertCourse(db: D1Database, c: CourseInput, now: string): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO courses (course_id, name, term, moodle_course_id, github_org, status, created_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+      `INSERT INTO courses
+         (course_id, name, term, moodle_course_id, github_org, google_classroom_id, status, created_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
        ON CONFLICT(course_id) DO UPDATE SET
-         name = ?2, term = ?3, moodle_course_id = ?4, github_org = ?5, status = ?6`,
+         name = ?2, term = ?3, moodle_course_id = ?4, github_org = ?5,
+         google_classroom_id = ?6, status = ?7`,
     )
     .bind(
       c.course_id, c.name, c.term ?? null, c.moodle_course_id ?? null,
-      c.github_org ?? null, c.status || "active", now,
+      c.github_org ?? null, c.google_classroom_id ?? null, c.status || "active", now,
     )
     .run();
 }
