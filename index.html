@@ -3,8 +3,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title id="t-title">課程帳號 / 成績系統</title>
-<body style="font-family:system-ui;max-width:640px;margin:3rem auto;padding:0 1rem;line-height:1.6">
-  <p style="text-align:right;font-size:.9em"><a href="#" id="lang-zh">中文</a> | <a href="#" id="lang-en">English</a></p>
+<link rel="stylesheet" href="./ui.css" />
+<body>
+  <nav class="lang-switch" aria-label="Language"><a href="#" id="lang-zh">中文</a> · <a href="#" id="lang-en">English</a></nav>
   <h1 id="t-h1"></h1>
   <p id="t-intro"></p>
   <ul>
@@ -12,12 +13,12 @@
     <li id="t-li2"></li>
     <li id="t-li3"></li>
   </ul>
-  <p><a id="start" style="display:inline-block;padding:.7rem 1.4rem;background:#0b5;color:#fff;border-radius:8px;text-decoration:none"></a></p>
-  <p id="alt-label" style="color:#777;font-size:.9em;margin-bottom:.3rem"></p>
-  <p style="display:flex;gap:.6rem;flex-wrap:wrap">
-    <a id="login-github" style="display:inline-block;padding:.5rem 1rem;border:1px solid #ccc;border-radius:8px;text-decoration:none;color:#333"></a>
-    <a id="login-google" style="display:inline-block;padding:.5rem 1rem;border:1px solid #ccc;border-radius:8px;text-decoration:none;color:#333"></a>
-  </p>
+  <div class="actions"><a id="start" class="button button--primary"></a></div>
+  <p id="alt-label" class="hint"></p>
+  <div class="actions">
+    <a id="login-github" class="button"></a>
+    <a id="login-google" class="button"></a>
+  </div>
   <script>
     // 部署後把這裡換成你的 Worker 網址
     const WORKER_BASE = "https://maccount-api.skhuang.workers.dev";

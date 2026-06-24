@@ -13,6 +13,57 @@ function htmlLang(lang: Lang): string {
   return lang === "en" ? "en" : "zh-Hant";
 }
 
+// Shared, dependency-free UI foundation for every Worker-rendered page. Keep
+// this inline so authenticated pages do not depend on a separate static host.
+const UI_CSS = `
+:root{color-scheme:light;--bg:#f4f7f6;--surface:#fff;--surface-soft:#f8faf9;--text:#17211d;--muted:#5f6f67;--line:#dbe4df;--brand:#087f5b;--brand-hover:#066b4c;--danger:#c92a2a;--danger-soft:#fff0f0;--success-soft:#eaf8f1;--warning-soft:#fff8db;--radius:12px;--shadow:0 12px 32px rgba(20,45,34,.08);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+*{box-sizing:border-box}
+html{min-height:100%;background:var(--bg)}
+body{max-width:780px!important;margin:2rem auto!important;padding:clamp(1.25rem,3vw,2.5rem)!important;background:var(--surface);color:var(--text);line-height:1.65!important;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+body:has(table){max-width:1040px!important}
+h1,h2,h3{line-height:1.25;letter-spacing:-.02em;color:var(--text)}
+h1{font-size:clamp(1.75rem,4vw,2.3rem);margin:.4rem 0 1.4rem}
+h2{font-size:1.25rem;margin:2.25rem 0 .75rem;padding-top:1.25rem;border-top:1px solid var(--line)}
+h3{font-size:1.05rem}
+p{margin:.75rem 0}
+a{color:var(--brand);text-underline-offset:3px;text-decoration-thickness:1px}
+a:hover{color:var(--brand-hover)}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid rgba(8,127,91,.28);outline-offset:2px}
+ul{padding-left:1.35rem}li+li{margin-top:.35rem}
+form{max-width:560px}
+label{display:block;color:var(--text);font-weight:600}
+label input:not([type=checkbox]),label select{display:block;width:100%;margin-top:.35rem}
+input:not([type=checkbox]):not([type=hidden]),select,textarea{width:100%;min-height:44px;padding:.65rem .75rem;border:1px solid #b9c7c0;border-radius:8px;background:#fff;color:var(--text);font:inherit}
+textarea{min-height:7rem;resize:vertical}
+input::placeholder,textarea::placeholder{color:#73827a}
+button,.button{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:.58rem 1rem;border:1px solid transparent;border-radius:8px;background:var(--brand);color:#fff;font-family:inherit;font-size:.95rem;font-weight:600;line-height:1.2;cursor:pointer;text-decoration:none;transition:background .15s ease,transform .15s ease}
+button:hover,.button:hover{background:var(--brand-hover);color:#fff}
+button:active,.button:active{transform:translateY(1px)}
+form[action$="/delete"] button,form[action$="/remove"] button{border-color:#f1b6b6;background:#fff;color:var(--danger)}
+form[action$="/delete"] button:hover,form[action$="/remove"] button:hover{background:var(--danger-soft)}
+table{display:block;width:100%;overflow-x:auto;border:0!important;border-collapse:collapse;white-space:nowrap;-webkit-overflow-scrolling:touch}
+thead{background:var(--surface-soft)}
+th,td{padding:.7rem .8rem!important;border:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:.86rem;color:#405047}
+tbody tr:nth-child(even){background:#fbfcfb}
+tbody tr:hover{background:#f2f8f5}
+td form{margin:0}
+details{margin:.8rem 0;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}
+summary{padding:.75rem 1rem;cursor:pointer;font-weight:650}
+details table{margin:0;border-radius:0}
+code{padding:.12rem .35rem;border-radius:5px;background:#eef2f0;font-size:.9em}
+body>p[style*="background"]{padding:.75rem 1rem!important;border:1px solid var(--line);border-radius:9px!important}
+body>p[style*="#d4edda"]{background:var(--success-soft)!important;border-color:#b8e4ce}
+body>p[style*="#f8d7da"],body>p[style*="#fee"]{background:var(--danger-soft)!important;border-color:#f1b6b6}
+body>p[style*="#fff3cd"]{background:var(--warning-soft)!important;border-color:#eedc93}
+@media(max-width:640px){html{background:var(--surface)}body{width:100%;margin:0!important;padding:1.15rem!important;border:0;border-radius:0;box-shadow:none}h1{margin-top:.75rem}h2{margin-top:1.75rem}th,td{padding:.6rem!important}button{width:100%}td button,li button{width:auto}form[style*="display:inline"]{display:inline!important}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+`;
+
+function uiHead(): string {
+  return `<meta name="viewport" content="width=device-width, initial-scale=1"><style>${UI_CSS}</style>`;
+}
+
 // The student's repo link for a problem: a bare owner/name → github.com; a full
 // http(s) URL (e.g. a Gitea exam repo) is used as-is. null when no repo yet.
 function repoHref(repo: string | null | undefined): string | null {
@@ -100,7 +151,7 @@ export function adminHomePage(
 </form>
 <p style="color:#777;font-size:.9em">${t.course_create_note}</p>`
     : "";
-  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">
+  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
 <title>${t.admin_title}</title>
 <body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
 ${langToggle("/admin", lang)}
@@ -125,7 +176,7 @@ export function bindingsPage(lang: Lang, rows: BindingRow[], orgs: string[] = []
   const orgLinks = orgs
     .map((o) => `<a href="/admin/org/${encodeURIComponent(o)}">${h(o)}</a>`)
     .join("　");
-  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">
+  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
 <title>${t.admin_title}</title>
 <body style="font-family:system-ui;max-width:900px;margin:2rem auto;padding:0 1rem">
 ${langToggle("/admin/bindings", lang)}
@@ -168,7 +219,7 @@ export function orgMembersPage(
 <p style="color:#777;font-size:.9em">${t.org_unbound_note}</p>
 <p>${view.unbound.map((l) => h(l)).join("、")}</p>`
     : "";
-  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">
+  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
 <title>${t.admin_title}</title>
 <body style="font-family:system-ui;max-width:900px;margin:2rem auto;padding:0 1rem">
 ${langToggle(`/admin/org/${encodeURIComponent(org)}`, lang)}
@@ -434,7 +485,7 @@ ${
 </form>`
     : "";
 
-  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">
+  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
 <title>${t.admin_title}</title>
 <body style="font-family:system-ui;max-width:900px;margin:2rem auto">
 ${langToggle(base, lang)}
@@ -590,8 +641,7 @@ ${courseTable(labRows)}`
       `</p>`
     : "";
 
-  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
 <title>${t.acct_title}</title>
 <body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
 ${langToggle("/me", lang)}
@@ -625,8 +675,7 @@ export function examPage(lang: Lang, assignmentId: string, rows: GradeRow[]): st
   <td>${g.score == null ? "-" : h(g.score)} / ${g.max_score == null ? "-" : h(g.max_score)}</td></tr>`;
     })
     .join("\n");
-  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
 <title>${h(title)}</title>
 <body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
 ${langToggle(`/me/exam/${encodeURIComponent(assignmentId)}`, lang)}
@@ -667,8 +716,7 @@ export function coursePrejoinPage(
   const formsHtml = forms.length
     ? `<ul>${forms.map((f) => `<li>${linkOrText(f.url, f.title)}</li>`).join("")}</ul>`
     : `<p style="color:#666">${t.forms_none}</p>`;
-  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
 <title>${h(courseName)}</title>
 <body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
 ${langToggle(`/me/${encodeURIComponent(courseId)}`, lang)}

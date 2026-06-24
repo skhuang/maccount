@@ -16,6 +16,13 @@ const rows: BindingRow[] = [
 ];
 
 describe("adminPage", () => {
+  it("includes the shared responsive UI foundation", () => {
+    const html = adminPage("zh", course, rows);
+    expect(html).toContain('<meta name="viewport" content="width=device-width, initial-scale=1">');
+    expect(html).toContain("--brand:#087f5b");
+    expect(html).toContain("overflow-x:auto");
+  });
+
   it("shows the count and a course-scoped export link", () => {
     const html = adminPage("zh", course, rows);
     expect(html).toContain("(1)");
