@@ -3,11 +3,14 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title id="t-title">結果</title>
-<body style="font-family:system-ui;max-width:640px;margin:3rem auto;padding:0 1rem;line-height:1.6">
-  <p style="text-align:right;font-size:.9em"><a href="#" id="lang-zh">中文</a> | <a href="#" id="lang-en">English</a></p>
-  <h1 id="title">…</h1>
-  <p id="msg"></p>
-  <p><a href="./" id="home"></a></p>
+<link rel="stylesheet" href="./ui.css" />
+<body>
+  <nav class="lang-switch" aria-label="Language"><a href="#" id="lang-zh">中文</a> · <a href="#" id="lang-en">English</a></nav>
+  <main class="result" role="status">
+    <h1 id="title">…</h1>
+    <p id="msg"></p>
+    <p><a href="./" id="home" class="button"></a></p>
+  </main>
   <script>
     const STR = {
       zh: {
