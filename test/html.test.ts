@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { adminPage, adminHomePage, coursePrejoinPage } from "../src/html";
+import { adminPage, adminHomePage, coursePrejoinPage, dashboardPage } from "../src/html";
 import type { BindingRow } from "../src/csv";
+import type { GradeRow } from "../src/db/grades";
 
 const course = { course_id: "ds-2026", name: "資料結構 2026" };
 
@@ -28,6 +29,19 @@ describe("adminPage", () => {
     expect(html).toContain("(1)");
     expect(html).toContain('href="/c/ds-2026/admin/export.csv"');
     expect(html).toContain("資料結構 2026");
+  });
+
+  it("groups admin tools into navigable sections with summary stats", () => {
+    const html = adminPage("zh", course, rows, {
+      isOwner: true,
+      staff: [],
+      enrolled: [{ student_id: "0856001", github_login: "octo", google_email: null }],
+    });
+    expect(html).toContain('class="section-nav"');
+    expect(html).toContain('href="#bindings"');
+    expect(html).toContain('id="enrollment"');
+    expect(html).toContain('id="settings"');
+    expect(html).toContain('class="stats-grid"');
   });
 
   it("shows the Google column with the bound email", () => {
@@ -157,6 +171,49 @@ describe("adminPage", () => {
     expect(html).not.toContain("confirm('刪除");
     expect(html).toContain("confirm('確定刪除此綁定？')");
     expect(html).toContain('value="O&#39;Brien"');
+  });
+});
+
+describe("dashboardPage", () => {
+  const grade: GradeRow = {
+    course_id: "ds-2026",
+    student_id: "0856001",
+    problem_id: "lab01-stack",
+    verdict: "AC",
+    score: 100,
+    max_score: 100,
+    updated_at: "2026-06-24T00:00:00Z",
+    repo: "octo/lab01-stack",
+    assignment_id: "lab01",
+    assignment_type: "lab",
+    assignment_title: "Lab 1",
+  };
+
+  it("renders account status cards, course cards, and accessible verdict badges", () => {
+    const html = dashboardPage(
+      "zh",
+      { id: "0856001", name: "學生" },
+      { ...rows[0], google_email: "octo@gmail.com" },
+      [grade],
+      false,
+      {},
+      [],
+      { "ds-2026": "資料結構 2026" },
+      [{ course_id: "ds-2026", name: "資料結構 2026" }],
+    );
+    expect(html).toContain('class="account-grid"');
+    expect(html).toContain('class="course-card"');
+    expect(html).toContain('class="badge badge--success">AC</span>');
+    expect(html).toContain("octo@gmail.com");
+  });
+
+  it("keeps unknown verdict text escaped and uses a warning badge", () => {
+    const html = dashboardPage(
+      "en", { id: "0856001", name: "Student" }, null,
+      [{ ...grade, verdict: "<pending>" }], false, {},
+    );
+    expect(html).toContain('class="badge badge--warning">&lt;pending&gt;</span>');
+    expect(html).not.toContain("<pending>");
   });
 });
 

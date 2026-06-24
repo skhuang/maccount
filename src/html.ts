@@ -56,7 +56,17 @@ body>p[style*="background"]{padding:.75rem 1rem!important;border:1px solid var(-
 body>p[style*="#d4edda"]{background:var(--success-soft)!important;border-color:#b8e4ce}
 body>p[style*="#f8d7da"],body>p[style*="#fee"]{background:var(--danger-soft)!important;border-color:#f1b6b6}
 body>p[style*="#fff3cd"]{background:var(--warning-soft)!important;border-color:#eedc93}
-@media(max-width:640px){html{background:var(--surface)}body{width:100%;margin:0!important;padding:1.15rem!important;border:0;border-radius:0;box-shadow:none}h1{margin-top:.75rem}h2{margin-top:1.75rem}th,td{padding:.6rem!important}button{width:100%}td button,li button{width:auto}form[style*="display:inline"]{display:inline!important}}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.5rem;color:var(--muted);font-size:.9rem}.topbar p{margin:0!important}.topbar__actions{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+.identity{margin-bottom:1.25rem}.identity h1{margin-bottom:.25rem}.identity__meta{margin:0;color:var(--muted)}
+.account-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin:1.25rem 0 1.5rem}.status-card{padding:1rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface-soft)}.status-card__head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.55rem}.status-card__title{font-weight:700}.status-card__value{min-height:1.65rem;margin:0 0 .75rem;overflow-wrap:anywhere}.status-card__action{margin:0;font-size:.9rem}
+.badge{display:inline-flex;align-items:center;gap:.35rem;padding:.18rem .5rem;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--muted);font-size:.78rem;font-weight:700;line-height:1.3;white-space:nowrap}.badge::before{content:"";width:.45rem;height:.45rem;border-radius:50%;background:currentColor}.badge--success{border-color:#a8dac1;background:var(--success-soft);color:#08734f}.badge--warning{border-color:#ead483;background:var(--warning-soft);color:#8a6500}.badge--danger{border-color:#efb4b4;background:var(--danger-soft);color:var(--danger)}.badge--neutral{color:#647269}
+.alert{padding:.8rem 1rem;border:1px solid var(--line);border-radius:9px}.alert--success{border-color:#b8e4ce;background:var(--success-soft)}.alert--warning{border-color:#eedc93;background:var(--warning-soft)}.alert--danger{border-color:#f1b6b6;background:var(--danger-soft)}
+.course-list{display:grid;gap:1rem}.course-card{padding:1.1rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.course-card h3{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:0 0 .8rem}.course-card h3::after{content:"";width:.55rem;height:.55rem;border-radius:50%;background:var(--brand)}.course-card>p:last-child{margin-bottom:0}.course-card table{margin-top:.45rem}
+.section-nav{position:sticky;top:0;z-index:2;display:flex;gap:.5rem;margin:0 -1rem 1.25rem;padding:.7rem 1rem;overflow-x:auto;border-block:1px solid var(--line);background:rgba(255,255,255,.96);box-shadow:0 5px 16px rgba(20,45,34,.05);white-space:nowrap}.section-nav a{padding:.3rem .55rem;border-radius:6px;text-decoration:none;font-size:.88rem;font-weight:650}.section-nav a:hover{background:var(--surface-soft)}
+.stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem;margin:1rem 0 1.5rem}.stat{padding:.85rem;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}.stat__value{display:block;font-size:1.45rem;font-weight:750;line-height:1.2}.stat__label{display:block;margin-top:.25rem;color:var(--muted);font-size:.82rem}
+.admin-sections{display:grid;gap:1rem}.admin-section{scroll-margin-top:5rem;padding:1.2rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.admin-section>h2:first-child{margin:0 0 .75rem;padding:0;border:0}.admin-section+.admin-section{margin-top:0}.admin-section form:last-child{margin-bottom:0}
+@media(max-width:760px){.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){html{background:var(--surface)}body{width:100%;margin:0!important;padding:1.15rem!important;border:0;border-radius:0;box-shadow:none}h1{margin-top:.75rem}h2{margin-top:1.75rem}th,td{padding:.6rem!important}button{width:100%}td button,li button{width:auto}form[style*="display:inline"]{display:inline!important}.topbar{align-items:flex-start}.topbar__actions{justify-content:flex-end}.account-grid{grid-template-columns:1fr}.section-nav{margin-inline:-1.15rem;padding-inline:1.15rem}.admin-section{padding:1rem}.course-card{padding:1rem}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 `;
 
@@ -69,6 +79,19 @@ function uiHead(): string {
 function repoHref(repo: string | null | undefined): string | null {
   if (!repo) return null;
   return /^https?:\/\//.test(repo) ? repo : `https://github.com/${repo}`;
+}
+
+function verdictBadge(verdict: string | null | undefined): string {
+  const value = (verdict ?? "-").trim() || "-";
+  const normalized = value.toUpperCase();
+  const tone = ["AC", "PASS", "PASSED", "OK"].includes(normalized)
+    ? "success"
+    : ["WA", "RE", "TLE", "MLE", "CE", "FAIL", "FAILED"].includes(normalized)
+      ? "danger"
+      : normalized === "-"
+        ? "neutral"
+        : "warning";
+  return `<span class="badge badge--${tone}">${h(value)}</span>`;
 }
 
 // Render a stored updated_at (epoch seconds/ms, or an ISO string) as a readable
@@ -321,7 +344,7 @@ export function adminPage(
     )
     .join("\n");
   const staffSection = isOwner
-    ? `<h2>${t.staff_heading}</h2>
+    ? `<section class="admin-section" id="staff"><h2>${t.staff_heading}</h2>
 <p style="color:#777;font-size:.9em">${t.staff_note}</p>
 <table border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>NYCU id</th><th>${t.staff_added_by}</th><th></th></tr></thead>
@@ -329,7 +352,7 @@ export function adminPage(
 <form method="post" action="${base}/staff/add" style="margin-top:8px">
   <input name="nycu_id" placeholder="${t.staff_id_placeholder}" required>
   <button type="submit">${t.staff_add}</button>
-</form>`
+</form></section>`
     : "";
 
   // Enrollment (course roster). Bound = has a GitHub binding; unbound students
@@ -352,7 +375,7 @@ export function adminPage(
   <button type="submit">${t.enroll_import}</button>
 </form>`
     : "";
-  const enrollSection = `<h2>${t.enroll_heading.replace("{n}", String(enrolled.length))}</h2>
+  const enrollSection = `<section class="admin-section" id="enrollment"><h2>${t.enroll_heading.replace("{n}", String(enrolled.length))}</h2>
 <p style="color:#777;font-size:.9em">${t.enroll_note.replace("{bound}", String(bound)).replace("{gbound}", String(gbound))}</p>${
     enrolled.length
       ? `
@@ -362,7 +385,7 @@ export function adminPage(
 <tbody>${enrolledRows}</tbody></table></details>`
       : ""
   }
-${enrollImport}`;
+${enrollImport}</section>`;
 
   // Share a staff-owned Drive file with the class (any course staff). Acts as
   // the logged-in staff's own connected Google Drive; recipients are the
@@ -379,7 +402,7 @@ ${enrollImport}`;
   const driveBanner = driveBannerText
     ? `<p style="padding:8px;border:1px solid #ccc;background:#f6f6f6">${driveBannerText}</p>`
     : "";
-  const driveSection = `<h2>${t.drive_heading}</h2>
+  const driveSection = `<section class="admin-section" id="drive"><h2>${t.drive_heading}</h2>
 <p style="color:#777;font-size:.9em">${t.drive_note} <a href="/auth/google/start?drive=1">${t.drive_connect}</a></p>
 ${driveBanner}
 <form method="post" action="${base}/drive/share" style="display:grid;gap:6px;max-width:440px">
@@ -391,7 +414,7 @@ ${driveBanner}
   </select>
   <label><input type="checkbox" name="notify" value="1"> ${t.drive_notify}</label>
   <button type="submit">${t.drive_share_btn}</button>
-</form>`;
+</form></section>`;
 
   // Google Forms attached to the course (any course staff). Students see these
   // on /me under the matching course and answer signed into Google.
@@ -419,7 +442,7 @@ ${driveBanner}
         .join("\n")}</ul>`
     : `<p style="color:#666">${t.forms_none}</p>`;
   const preEnrollLabel = `<label><input type="checkbox" name="pre_enroll" value="1"> ${t.forms_pre_enroll_label}</label>`;
-  const formsSection = `<h2>${t.forms_heading}</h2>
+  const formsSection = `<section class="admin-section" id="forms"><h2>${t.forms_heading}</h2>
 <p style="color:#777;font-size:.9em">${t.forms_note}</p>
 <p style="color:#777;font-size:.9em">${t.prejoin_link_label}：<code>/me/${h(course.course_id)}</code></p>
 ${formsBanner}
@@ -435,7 +458,7 @@ ${formsRows}
   <input name="title" placeholder="${t.forms_create_title_ph}" required>
   ${preEnrollLabel}
   <button type="submit">${t.forms_create_btn}</button>
-</form>`;
+</form></section>`;
 
   // Google Classroom — invite enrolled+bound students into the course's
   // Classroom (acts as the staff's connected Google account; needs the
@@ -454,7 +477,7 @@ ${formsRows}
   const classroomBanner = classroomBannerText
     ? `<p style="padding:8px;border:1px solid #ccc;background:#f6f6f6">${classroomBannerText}</p>`
     : "";
-  const classroomSection = `<h2>${t.classroom_heading}</h2>
+  const classroomSection = `<section class="admin-section" id="classroom"><h2>${t.classroom_heading}</h2>
 <p style="color:#777;font-size:.9em">${t.classroom_note}</p>
 ${classroomBanner}
 ${
@@ -462,12 +485,12 @@ ${
       ? `<p>Classroom ID：<code>${h(classroomId)}</code></p>
 <form method="post" action="${base}/classroom/invite"><button type="submit">${t.classroom_invite_btn}</button></form>`
       : `<p style="color:#b00">${t.classroom_no_id}</p>`
-  }`;
+  }</section>`;
 
   // Course settings — owner edits name/term/Moodle/org/status (re-submits the
   // upsert with the same course_id).
   const settingsSection = isOwner
-    ? `<h2>${t.course_settings}</h2>
+    ? `<section class="admin-section" id="settings"><h2>${t.course_settings}</h2>
 <form method="post" action="/admin/courses" style="display:grid;gap:6px;max-width:440px">
   <input type="hidden" name="course_id" value="${h(course.course_id)}">
   <label>${t.ph_course_name}<input name="name" value="${h(course.name)}" required></label>
@@ -482,29 +505,47 @@ ${
       <option value="archived"${course.status === "archived" ? " selected" : ""}>archived</option>
     </select></label>
   <button type="submit">${t.course_save}</button>
-</form>`
+</form></section>`
     : "";
+
+  const adminNav = `<nav class="section-nav" aria-label="${h(course.name)}">
+  <a href="#bindings">${t.admin_bindings.replace("{n}", String(rows.length))}</a>
+  <a href="#enrollment">${t.enroll_heading.replace("{n}", String(enrolled.length))}</a>
+  <a href="#drive">${t.drive_heading}</a>
+  <a href="#forms">${t.forms_heading}</a>
+  <a href="#classroom">${t.classroom_heading}</a>
+  ${isOwner ? `<a href="#staff">${t.staff_heading}</a><a href="#settings">${t.course_settings}</a>` : ""}
+</nav>`;
+  const stats = `<div class="stats-grid" aria-label="${t.enroll_heading.replace("{n}", String(enrolled.length))}">
+  <div class="stat"><span class="stat__value">${rows.length}</span><span class="stat__label">${t.admin_bindings.replace("{n}", String(rows.length))}</span></div>
+  <div class="stat"><span class="stat__value">${enrolled.length}</span><span class="stat__label">${t.enroll_heading.replace("{n}", String(enrolled.length))}</span></div>
+  <div class="stat"><span class="stat__value">${bound}</span><span class="stat__label">${t.github} ${t.bound}</span></div>
+  <div class="stat"><span class="stat__value">${gbound}</span><span class="stat__label">${t.google} ${t.bound}</span></div>
+</div>`;
 
   return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
 <title>${t.admin_title}</title>
 <body style="font-family:system-ui;max-width:900px;margin:2rem auto">
-${langToggle(base, lang)}
-<p style="font-size:.9em"><a href="/admin">← ${t.admin_courses_heading}</a></p>
-<h1>${h(course.name)} <span style="color:#999;font-size:.6em">${h(course.course_id)}</span></h1>
-<h2>${t.admin_bindings.replace("{n}", String(rows.length))}</h2>
+<header class="topbar"><div>${langToggle(base, lang)}</div><div class="topbar__actions"><a href="/admin">← ${t.admin_courses_heading}</a></div></header>
+<div class="identity"><h1>${h(course.name)}</h1><p class="identity__meta">${h(course.course_id)}${course.term ? ` · ${h(course.term)}` : ""}</p></div>
+${stats}
+${adminNav}
+<div class="admin-sections">
+<section class="admin-section" id="bindings"><h2>${t.admin_bindings.replace("{n}", String(rows.length))}</h2>
 ${banner}
 <p><a href="${base}/export.csv">${t.export_full}</a>　|　<a href="${base}/roster.csv">${t.export_roster}</a></p>
 <table border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>NYCU id</th><th>${t.th_name}</th><th>GitHub</th><th>${t.th_github_id}</th><th>${t.google}</th><th>${t.th_updated}</th>${isOwner ? `<th>${t.th_actions}</th>` : ""}</tr></thead>
 <tbody>
 ${trs}
-</tbody></table>
+</tbody></table></section>
 ${enrollSection}
 ${driveSection}
 ${formsSection}
 ${classroomSection}
 ${staffSection}
 ${settingsSection}
+</div>
 </body></html>`;
 }
 
@@ -525,12 +566,16 @@ export function dashboardPage(
   meetByCourse: Record<string, string> = {},
 ): string {
   const t = T[lang];
-  const gh = binding?.github_login
-    ? `${t.bound} <b>${h(binding.github_login)}</b> — <a href="/auth/github/start">${t.rebind}</a>`
-    : `<span style="color:#b00">${t.not_bound}</span> — <a href="/auth/github/start"><b>${t.bind_action}</b></a>`;
-  const goog = binding?.google_email
-    ? `${t.bound} <b>${h(binding.google_email)}</b> — <a href="/auth/google/start">${t.rebind}</a>`
-    : `<span style="color:#b00">${t.not_bound}</span> — <a href="/auth/google/start"><b>${t.bind_google_action}</b></a>`;
+  const accountCard = (label: string, value: string | null | undefined, href: string, action: string) =>
+    `<article class="status-card">
+  <div class="status-card__head"><span class="status-card__title">${label}</span><span class="badge badge--${value ? "success" : "warning"}">${value ? t.bound : t.not_bound}</span></div>
+  <p class="status-card__value">${value ? `<b>${h(value)}</b>` : t.not_bound}</p>
+  <p class="status-card__action"><a class="${value ? "" : "button"}" href="${href}">${value ? t.rebind : action}</a></p>
+</article>`;
+  const accountCards = `<div class="account-grid" aria-label="${t.acct_heading}">
+  ${accountCard(t.github, binding?.github_login, "/auth/github/start", t.bind_action)}
+  ${accountCard(t.google, binding?.google_email, "/auth/google/start", t.bind_google_action)}
+</div>`;
 
   // The student's own repo for the problem; link to it when present. A bare
   // owner/name → github.com; a full http(s) URL is used as-is.
@@ -544,7 +589,7 @@ export function dashboardPage(
       .map(
         (g) => `<tr>
   <td>${problemCell(g)}</td>
-  <td>${h(g.verdict ?? "-")}</td>
+  <td>${verdictBadge(g.verdict)}</td>
   <td>${g.score == null ? "-" : h(g.score)} / ${g.max_score == null ? "-" : h(g.max_score)}</td>
   <td>${h(fmtTime(g.updated_at))}</td>
 </tr>`,
@@ -607,7 +652,7 @@ ${courseTable(labRows)}`
 <ul>${fs.map((f) => `<li>${linkOrText(f.url, f.title)}</li>`).join("")}</ul>`;
   };
   const table = courseOrder.length
-    ? courseOrder
+    ? `<div class="course-list">${courseOrder
         .map((cid) => {
           const rs = gradesByCourse.get(cid) ?? [];
           const parts: string[] = [];
@@ -617,24 +662,24 @@ ${courseTable(labRows)}`
           const fhtml = formsFor(cid);
           if (fhtml) parts.push(fhtml);
           const inner = parts.length ? parts.join("") : `<p style="color:#666">${t.course_no_data}</p>`;
-          return `<h3 style="margin:1rem 0 .3rem">${h(courseName(cid))}</h3>\n${inner}`;
+          return `<article class="course-card"><h3>${h(courseName(cid))}</h3>\n${inner}</article>`;
         })
-        .join("\n")
+        .join("\n")}</div>`
     : `<p style="color:#666">${t.no_grades}</p>`;
 
   const okFlash = flash.bound ? t.flash_bound_ok : flash.gbound ? t.flash_gbound_ok : "";
   const flashHtml = okFlash
-    ? `<p style="padding:.5rem .8rem;border-radius:6px;background:#d4edda">${okFlash}</p>`
+    ? `<p class="alert alert--success" role="status">${okFlash}</p>`
     : flash.error
-      ? `<p style="padding:.5rem .8rem;border-radius:6px;background:#f8d7da">${t.flash_error_prefix}${h(flash.error)}</p>`
+      ? `<p class="alert alert--danger" role="alert">${t.flash_error_prefix}${h(flash.error)}</p>`
       : "";
 
   const adminHtml = admin
-    ? `<p style="margin-top:1.5rem"><a href="/admin"><b>${t.admin_link}</b></a></p>`
+    ? `<p style="margin-top:1.5rem"><a class="button" href="/admin">${t.admin_link}</a></p>`
     : "";
 
   const orgHtml = orgJoins.length
-    ? `<p style="padding:.5rem .8rem;border-radius:6px;background:#fff3cd">${t.join_org_prompt} ` +
+    ? `<p class="alert alert--warning">${t.join_org_prompt} ` +
       orgJoins
         .map((j) => `<a href="${h(j.url)}" target="_blank" rel="noopener"><b>${h(j.org)}</b></a>`)
         .join("　") +
@@ -644,13 +689,10 @@ ${courseTable(labRows)}`
   return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
 <title>${t.acct_title}</title>
 <body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
-${langToggle("/me", lang)}
-<p style="text-align:right;font-size:.9em"><a href="/logout">${t.logout}</a></p>
-<h1>${t.acct_heading}</h1>
+<header class="topbar"><div>${langToggle("/me", lang)}</div><div class="topbar__actions"><a href="/logout">${t.logout}</a></div></header>
+<div class="identity"><h1>${t.acct_heading}</h1><p class="identity__meta">${t.student_id}：<b>${h(nycu.id)}</b>${nycu.name ? ` · ${h(nycu.name)}` : ""}</p></div>
 ${flashHtml}
-<p>${t.student_id}：<b>${h(nycu.id)}</b>${nycu.name ? `（${h(nycu.name)}）` : ""}</p>
-<p>${t.github}：${gh}</p>
-<p>${t.google}：${goog}</p>
+${accountCards}
 ${orgHtml}
 <h2>${t.my_courses_heading}</h2>
 ${table}
@@ -671,7 +713,7 @@ export function examPage(lang: Lang, assignmentId: string, rows: GradeRow[]): st
         ? `<a href="${h(url)}" target="_blank" rel="noopener">${t.exam_go_solve} ↗</a>`
         : `<span style="color:#999">${t.exam_no_repo}</span>`;
       return `<tr><td>${h(g.problem_id)}</td><td>${repoCell}</td>
-  <td>${h(g.verdict ?? "-")}</td>
+  <td>${verdictBadge(g.verdict)}</td>
   <td>${g.score == null ? "-" : h(g.score)} / ${g.max_score == null ? "-" : h(g.max_score)}</td></tr>`;
     })
     .join("\n");
@@ -703,15 +745,15 @@ export function coursePrejoinPage(
   flash: { bound?: boolean; gbound?: boolean } = {},
 ): string {
   const t = T[lang];
-  const gh = binding?.github_login
-    ? `${t.bound} <b>${h(binding.github_login)}</b> — <a href="/auth/github/start">${t.rebind}</a>`
-    : `<span style="color:#b00">${t.not_bound}</span> — <a href="/auth/github/start"><b>${t.bind_action}</b></a>`;
-  const goog = binding?.google_email
-    ? `${t.bound} <b>${h(binding.google_email)}</b> — <a href="/auth/google/start">${t.rebind}</a>`
-    : `<span style="color:#b00">${t.not_bound}</span> — <a href="/auth/google/start"><b>${t.bind_google_action}</b></a>`;
+  const accountCard = (label: string, value: string | null | undefined, href: string, action: string) =>
+    `<article class="status-card">
+  <div class="status-card__head"><span class="status-card__title">${label}</span><span class="badge badge--${value ? "success" : "warning"}">${value ? t.bound : t.not_bound}</span></div>
+  <p class="status-card__value">${value ? `<b>${h(value)}</b>` : t.not_bound}</p>
+  <p class="status-card__action"><a class="${value ? "" : "button"}" href="${href}">${value ? t.rebind : action}</a></p>
+</article>`;
   const okFlash = flash.bound ? t.flash_bound_ok : flash.gbound ? t.flash_gbound_ok : "";
   const flashHtml = okFlash
-    ? `<p style="padding:.5rem .8rem;border-radius:6px;background:#d4edda">${okFlash}</p>`
+    ? `<p class="alert alert--success" role="status">${okFlash}</p>`
     : "";
   const formsHtml = forms.length
     ? `<ul>${forms.map((f) => `<li>${linkOrText(f.url, f.title)}</li>`).join("")}</ul>`
@@ -719,14 +761,14 @@ export function coursePrejoinPage(
   return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
 <title>${h(courseName)}</title>
 <body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
-${langToggle(`/me/${encodeURIComponent(courseId)}`, lang)}
-<p style="text-align:right;font-size:.9em"><a href="/me">${t.acct_heading}</a>　|　<a href="/logout">${t.logout}</a></p>
-<h1>${h(courseName)}</h1>
+<header class="topbar"><div>${langToggle(`/me/${encodeURIComponent(courseId)}`, lang)}</div><div class="topbar__actions"><a href="/me">${t.acct_heading}</a><a href="/logout">${t.logout}</a></div></header>
+<div class="identity"><h1>${h(courseName)}</h1><p class="identity__meta">${t.student_id}：<b>${h(nycu.id)}</b>${nycu.name ? ` · ${h(nycu.name)}` : ""}</p></div>
 <p style="color:#555">${t.prejoin_intro}</p>
 ${flashHtml}
-<p>${t.student_id}：<b>${h(nycu.id)}</b>${nycu.name ? `（${h(nycu.name)}）` : ""}</p>
-<p>${t.github}：${gh}</p>
-<p>${t.google}：${goog}</p>
+<div class="account-grid" aria-label="${t.acct_heading}">
+${accountCard(t.github, binding?.github_login, "/auth/github/start", t.bind_action)}
+${accountCard(t.google, binding?.google_email, "/auth/google/start", t.bind_google_action)}
+</div>
 <h2>${t.forms_student_heading}</h2>
 ${formsHtml}
 </body></html>`;
