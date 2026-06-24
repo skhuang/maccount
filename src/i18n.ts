@@ -49,6 +49,12 @@ export interface Strings {
   admin_courses_heading: string;
   no_courses: string;
   no_bindings: string;
+  table_search_label: string;
+  table_search_placeholder: string;
+  table_filter_label: string;
+  table_filter_all: string;
+  table_filter_unbound: string;
+  table_showing: string; // {visible} {total}
   course_create: string;
   course_create_note: string;
   ph_course_id: string;
@@ -138,6 +144,9 @@ export interface Strings {
   forms_pre_enroll_label: string;
   forms_pre_enroll_badge: string;
   prejoin_link_label: string;
+  copy_link: string;
+  copied: string;
+  copy_failed: string;
   prejoin_intro: string;
   classroom_heading: string;
   classroom_note: string;
@@ -183,6 +192,12 @@ export const T: Record<Lang, Strings> = {
     admin_courses_heading: "課程列表",
     no_courses: "尚無課程。",
     no_bindings: "目前沒有綁定資料。",
+    table_search_label: "搜尋名單",
+    table_search_placeholder: "搜尋學號、姓名、GitHub 或 Google",
+    table_filter_label: "篩選狀態",
+    table_filter_all: "全部狀態",
+    table_filter_unbound: "未完整綁定",
+    table_showing: "顯示 {visible} / {total} 筆",
     course_create: "建立／更新課程",
     course_create_note: "course_id 為英數與 - _（如 ds-2026）；moodle_course_id 為 Moodle 課程數字 id（之後對應選課/成績用）。再次送出相同 course_id 即更新。",
     ph_course_id: "course_id（如 ds-2026）",
@@ -274,6 +289,9 @@ export const T: Record<Lang, Strings> = {
     forms_pre_enroll_label: "給尚未選課的學生（報到問卷，顯示於 /me/<課程>）",
     forms_pre_enroll_badge: "（尚未選課）",
     prejoin_link_label: "尚未選課學生入口",
+    copy_link: "複製連結",
+    copied: "已複製",
+    copy_failed: "無法複製",
     prejoin_intro: "尚未選課也沒關係！請先綁定你的 GitHub / Google 帳號，並填寫下方問卷，老師會據此將你加入課程。",
     classroom_heading: "Google Classroom",
     classroom_note: "把「選課∩已綁 Google」的學生以其 Google email 邀請加入本課的 Google Classroom（你需先「連結我的 Google Drive（完整權限）」一次，且你本人須為該 Classroom 的老師）。Classroom ID 請於上方設定區填寫。",
@@ -317,6 +335,12 @@ export const T: Record<Lang, Strings> = {
     admin_courses_heading: "Courses",
     no_courses: "No courses yet.",
     no_bindings: "No account bindings yet.",
+    table_search_label: "Search list",
+    table_search_placeholder: "Search student ID, name, GitHub, or Google",
+    table_filter_label: "Filter status",
+    table_filter_all: "All statuses",
+    table_filter_unbound: "Missing a binding",
+    table_showing: "Showing {visible} of {total}",
     course_create: "Create / update course",
     course_create_note: "course_id is alphanumeric + - _ (e.g. ds-2026); moodle_course_id is the Moodle numeric course id (used later for enrollment/grade mapping). Submitting the same course_id again updates it.",
     ph_course_id: "course_id (e.g. ds-2026)",
@@ -408,6 +432,9 @@ export const T: Record<Lang, Strings> = {
     forms_pre_enroll_label: "For not-yet-enrolled students (shown on /me/<course>)",
     forms_pre_enroll_badge: "(prospective)",
     prejoin_link_label: "Prospective-student entry",
+    copy_link: "Copy link",
+    copied: "Copied",
+    copy_failed: "Couldn't copy",
     prejoin_intro: "Not enrolled yet? No problem — bind your GitHub / Google account and fill in the form below; the instructor will enroll you based on it.",
     classroom_heading: "Google Classroom",
     classroom_note: "Invite enrolled students who bound Google (by their Google email) into this course's Google Classroom. Connect your Google Drive (full access) once first, and you must be a teacher of that Classroom. Set the Classroom ID in “Course settings” above.",
