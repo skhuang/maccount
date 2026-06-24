@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { adminPage, adminHomePage, coursePrejoinPage, dashboardPage } from "../src/html";
+import {
+  adminPage,
+  adminHomePage,
+  bindingsPage,
+  coursePrejoinPage,
+  dashboardPage,
+  orgMembersPage,
+} from "../src/html";
 import type { BindingRow } from "../src/csv";
 import type { GradeRow } from "../src/db/grades";
 
@@ -42,6 +49,30 @@ describe("adminPage", () => {
     expect(html).toContain('id="enrollment"');
     expect(html).toContain('id="settings"');
     expect(html).toContain('class="stats-grid"');
+  });
+
+  it("adds searchable binding and filterable enrollment tables", () => {
+    const html = adminPage("zh", course, rows, {
+      isOwner: true,
+      staff: [],
+      enrolled: [
+        { student_id: "a01", github_login: "alice", google_email: "a@example.com" },
+        { student_id: "b02", github_login: null, google_email: null },
+      ],
+    });
+    expect(html).toContain('data-table-id="course-bindings-table"');
+    expect(html).toContain('data-table-id="enrollment-table"');
+    expect(html).toContain('data-status="complete"');
+    expect(html).toContain('data-status="missing"');
+    expect(html).toContain(`<option value="missing">未完整綁定</option>`);
+    expect(html).toContain("data-table-search");
+  });
+
+  it("provides a copy action for the prospective-student link", () => {
+    const html = adminPage("en", course, [], { isOwner: true, staff: [] });
+    expect(html).toContain('data-copy-path="/me/ds-2026"');
+    expect(html).toContain(">Copy link</button>");
+    expect(html).toContain("navigator.clipboard.writeText");
   });
 
   it("gives admin form controls persistent labels and marks risky replacement", () => {
@@ -185,6 +216,25 @@ describe("adminPage", () => {
     expect(html).not.toContain("confirm('刪除");
     expect(html).toContain("confirm('確定刪除此綁定？')");
     expect(html).toContain('value="O&#39;Brien"');
+  });
+});
+
+describe("admin list tools", () => {
+  it("adds client-side search to the global bindings list", () => {
+    const html = bindingsPage("en", rows);
+    expect(html).toContain('data-table-id="bindings-table"');
+    expect(html).toContain('<table id="bindings-table"');
+    expect(html).toContain("Showing {visible} of {total}");
+  });
+
+  it("adds membership status filters to the org list", () => {
+    const html = orgMembersPage("zh", "example-org", {
+      rows: [{ student_id: "a01", nycu_name: "甲", github_login: "alice", status: "pending" }],
+      unbound: [],
+    });
+    expect(html).toContain('data-table-id="org-members-table"');
+    expect(html).toContain('<option value="pending">待接受</option>');
+    expect(html).toContain('data-status="pending"');
   });
 });
 

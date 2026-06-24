@@ -67,13 +67,81 @@ body>p[style*="#fff3cd"]{background:var(--warning-soft)!important;border-color:#
 .stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem;margin:1rem 0 1.5rem}.stat{padding:.85rem;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}.stat__value{display:block;font-size:1.45rem;font-weight:750;line-height:1.2}.stat__label{display:block;margin-top:.25rem;color:var(--muted);font-size:.82rem}
 .admin-sections{display:grid;gap:1rem}.admin-section{scroll-margin-top:5rem;padding:1.2rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.admin-section>h2:first-child{margin:0 0 .75rem;padding:0;border:0}.admin-section+.admin-section{margin-top:0}.admin-section form:last-child{margin-bottom:0}
 .lang-toggle{display:inline-flex;align-items:center;gap:.5rem;color:var(--muted);font-size:.9rem}.lang-toggle [aria-current="true"]{padding:.2rem .45rem;border-radius:6px;background:var(--surface-soft);color:var(--text);font-weight:700}.empty-state{margin:.8rem 0;padding:1rem;border:1px dashed #b9c7c0;border-radius:10px;background:var(--surface-soft);color:var(--muted);text-align:center;list-style:none}.empty-cell{padding:1.4rem!important;color:var(--muted);text-align:center}.inline-actions{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap}.text-danger{color:var(--danger)}
+.table-tools{display:grid;grid-template-columns:minmax(220px,1fr) minmax(160px,auto) auto;align-items:end;gap:.75rem;margin:.85rem 0}.table-tools label{font-size:.82rem}.table-tools input,.table-tools select{margin-top:.25rem}.table-count{align-self:center;margin:1.35rem 0 0;color:var(--muted);font-size:.85rem;white-space:nowrap}.copy-field{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin:.75rem 0}.button--secondary{min-height:34px;padding:.4rem .7rem;border-color:var(--line);background:#fff;color:var(--brand);font-size:.85rem}.button--secondary:hover{border-color:#9db2a7;background:var(--surface-soft);color:var(--brand-hover)}tr[hidden]{display:none}
 @media(max-width:760px){.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:640px){html{background:var(--surface)}body{width:100%;margin:0!important;padding:1.15rem!important;border:0;border-radius:0;box-shadow:none}h1{margin-top:.75rem}h2{margin-top:1.75rem}th,td{padding:.6rem!important}button{width:100%}td button,li button{width:auto}form[style*="display:inline"]{display:inline!important}.topbar{align-items:flex-start}.topbar__actions{justify-content:flex-end}.account-grid{grid-template-columns:1fr}.section-nav{margin-inline:-1.15rem;padding-inline:1.15rem}.admin-section{padding:1rem}.course-card{padding:1rem}}
+@media(max-width:640px){html{background:var(--surface)}body{width:100%;margin:0!important;padding:1.15rem!important;border:0;border-radius:0;box-shadow:none}h1{margin-top:.75rem}h2{margin-top:1.75rem}th,td{padding:.6rem!important}button{width:100%}td button,li button,.button--secondary{width:auto}form[style*="display:inline"]{display:inline!important}.topbar{align-items:flex-start}.topbar__actions{justify-content:flex-end}.account-grid{grid-template-columns:1fr}.section-nav{margin-inline:-1.15rem;padding-inline:1.15rem}.admin-section{padding:1rem}.course-card{padding:1rem}.table-tools{grid-template-columns:1fr}.table-count{margin:0}.copy-field{align-items:stretch}.copy-field code{flex:1;overflow-wrap:anywhere}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 `;
 
 function uiHead(): string {
   return `<meta name="viewport" content="width=device-width, initial-scale=1"><style>${UI_CSS}</style>`;
+}
+
+type TableFilterOption = { value: string; label: string };
+
+function tableTools(
+  t: (typeof T)[Lang],
+  tableId: string,
+  total: number,
+  filters: TableFilterOption[] = [],
+): string {
+  const count = t.table_showing.replace("{visible}", String(total)).replace("{total}", String(total));
+  const filter = filters.length
+    ? `<label>${t.table_filter_label}<select data-table-status>
+  <option value="">${t.table_filter_all}</option>
+  ${filters.map((f) => `<option value="${h(f.value)}">${h(f.label)}</option>`).join("")}
+</select></label>`
+    : "";
+  return `<div class="table-tools" data-table-tools data-table-id="${h(tableId)}">
+  <label>${t.table_search_label}<input type="search" data-table-search placeholder="${t.table_search_placeholder}" autocomplete="off"></label>
+  ${filter}
+  <p class="table-count" data-table-count data-template="${h(t.table_showing)}" aria-live="polite">${h(count)}</p>
+</div>`;
+}
+
+function uiEnhancements(t: (typeof T)[Lang]): string {
+  return `<script>(()=>{
+const normalize=(value)=>value.normalize("NFKC").toLocaleLowerCase();
+document.querySelectorAll("[data-table-tools]").forEach((tools)=>{
+  const table=document.getElementById(tools.dataset.tableId||"");
+  if(!table)return;
+  const rows=[...table.querySelectorAll("tbody tr[data-row]")];
+  const search=tools.querySelector("[data-table-search]");
+  const status=tools.querySelector("[data-table-status]");
+  const count=tools.querySelector("[data-table-count]");
+  const apply=()=>{
+    const query=normalize(search?.value.trim()||"");
+    const wanted=status?.value||"";
+    let visible=0;
+    rows.forEach((row)=>{
+      const matchesText=!query||normalize(row.textContent||"").includes(query);
+      const matchesStatus=!wanted||row.dataset.status===wanted;
+      row.hidden=!(matchesText&&matchesStatus);
+      if(!row.hidden)visible++;
+    });
+    if(count)count.textContent=(count.dataset.template||"").replace("{visible}",String(visible)).replace("{total}",String(rows.length));
+  };
+  search?.addEventListener("input",apply);
+  status?.addEventListener("change",apply);
+});
+document.querySelectorAll("[data-copy-path]").forEach((button)=>{
+  const original=button.textContent||"";
+  const finish=(ok)=>{
+    button.textContent=ok?${JSON.stringify(t.copied)}:${JSON.stringify(t.copy_failed)};
+    window.setTimeout(()=>{button.textContent=original;},1600);
+  };
+  button.addEventListener("click",()=>{
+    const value=new URL(button.dataset.copyPath||"/",location.origin).href;
+    if(navigator.clipboard?.writeText){
+      navigator.clipboard.writeText(value).then(()=>finish(true),()=>finish(false));
+      return;
+    }
+    const area=document.createElement("textarea");
+    area.value=value;area.style.position="fixed";area.style.opacity="0";document.body.append(area);area.select();
+    let ok=false;try{ok=document.execCommand("copy");}catch{}area.remove();finish(ok);
+  });
+});
+})();</script>`;
 }
 
 // The student's repo link for a problem: a bare owner/name → github.com; a full
@@ -193,7 +261,7 @@ export function bindingsPage(lang: Lang, rows: BindingRow[], orgs: string[] = []
   const t = T[lang];
   const trs = rows
     .map(
-      (r) => `<tr><td>${h(r.nycu_id)}</td><td>${h(r.nycu_name)}</td>
+      (r) => `<tr data-row><td>${h(r.nycu_id)}</td><td>${h(r.nycu_name)}</td>
   <td>${h(r.github_login)}</td><td>${h(r.github_id)}</td><td>${h(r.google_email)}</td><td>${h(fmtTime(r.updated_at))}</td></tr>`,
     )
     .join("\n");
@@ -207,11 +275,13 @@ ${langToggle("/admin/bindings", lang)}
 <p style="font-size:.9em"><a href="/admin">← ${t.admin_courses_heading}</a></p>
 <h1>${t.bindings_all_link}（${rows.length}）</h1>
 ${orgs.length ? `<p>${t.bindings_query_heading}：${orgLinks}</p>` : ""}
-<table border="1" cellpadding="6" cellspacing="0">
+${rows.length ? tableTools(t, "bindings-table", rows.length) : ""}
+<table id="bindings-table" border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>NYCU id</th><th>${t.th_name}</th><th>GitHub</th><th>${t.th_github_id}</th><th>${t.google}</th><th>${t.th_updated}</th></tr></thead>
 <tbody>
 ${trs || `<tr><td colspan="6" class="empty-cell">${t.no_bindings}</td></tr>`}
 </tbody></table>
+${uiEnhancements(t)}
 </body></html>`;
 }
 
@@ -234,7 +304,7 @@ export function orgMembersPage(
   const sorted = [...view.rows].sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
   const trs = sorted
     .map(
-      (r) => `<tr><td>${h(r.github_login)}</td><td>${h(r.student_id)}</td>
+      (r) => `<tr data-row data-status="${h(r.status)}"><td>${h(r.github_login)}</td><td>${h(r.student_id)}</td>
   <td>${h(r.nycu_name)}</td><td>${badge[r.status] ?? h(r.status)}</td></tr>`,
     )
     .join("\n");
@@ -250,12 +320,18 @@ ${langToggle(`/admin/org/${encodeURIComponent(org)}`, lang)}
 <p style="font-size:.9em"><a href="/admin">← ${t.admin_courses_heading}</a>　|　<a href="/admin/bindings">${t.bindings_all_link}</a></p>
 <h1>GitHub org：${h(org)}</h1>
 ${err ? `<p style="padding:8px;border:1px solid #c00;background:#fee">${t.org_fetch_error}：${h(err)}</p>` : ""}
-<table border="1" cellpadding="6" cellspacing="0">
+${sorted.length ? tableTools(t, "org-members-table", sorted.length, [
+    { value: "member", label: t.org_status_member },
+    { value: "pending", label: t.org_status_pending },
+    { value: "none", label: t.org_status_none },
+  ]) : ""}
+<table id="org-members-table" border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>GitHub</th><th>NYCU id</th><th>${t.th_name}</th><th>${t.org_status_col}</th></tr></thead>
 <tbody>
 ${trs || `<tr><td colspan="4" class="empty-cell">${t.no_bindings}</td></tr>`}
 </tbody></table>
 ${unbound}
+${uiEnhancements(t)}
 </body></html>`;
 }
 
@@ -321,7 +397,7 @@ export function adminPage(
       : "";
   const trs = rows
     .map(
-      (r) => `<tr>
+      (r) => `<tr data-row>
   <td>${h(r.nycu_id)}</td><td>${h(r.nycu_name)}</td>
   <td>${h(r.github_login)}</td><td>${h(r.github_id)}</td>
   <td>${h(r.google_email)}</td>
@@ -362,7 +438,7 @@ export function adminPage(
   const gbound = enrolled.filter((e) => e.google_email).length;
   const enrolledRows = enrolled
     .map(
-      (e) => `<tr><td>${h(e.student_id)}</td><td>${
+      (e) => `<tr data-row data-status="${e.github_login && e.google_email ? "complete" : "missing"}"><td>${h(e.student_id)}</td><td>${
         e.github_login ? h(e.github_login) : `<span class="badge badge--danger">${t.enroll_unbound}</span>`
       }</td><td>${
         e.google_email ? h(e.google_email) : `<span class="badge badge--danger">${t.enroll_unbound}</span>`
@@ -381,7 +457,8 @@ export function adminPage(
     enrolled.length
       ? `
 <details><summary>${t.enroll_show_list}</summary>
-<table border="1" cellpadding="6" cellspacing="0">
+${tableTools(t, "enrollment-table", enrolled.length, [{ value: "missing", label: t.table_filter_unbound }])}
+<table id="enrollment-table" border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>NYCU id</th><th>GitHub</th><th>Google</th></tr></thead>
 <tbody>${enrolledRows}</tbody></table></details>`
       : ""
@@ -445,7 +522,7 @@ ${driveBanner}
   const preEnrollLabel = `<label class="check-row"><input type="checkbox" name="pre_enroll" value="1"> <span>${t.forms_pre_enroll_label}</span></label>`;
   const formsSection = `<section class="admin-section" id="forms"><h2>${t.forms_heading}</h2>
 <p style="color:#777;font-size:.9em">${t.forms_note}</p>
-<p style="color:#777;font-size:.9em">${t.prejoin_link_label}：<code>/me/${h(course.course_id)}</code></p>
+<div class="copy-field"><span>${t.prejoin_link_label}：</span><code>/me/${h(course.course_id)}</code><button type="button" class="button button--secondary" data-copy-path="/me/${h(course.course_id)}">${t.copy_link}</button></div>
 ${formsBanner}
 ${formsRows}
 <form method="post" action="${base}/forms/add" class="form-stack" style="max-width:440px">
@@ -535,7 +612,8 @@ ${adminNav}
 <section class="admin-section" id="bindings"><h2>${t.admin_bindings.replace("{n}", String(rows.length))}</h2>
 ${banner}
 <p><a href="${base}/export.csv">${t.export_full}</a>　|　<a href="${base}/roster.csv">${t.export_roster}</a></p>
-<table border="1" cellpadding="6" cellspacing="0">
+${rows.length ? tableTools(t, "course-bindings-table", rows.length) : ""}
+<table id="course-bindings-table" border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>NYCU id</th><th>${t.th_name}</th><th>GitHub</th><th>${t.th_github_id}</th><th>${t.google}</th><th>${t.th_updated}</th>${isOwner ? `<th>${t.th_actions}</th>` : ""}</tr></thead>
 <tbody>
 ${trs || `<tr><td colspan="${isOwner ? "7" : "6"}" class="empty-cell">${t.no_bindings}</td></tr>`}
@@ -547,6 +625,7 @@ ${classroomSection}
 ${staffSection}
 ${settingsSection}
 </div>
+${uiEnhancements(t)}
 </body></html>`;
 }
 
