@@ -71,7 +71,7 @@ body>p[style*="#fff3cd"]{background:var(--warning-soft)!important;border-color:#
 .table-tools{display:grid;grid-template-columns:minmax(220px,1fr) minmax(160px,auto) auto;align-items:end;gap:.75rem;margin:.85rem 0}.table-tools label{font-size:.82rem}.table-tools input,.table-tools select{margin-top:.25rem}.table-count{align-self:center;margin:1.35rem 0 0;color:var(--muted);font-size:.85rem;white-space:nowrap}.copy-field{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin:.75rem 0}.button--secondary{min-height:34px;padding:.4rem .7rem;border-color:var(--line);background:#fff;color:var(--brand);font-size:.85rem}.button--secondary:hover{border-color:#9db2a7;background:var(--surface-soft);color:var(--brand-hover)}tr[hidden]{display:none}
 .sort-button{display:flex;width:100%;min-height:0;padding:0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;text-align:left}.sort-button:hover{background:transparent;color:var(--brand)}.sort-icon{margin-left:.4rem;color:var(--muted)}.course-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin:1rem 0}.course-admin-card{display:flex;min-height:150px;flex-direction:column;padding:1.1rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.course-admin-card--archived{background:var(--surface-soft)}.course-admin-card__head{display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem}.course-admin-card h2{margin:0;padding:0;border:0;font-size:1.1rem}.course-admin-card__meta{margin:.45rem 0 1rem;color:var(--muted);font-size:.88rem}.course-admin-card__action{margin:auto 0 0}.admin-disclosure{margin:1.5rem 0;background:#fff}.admin-disclosure>summary{font-size:1.05rem}.admin-disclosure__body{padding:0 1rem 1rem}.utility-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}.utility-card{padding:1rem;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}.utility-card p{margin:.35rem 0 0;color:var(--muted);font-size:.86rem}
 @media(max-width:760px){.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:640px){html{background:var(--surface)}body{width:100%;margin:0!important;padding:1.15rem!important;border:0;border-radius:0;box-shadow:none}h1{margin-top:.75rem}h2{margin-top:1.75rem}th,td{padding:.6rem!important}button{width:100%}td button,li button,.button--secondary,.sort-button{width:auto}form[style*="display:inline"]{display:inline!important}.topbar{align-items:flex-start}.topbar__actions{justify-content:flex-end}.account-grid{grid-template-columns:1fr}.section-nav{margin-inline:-1.15rem;padding-inline:1.15rem}.admin-section{padding:1rem}.course-card{padding:1rem}.table-tools{grid-template-columns:1fr}.table-count{margin:0}.copy-field{align-items:stretch}.copy-field code{flex:1;overflow-wrap:anywhere}.course-grid,.utility-grid{grid-template-columns:1fr}}
+@media(max-width:640px){html{background:var(--surface)}body{width:100%;margin:0!important;padding:1.15rem!important;border:0;border-radius:0;box-shadow:none}h1{margin-top:.75rem}h2{margin-top:1.75rem}th,td{padding:.6rem!important}button{width:100%}td button,li button,.button--secondary,.sort-button{width:auto}form[style*="display:inline"]{display:inline!important}.topbar{align-items:flex-start}.topbar__actions{justify-content:flex-end}.account-grid{grid-template-columns:1fr}.section-nav{margin-inline:-1.15rem;padding-inline:1.15rem}.admin-section{padding:1rem}.course-card{padding:1rem}.table-tools{grid-template-columns:1fr}.table-count{margin:0}.copy-field{align-items:stretch}.copy-field code{flex:1;overflow-wrap:anywhere}.course-grid,.utility-grid{grid-template-columns:1fr}.mobile-compact{display:table;table-layout:auto;overflow:visible;white-space:normal}.mobile-compact th,.mobile-compact td{overflow-wrap:anywhere}.mobile-compact .mobile-secondary,.mobile-compact th:nth-child(5){display:none}.mobile-card-table{overflow:visible;white-space:normal}.mobile-card-table thead{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}.mobile-card-table tbody,.mobile-card-table tr,.mobile-card-table td{display:block;width:100%}.mobile-card-table tr{margin-bottom:.75rem;overflow:hidden;border:1px solid var(--line);border-radius:10px;background:#fff}.mobile-card-table td{display:grid;grid-template-columns:minmax(6.5rem,40%) minmax(0,1fr);gap:.75rem;border:0;border-bottom:1px solid var(--line);white-space:normal;overflow-wrap:anywhere}.mobile-card-table td:last-child{border-bottom:0}.mobile-card-table td::before{content:attr(data-label);color:var(--muted);font-size:.82rem;font-weight:700}.mobile-card-table tbody tr:nth-child(even),.mobile-card-table tbody tr:hover{background:#fff}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 `;
 
@@ -101,8 +101,13 @@ function tableTools(
 </div>`;
 }
 
-function sortableTh(label: string, column: number, type: "text" | "number" = "text"): string {
-  return `<th data-sort-column="${column}" data-sort-type="${type}">${h(label)}</th>`;
+function sortableTh(
+  label: string,
+  column: number,
+  type: "text" | "number" = "text",
+  className = "",
+): string {
+  return `<th${className ? ` class="${h(className)}"` : ""} data-sort-column="${column}" data-sort-type="${type}">${h(label)}</th>`;
 }
 
 function uiEnhancements(t: (typeof T)[Lang]): string {
@@ -304,7 +309,7 @@ export function bindingsPage(lang: Lang, rows: BindingRow[], orgs: string[] = []
   const trs = rows
     .map(
       (r) => `<tr data-row><td>${h(r.nycu_id)}</td><td>${h(r.nycu_name)}</td>
-  <td>${h(r.github_login)}</td><td>${h(r.github_id)}</td><td>${h(r.google_email)}</td><td>${h(fmtTime(r.updated_at))}</td></tr>`,
+  <td>${h(r.github_login)}</td><td class="mobile-secondary">${h(r.github_id)}</td><td class="mobile-secondary">${h(r.google_email)}</td><td class="mobile-secondary">${h(fmtTime(r.updated_at))}</td></tr>`,
     )
     .join("\n");
   const orgLinks = orgs
@@ -318,8 +323,8 @@ ${langToggle("/admin/bindings", lang)}
 <h1>${t.bindings_all_link}（${rows.length}）</h1>
 ${orgs.length ? `<p>${t.bindings_query_heading}：${orgLinks}</p>` : ""}
 ${rows.length ? tableTools(t, "bindings-table", rows.length) : ""}
-<table id="bindings-table" border="1" cellpadding="6" cellspacing="0">
-<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("GitHub", 2)}${sortableTh(t.th_github_id, 3, "number")}<th>Google</th>${sortableTh(t.th_updated, 5)}</tr></thead>
+<table id="bindings-table" class="mobile-compact" border="1" cellpadding="6" cellspacing="0">
+<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("GitHub", 2)}${sortableTh(t.th_github_id, 3, "number", "mobile-secondary")}<th>Google</th>${sortableTh(t.th_updated, 5, "text", "mobile-secondary")}</tr></thead>
 <tbody>
 ${trs || `<tr><td colspan="6" class="empty-cell">${t.no_bindings}</td></tr>`}
 </tbody></table>
@@ -347,7 +352,7 @@ export function orgMembersPage(
   const trs = sorted
     .map(
       (r) => `<tr data-row data-status="${h(r.status)}"><td>${h(r.github_login)}</td><td>${h(r.student_id)}</td>
-  <td>${h(r.nycu_name)}</td><td>${badge[r.status] ?? h(r.status)}</td></tr>`,
+  <td class="mobile-secondary">${h(r.nycu_name)}</td><td>${badge[r.status] ?? h(r.status)}</td></tr>`,
     )
     .join("\n");
   const unbound = view.unbound.length
@@ -367,8 +372,8 @@ ${sorted.length ? tableTools(t, "org-members-table", sorted.length, [
     { value: "pending", label: t.org_status_pending },
     { value: "none", label: t.org_status_none },
   ]) : ""}
-<table id="org-members-table" border="1" cellpadding="6" cellspacing="0">
-<thead><tr>${sortableTh("GitHub", 0)}${sortableTh("NYCU id", 1)}${sortableTh(t.th_name, 2)}${sortableTh(t.org_status_col, 3)}</tr></thead>
+<table id="org-members-table" class="mobile-compact" border="1" cellpadding="6" cellspacing="0">
+<thead><tr>${sortableTh("GitHub", 0)}${sortableTh("NYCU id", 1)}${sortableTh(t.th_name, 2, "text", "mobile-secondary")}${sortableTh(t.org_status_col, 3)}</tr></thead>
 <tbody>
 ${trs || `<tr><td colspan="4" class="empty-cell">${t.no_bindings}</td></tr>`}
 </tbody></table>
@@ -441,9 +446,9 @@ export function adminPage(
     .map(
       (r) => `<tr data-row>
   <td>${h(r.nycu_id)}</td><td>${h(r.nycu_name)}</td>
-  <td>${h(r.github_login)}</td><td>${h(r.github_id)}</td>
-  <td>${h(r.google_email)}</td>
-  <td>${h(fmtTime(r.updated_at))}</td>${
+  <td>${h(r.github_login)}</td><td class="mobile-secondary">${h(r.github_id)}</td>
+  <td class="mobile-secondary">${h(r.google_email)}</td>
+  <td class="mobile-secondary">${h(fmtTime(r.updated_at))}</td>${
     isOwner
       ? `
   <td><form method="post" action="${base}/delete" onsubmit="return confirm('${t.confirm_delete}')">
@@ -457,7 +462,7 @@ export function adminPage(
   // Staff/TA management — owner only.
   const staffRows = staff
     .map(
-      (s) => `<tr><td>${h(s.nycu_id)}</td><td>${h(s.added_by)}</td>
+      (s) => `<tr><td>${h(s.nycu_id)}</td><td class="mobile-secondary">${h(s.added_by)}</td>
   <td><form method="post" action="${base}/staff/remove" onsubmit="return confirm('${t.staff_remove_confirm}')">
     <input type="hidden" name="nycu_id" value="${h(s.nycu_id)}"><button type="submit">${t.staff_remove}</button></form></td></tr>`,
     )
@@ -465,8 +470,8 @@ export function adminPage(
   const staffSection = isOwner
     ? `<section class="admin-section" id="staff"><h2>${t.staff_heading}</h2>
 <p class="muted text-small">${t.staff_note}</p>
-<table border="1" cellpadding="6" cellspacing="0">
-<thead><tr><th>NYCU id</th><th>${t.staff_added_by}</th><th></th></tr></thead>
+<table class="mobile-compact" border="1" cellpadding="6" cellspacing="0">
+<thead><tr><th>NYCU id</th><th class="mobile-secondary">${t.staff_added_by}</th><th></th></tr></thead>
 <tbody>${staffRows}</tbody></table>
 <form method="post" action="${base}/staff/add" class="form-stack" style="margin-top:12px">
   <label>${t.staff_id_label}<input name="nycu_id" placeholder="${t.staff_id_placeholder}" required autocomplete="off"></label>
@@ -500,7 +505,7 @@ export function adminPage(
       ? `
 <details><summary>${t.enroll_show_list}</summary>
 ${tableTools(t, "enrollment-table", enrolled.length, [{ value: "missing", label: t.table_filter_unbound }])}
-<table id="enrollment-table" border="1" cellpadding="6" cellspacing="0">
+<table id="enrollment-table" class="mobile-compact" border="1" cellpadding="6" cellspacing="0">
 <thead><tr>${sortableTh("NYCU id", 0)}${sortableTh("GitHub", 1)}<th>Google</th></tr></thead>
 <tbody>${enrolledRows}</tbody></table></details>`
       : ""
@@ -655,8 +660,8 @@ ${adminNav}
 ${banner}
 <p><a href="${base}/export.csv">${t.export_full}</a>　|　<a href="${base}/roster.csv">${t.export_roster}</a></p>
 ${rows.length ? tableTools(t, "course-bindings-table", rows.length) : ""}
-<table id="course-bindings-table" border="1" cellpadding="6" cellspacing="0">
-<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("GitHub", 2)}${sortableTh(t.th_github_id, 3, "number")}<th>Google</th>${sortableTh(t.th_updated, 5)}${isOwner ? `<th>${t.th_actions}</th>` : ""}</tr></thead>
+<table id="course-bindings-table" class="mobile-compact" border="1" cellpadding="6" cellspacing="0">
+<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("GitHub", 2)}${sortableTh(t.th_github_id, 3, "number", "mobile-secondary")}<th>Google</th>${sortableTh(t.th_updated, 5, "text", "mobile-secondary")}${isOwner ? `<th>${t.th_actions}</th>` : ""}</tr></thead>
 <tbody>
 ${trs || `<tr><td colspan="${isOwner ? "7" : "6"}" class="empty-cell">${t.no_bindings}</td></tr>`}
 </tbody></table></section>
@@ -710,10 +715,10 @@ export function dashboardPage(
     rs
       .map(
         (g) => `<tr>
-  <td>${problemCell(g)}</td>
-  <td>${verdictBadge(g.verdict)}</td>
-  <td>${g.score == null ? "-" : h(g.score)} / ${g.max_score == null ? "-" : h(g.max_score)}</td>
-  <td>${h(fmtTime(g.updated_at))}</td>
+  <td data-label="${h(t.col_problem)}">${problemCell(g)}</td>
+  <td data-label="${h(t.col_result)}">${verdictBadge(g.verdict)}</td>
+  <td data-label="${h(t.col_score)}">${g.score == null ? "-" : h(g.score)} / ${g.max_score == null ? "-" : h(g.max_score)}</td>
+  <td data-label="${h(t.col_updated)}">${h(fmtTime(g.updated_at))}</td>
 </tr>`,
       )
       .join("\n");
@@ -725,7 +730,7 @@ export function dashboardPage(
     arr.push(g);
     gradesByCourse.set(g.course_id, arr);
   }
-  const courseTable = (rs: GradeRow[]) => `<table border="1" cellpadding="6" cellspacing="0">
+  const courseTable = (rs: GradeRow[]) => `<table class="mobile-card-table" border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>${t.col_problem}</th><th>${t.col_result}</th><th>${t.col_score}</th><th>${t.col_updated}</th></tr></thead>
 <tbody>
 ${renderRows(rs)}
@@ -859,9 +864,9 @@ export function examPage(lang: Lang, assignmentId: string, rows: GradeRow[]): st
       const repoCell = url
         ? `<a href="${h(url)}" target="_blank" rel="noopener">${t.exam_go_solve} ↗</a>`
         : `<span class="muted">${t.exam_no_repo}</span>`;
-      return `<tr><td>${h(g.problem_id)}</td><td>${repoCell}</td>
-  <td>${verdictBadge(g.verdict)}</td>
-  <td>${g.score == null ? "-" : h(g.score)} / ${g.max_score == null ? "-" : h(g.max_score)}</td></tr>`;
+      return `<tr><td data-label="${h(t.col_problem)}">${h(g.problem_id)}</td><td data-label="repo">${repoCell}</td>
+  <td data-label="${h(t.col_result)}">${verdictBadge(g.verdict)}</td>
+  <td data-label="${h(t.col_score)}">${g.score == null ? "-" : h(g.score)} / ${g.max_score == null ? "-" : h(g.max_score)}</td></tr>`;
     })
     .join("\n");
   return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
@@ -871,7 +876,7 @@ ${langToggle(`/me/exam/${encodeURIComponent(assignmentId)}`, lang)}
 <p style="font-size:.9em"><a href="/me">← ${t.acct_heading}</a></p>
 <h1>${h(title)}</h1>
 <p class="muted text-small">${t.exam_intro}</p>
-<table border="1" cellpadding="6" cellspacing="0">
+<table class="mobile-card-table" border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>${t.col_problem}</th><th>repo</th><th>${t.col_result}</th><th>${t.col_score}</th></tr></thead>
 <tbody>
 ${trs}
