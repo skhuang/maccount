@@ -92,6 +92,45 @@ test("prospective-student link can be copied", async ({ page }) => {
   await expect(page.locator('[data-copy-path="/me/ds-2026"]')).toHaveText("已複製");
 });
 
+test("destructive admin actions use an accessible confirmation dialog", async ({ page }) => {
+  let posts = 0;
+  await page.route("https://maccount.example.test/**", async (route) => {
+    if (route.request().method() === "POST") posts++;
+    await route.fulfill({ contentType: "text/html", body: adminFixture() });
+  });
+  await page.goto("https://maccount.example.test/admin");
+
+  const deleteButton = page.locator('form[action$="/delete"] button').first();
+  await deleteButton.click();
+  const dialog = page.locator("[data-confirm-dialog]");
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveAttribute("aria-labelledby", "confirm-dialog-title");
+  await expect(dialog.locator("#confirm-dialog-title")).toHaveText("刪除帳號綁定？");
+  await expect(dialog.locator("#confirm-dialog-message")).toContainText("所有課程都會受影響");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(deleteButton).toBeFocused();
+  expect(posts).toBe(0);
+
+  await deleteButton.click();
+  await dialog.locator("[data-confirm-cancel]").click();
+  await expect(dialog).toBeHidden();
+  expect(posts).toBe(0);
+
+  await page.locator('textarea[name="student_ids"]').fill("a01");
+  await page.locator('input[name="replace"]').check();
+  await page.locator('form[action$="/enroll"] button[type="submit"]').click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator("#confirm-dialog-title")).toHaveText("覆蓋整份選課名單？");
+  await expect(dialog.locator("#confirm-dialog-message")).toContainText("未列出的學生會從本課移除");
+  await dialog.locator("[data-confirm-cancel]").click();
+  expect(posts).toBe(0);
+
+  await deleteButton.click();
+  await dialog.locator("[data-confirm-submit]").click();
+  await expect.poll(() => posts).toBe(1);
+});
+
 test("student and admin pages have no automated WCAG A/AA violations", async ({ page }) => {
   const student = dashboardPage(
     "zh",

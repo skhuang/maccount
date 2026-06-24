@@ -84,6 +84,8 @@ describe("adminPage", () => {
     expect(html).toContain(`<label>分享權限<select name="role"`);
     expect(html).toContain(`<label>問卷標題<input name="title"`);
     expect(html).toContain('class="check-row check-row--danger"');
+    expect(html).toContain('data-confirm-when="replace"');
+    expect(html).toContain("未列出的學生會從本課移除");
   });
 
   it("renders an explicit empty state when there are no bindings", () => {
@@ -213,10 +215,12 @@ describe("adminPage", () => {
     expect(html).not.toContain("課程設定"); // nor edit settings
   });
 
-  it("does not interpolate user data into the inline onsubmit JS", () => {
+  it("escapes user data in accessible confirmation details without inline confirm JS", () => {
     const html = adminPage("zh", course, [{ ...rows[0], nycu_id: "O'Brien" }], { isOwner: true, staff: [] });
-    expect(html).not.toContain("confirm('刪除");
-    expect(html).toContain("confirm('確定刪除此綁定？')");
+    expect(html).not.toContain("confirm(");
+    expect(html).toContain('data-confirm-title="刪除帳號綁定？"');
+    expect(html).toContain("將刪除 O&#39;Brien 的全域 GitHub／Google 帳號綁定");
+    expect(html).toContain('class="confirm-dialog"');
     expect(html).toContain('value="O&#39;Brien"');
   });
 });

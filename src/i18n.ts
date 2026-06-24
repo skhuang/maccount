@@ -108,6 +108,12 @@ export interface Strings {
   th_actions: string;
   delete: string;
   confirm_delete: string;
+  confirm_delete_detail: string; // "{id}" placeholder
+  confirm_dialog_title: string;
+  confirm_cancel: string;
+  confirm_continue: string;
+  enroll_replace_confirm: string;
+  enroll_replace_confirm_detail: string;
   staff_heading: string;
   staff_note: string;
   staff_added_by: string;
@@ -116,6 +122,7 @@ export interface Strings {
   staff_add: string;
   staff_remove: string;
   staff_remove_confirm: string;
+  staff_remove_confirm_detail: string; // "{id}" placeholder
   staff_sync_ok: string;
   staff_sync_nobinding: string;
   staff_sync_error: string;
@@ -143,6 +150,7 @@ export interface Strings {
   forms_add: string;
   forms_remove: string;
   forms_remove_confirm: string;
+  forms_remove_confirm_detail: string; // "{title}" placeholder
   forms_none: string;
   forms_msg_bad: string;
   forms_msg_nodrive: string;
@@ -264,7 +272,13 @@ export const T: Record<Lang, Strings> = {
     th_updated: "更新時間",
     th_actions: "",
     delete: "刪除",
-    confirm_delete: "確定刪除此綁定？",
+    confirm_delete: "刪除帳號綁定？",
+    confirm_delete_detail: "將刪除 {id} 的全域 GitHub／Google 帳號綁定，所有課程都會受影響；成績與選課資料不會刪除。",
+    confirm_dialog_title: "確認管理操作",
+    confirm_cancel: "取消",
+    confirm_continue: "確認執行",
+    enroll_replace_confirm: "覆蓋整份選課名單？",
+    enroll_replace_confirm_detail: "新名單將取代目前整份名單；未列出的學生會從本課移除。此操作不會刪除帳號綁定或成績。",
     staff_heading: "TA／助教管理",
     staff_note: "助教（NYCU 帳號）可檢視名單與匯出；只有 ADMIN_IDS 內的擁有者能新增/移除助教或刪除綁定。",
     staff_added_by: "加入者",
@@ -272,7 +286,8 @@ export const T: Record<Lang, Strings> = {
     staff_id_placeholder: "NYCU 帳號（學號/教職員帳號）",
     staff_add: "新增助教",
     staff_remove: "移除",
-    staff_remove_confirm: "確定移除此助教？",
+    staff_remove_confirm: "移除助教權限？",
+    staff_remove_confirm_detail: "將移除 {id} 的本課管理權限，並嘗試同步移出 GitHub staff team 與課程組織。",
     staff_sync_ok: "已同步到 GitHub org 與 staff team。",
     staff_sync_nobinding: "此助教尚未綁定 GitHub；請他先到 /me 綁定，再加入一次以同步。",
     staff_sync_error: "GitHub org/team 同步失敗（請檢查 ORG_INVITE_TOKEN 權限與 STAFF_TEAM）。",
@@ -299,7 +314,8 @@ export const T: Record<Lang, Strings> = {
     forms_url_ph: "Google 表單連結（https://docs.google.com/forms/…）",
     forms_add: "新增問卷",
     forms_remove: "移除",
-    forms_remove_confirm: "確定移除此問卷？",
+    forms_remove_confirm: "移除課程問卷？",
+    forms_remove_confirm_detail: "將從本課移除「{title}」連結；Google Drive 中的原始表單不會被刪除。",
     forms_none: "目前沒有問卷。",
     forms_msg_bad: "請填標題與有效的 https 連結。",
     forms_msg_nodrive: "尚未連結你的 Google（完整權限），無法建立表單。請先點上方「連結我的 Google Drive」並授權。",
@@ -419,7 +435,13 @@ export const T: Record<Lang, Strings> = {
     th_updated: "Updated",
     th_actions: "",
     delete: "Delete",
-    confirm_delete: "Delete this binding?",
+    confirm_delete: "Delete account binding?",
+    confirm_delete_detail: "This deletes {id}'s global GitHub/Google account binding and affects every course. Grades and enrollment data are kept.",
+    confirm_dialog_title: "Confirm admin action",
+    confirm_cancel: "Cancel",
+    confirm_continue: "Confirm action",
+    enroll_replace_confirm: "Replace the entire roster?",
+    enroll_replace_confirm_detail: "The new roster replaces the current one. Students not listed will be removed from this course. Account bindings and grades are kept.",
     staff_heading: "TA / staff",
     staff_note: "Staff (by NYCU id) can view bindings and export; only owners (ADMIN_IDS) can add/remove staff or delete bindings.",
     staff_added_by: "Added by",
@@ -427,7 +449,8 @@ export const T: Record<Lang, Strings> = {
     staff_id_placeholder: "NYCU id",
     staff_add: "Add staff",
     staff_remove: "Remove",
-    staff_remove_confirm: "Remove this staff member?",
+    staff_remove_confirm: "Remove staff access?",
+    staff_remove_confirm_detail: "This removes {id}'s admin access to this course and attempts to remove them from the GitHub staff team and course organization.",
     staff_sync_ok: "Synced to the GitHub org and staff team.",
     staff_sync_nobinding: "This TA hasn't bound GitHub yet; have them bind at /me, then add again to sync.",
     staff_sync_error: "GitHub org/team sync failed (check ORG_INVITE_TOKEN permissions and STAFF_TEAM).",
@@ -454,7 +477,8 @@ export const T: Record<Lang, Strings> = {
     forms_url_ph: "Google Form link (https://docs.google.com/forms/…)",
     forms_add: "Add form",
     forms_remove: "Remove",
-    forms_remove_confirm: "Remove this form?",
+    forms_remove_confirm: "Remove course form?",
+    forms_remove_confirm_detail: "This removes the “{title}” link from this course. The original form in Google Drive is not deleted.",
     forms_none: "No forms yet.",
     forms_msg_bad: "Enter a title and a valid https link.",
     forms_msg_nodrive: "Your Google (full access) isn't connected, so a form can't be created. Click “Connect my Google Drive” above and authorize first.",

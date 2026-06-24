@@ -62,6 +62,7 @@ body>p[style*="#fff3cd"]{background:var(--warning-soft)!important;border-color:#
 .account-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin:1.25rem 0 1.5rem}.status-card{padding:1rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface-soft)}.status-card__head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.55rem}.status-card__title{font-weight:700}.status-card__value{min-height:1.65rem;margin:0 0 .75rem;overflow-wrap:anywhere}.status-card__action{margin:0;font-size:.9rem}
 .badge{display:inline-flex;align-items:center;gap:.35rem;padding:.18rem .5rem;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--muted);font-size:.78rem;font-weight:700;line-height:1.3;white-space:nowrap}.badge::before{content:"";width:.45rem;height:.45rem;border-radius:50%;background:currentColor}.badge--success{border-color:#a8dac1;background:var(--success-soft);color:#08734f}.badge--warning{border-color:#ead483;background:var(--warning-soft);color:#8a6500}.badge--danger{border-color:#efb4b4;background:var(--danger-soft);color:var(--danger)}.badge--neutral{color:#647269}
 .alert{padding:.8rem 1rem;border:1px solid var(--line);border-radius:9px}.alert--success{border-color:#b8e4ce;background:var(--success-soft)}.alert--warning{border-color:#eedc93;background:var(--warning-soft)}.alert--danger{border-color:#f1b6b6;background:var(--danger-soft)}
+.confirm-dialog{width:min(32rem,calc(100% - 2rem));padding:0;border:1px solid var(--line);border-radius:14px;background:#fff;color:var(--text);box-shadow:0 24px 70px rgba(20,45,34,.24)}.confirm-dialog::backdrop{background:rgba(14,25,20,.56)}.confirm-dialog__body{padding:1.35rem}.confirm-dialog h2{margin:0 0 .65rem;padding:0;border:0}.confirm-dialog p{margin:.5rem 0 1.25rem;color:var(--muted)}.confirm-dialog__actions{display:flex;justify-content:flex-end;gap:.65rem}.button--danger{background:var(--danger)}.button--danger:hover{background:#a61e1e}
 .course-list{display:grid;gap:1rem}.course-card{padding:1.1rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.course-card h3{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:0 0 .8rem}.course-card h3::after{content:"";width:.55rem;height:.55rem;border-radius:50%;background:var(--brand)}.course-card>p:last-child{margin-bottom:0}.course-card table{margin-top:.45rem}
 .section-nav{position:sticky;top:0;z-index:2;display:flex;gap:.5rem;margin:0 -1rem 1.25rem;padding:.7rem 1rem;overflow-x:auto;border-block:1px solid var(--line);background:rgba(255,255,255,.96);box-shadow:0 5px 16px rgba(20,45,34,.05);white-space:nowrap}.section-nav a{padding:.3rem .55rem;border-radius:6px;text-decoration:none;font-size:.88rem;font-weight:650}.section-nav a:hover{background:var(--surface-soft)}
 .stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem;margin:1rem 0 1.5rem}.stat{padding:.85rem;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}.stat__value{display:block;font-size:1.45rem;font-weight:750;line-height:1.2}.stat__label{display:block;margin-top:.25rem;color:var(--muted);font-size:.82rem}
@@ -110,8 +111,23 @@ function sortableTh(
   return `<th${className ? ` class="${h(className)}"` : ""} data-sort-column="${column}" data-sort-type="${type}">${h(label)}</th>`;
 }
 
+function confirmAttrs(title: string, message: string, action: string, when = ""): string {
+  return `data-confirm-title="${h(title)}" data-confirm-message="${h(message)}" data-confirm-action="${h(action)}"${
+    when ? ` data-confirm-when="${h(when)}"` : ""
+  }`;
+}
+
 function uiEnhancements(t: (typeof T)[Lang]): string {
-  return `<script>(()=>{
+  return `<dialog class="confirm-dialog" data-confirm-dialog aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-message">
+  <div class="confirm-dialog__body">
+    <h2 id="confirm-dialog-title">${t.confirm_dialog_title}</h2>
+    <p id="confirm-dialog-message"></p>
+    <div class="confirm-dialog__actions">
+      <button type="button" class="button button--secondary" data-confirm-cancel>${t.confirm_cancel}</button>
+      <button type="button" class="button button--danger" data-confirm-submit>${t.confirm_continue}</button>
+    </div>
+  </div>
+</dialog><script>(()=>{
 const normalize=(value)=>value.normalize("NFKC").toLocaleLowerCase();
 document.querySelectorAll("[data-table-tools]").forEach((tools)=>{
   const table=document.getElementById(tools.dataset.tableId||"");
@@ -183,6 +199,31 @@ document.querySelectorAll("[data-copy-path]").forEach((button)=>{
     let ok=false;try{ok=document.execCommand("copy");}catch{}area.remove();finish(ok);
   });
 });
+const confirmDialog=document.querySelector("[data-confirm-dialog]");
+if(confirmDialog){
+  const title=confirmDialog.querySelector("#confirm-dialog-title");
+  const message=confirmDialog.querySelector("#confirm-dialog-message");
+  const cancel=confirmDialog.querySelector("[data-confirm-cancel]");
+  const proceed=confirmDialog.querySelector("[data-confirm-submit]");
+  let pendingForm=null;
+  document.querySelectorAll("form[data-confirm-message]").forEach((form)=>{
+    form.addEventListener("submit",(event)=>{
+      if(form.dataset.confirmed==="true"){delete form.dataset.confirmed;return;}
+      if(form.dataset.confirmWhen==="replace"&&!form.querySelector('[name="replace"]:checked'))return;
+      event.preventDefault();pendingForm=form;
+      if(title)title.textContent=form.dataset.confirmTitle||${JSON.stringify(t.confirm_dialog_title)};
+      if(message)message.textContent=form.dataset.confirmMessage||"";
+      if(proceed)proceed.textContent=form.dataset.confirmAction||${JSON.stringify(t.confirm_continue)};
+      confirmDialog.showModal();
+    });
+  });
+  cancel?.addEventListener("click",()=>confirmDialog.close());
+  proceed?.addEventListener("click",()=>{
+    const form=pendingForm;if(!form)return;
+    form.dataset.confirmed="true";confirmDialog.close();form.requestSubmit();
+  });
+  confirmDialog.addEventListener("close",()=>{pendingForm=null;});
+}
 })();</script>`;
 }
 
@@ -451,7 +492,11 @@ export function adminPage(
   <td class="mobile-secondary">${h(fmtTime(r.updated_at))}</td>${
     isOwner
       ? `
-  <td><form method="post" action="${base}/delete" onsubmit="return confirm('${t.confirm_delete}')">
+  <td><form method="post" action="${base}/delete" ${confirmAttrs(
+    t.confirm_delete,
+    t.confirm_delete_detail.replace("{id}", r.nycu_id),
+    t.delete,
+  )}>
     <input type="hidden" name="nycu_id" value="${h(r.nycu_id)}"><button type="submit">${t.delete}</button></form></td>`
       : ""
   }
@@ -463,7 +508,11 @@ export function adminPage(
   const staffRows = staff
     .map(
       (s) => `<tr><td>${h(s.nycu_id)}</td><td class="mobile-secondary">${h(s.added_by)}</td>
-  <td><form method="post" action="${base}/staff/remove" onsubmit="return confirm('${t.staff_remove_confirm}')">
+  <td><form method="post" action="${base}/staff/remove" ${confirmAttrs(
+    t.staff_remove_confirm,
+    t.staff_remove_confirm_detail.replace("{id}", s.nycu_id),
+    t.staff_remove,
+  )}>
     <input type="hidden" name="nycu_id" value="${h(s.nycu_id)}"><button type="submit">${t.staff_remove}</button></form></td></tr>`,
     )
     .join("\n");
@@ -493,7 +542,12 @@ export function adminPage(
     )
     .join("\n");
   const enrollImport = isOwner
-    ? `<form method="post" action="${base}/enroll" class="form-stack" style="margin-top:12px">
+    ? `<form method="post" action="${base}/enroll" class="form-stack" style="margin-top:12px" ${confirmAttrs(
+      t.enroll_replace_confirm,
+      t.enroll_replace_confirm_detail,
+      t.enroll_import,
+      "replace",
+    )}>
   <label>${t.enroll_ids_label}<textarea name="student_ids" rows="4" cols="40" placeholder="${t.enroll_placeholder}" required spellcheck="false"></textarea></label>
   <label class="check-row check-row--danger"><input type="checkbox" name="replace" value="1"> <span>${t.enroll_replace}</span></label>
   <button type="submit">${t.enroll_import}</button>
@@ -561,7 +615,11 @@ ${driveBanner}
             : "";
           const preBadge = f.pre_enroll ? ` <span class="badge badge--neutral">${t.forms_pre_enroll_badge}</span>` : "";
           return `<li>${linkOrText(f.url, f.title)}${preBadge}${editLink}
-  <form method="post" action="${base}/forms/remove" style="display:inline" onsubmit="return confirm('${t.forms_remove_confirm}')">
+  <form method="post" action="${base}/forms/remove" style="display:inline" ${confirmAttrs(
+    t.forms_remove_confirm,
+    t.forms_remove_confirm_detail.replace("{title}", f.title),
+    t.forms_remove,
+  )}>
     <input type="hidden" name="id" value="${h(f.id)}"><button type="submit">${t.forms_remove}</button></form></li>`;
         })
         .join("\n")}</ul>`
