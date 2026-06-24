@@ -33,3 +33,9 @@ jobs:
 
       - name: Check TypeScript
         run: npx tsc --noEmit
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run UI and accessibility tests
+        run: npm run test:ui

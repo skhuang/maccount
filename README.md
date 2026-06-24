@@ -10,6 +10,8 @@
 ```bash
 npm install
 npm test          # 跑所有 vitest 測試
+npx playwright install chromium  # 首次執行 UI 測試前安裝瀏覽器
+npm run test:ui   # Chromium 互動、手機版與 axe 無障礙測試
 npm run dev       # 本機 wrangler dev
 ```
 
