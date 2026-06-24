@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pickLang, langCookie, T } from "../src/i18n";
+import { pickLang, langCookie, langToggle, T } from "../src/i18n";
 
 const u = (qs: string) => new URL(`https://x/me${qs}`);
 
@@ -23,6 +23,15 @@ describe("langCookie", () => {
   it("sets a long-lived path-/ cookie", () => {
     expect(langCookie("en")).toContain("lang=en");
     expect(langCookie("en")).toContain("Path=/");
+  });
+});
+
+describe("langToggle", () => {
+  it("marks the current language and labels the navigation", () => {
+    const html = langToggle("/me", "zh");
+    expect(html).toContain('aria-label="Language"');
+    expect(html).toContain('<span aria-current="true">中文</span>');
+    expect(html).toContain('href="/me?lang=en" lang="en"');
   });
 });
 

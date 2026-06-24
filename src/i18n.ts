@@ -48,6 +48,7 @@ export interface Strings {
   export_roster: string;
   admin_courses_heading: string;
   no_courses: string;
+  no_bindings: string;
   course_create: string;
   course_create_note: string;
   ph_course_id: string;
@@ -79,6 +80,7 @@ export interface Strings {
   enroll_note: string; // "{bound}" placeholder
   enroll_show_list: string;
   enroll_unbound: string;
+  enroll_ids_label: string;
   enroll_placeholder: string;
   enroll_replace: string;
   enroll_import: string;
@@ -91,6 +93,7 @@ export interface Strings {
   staff_heading: string;
   staff_note: string;
   staff_added_by: string;
+  staff_id_label: string;
   staff_id_placeholder: string;
   staff_add: string;
   staff_remove: string;
@@ -101,7 +104,9 @@ export interface Strings {
   drive_heading: string;
   drive_note: string;
   drive_connect: string;
+  drive_file_label: string;
   drive_file_placeholder: string;
+  drive_role_label: string;
   drive_role_reader: string;
   drive_role_commenter: string;
   drive_role_writer: string;
@@ -113,7 +118,9 @@ export interface Strings {
   drive_msg_tokenerror: string;
   forms_heading: string;
   forms_note: string;
+  forms_title_label: string;
   forms_title_ph: string;
+  forms_url_label: string;
   forms_url_ph: string;
   forms_add: string;
   forms_remove: string;
@@ -175,6 +182,7 @@ export const T: Record<Lang, Strings> = {
     admin_bindings: "綁定名單 ({n})",
     admin_courses_heading: "課程列表",
     no_courses: "尚無課程。",
+    no_bindings: "目前沒有綁定資料。",
     course_create: "建立／更新課程",
     course_create_note: "course_id 為英數與 - _（如 ds-2026）；moodle_course_id 為 Moodle 課程數字 id（之後對應選課/成績用）。再次送出相同 course_id 即更新。",
     ph_course_id: "course_id（如 ds-2026）",
@@ -206,6 +214,7 @@ export const T: Record<Lang, Strings> = {
     enroll_note: "已綁定 GitHub：{bound}／Google：{gbound}。匯入後，此課的綁定名單與 roster 匯出會縮到「選課∩已綁」。",
     enroll_show_list: "顯示選課名單",
     enroll_unbound: "未綁定",
+    enroll_ids_label: "學生學號",
     enroll_placeholder: "貼上學號，一行一個（或以逗號／空白分隔）",
     enroll_replace: "取代整份名單（與 Moodle 同步；未列出者移除）",
     enroll_import: "匯入選課名單",
@@ -220,6 +229,7 @@ export const T: Record<Lang, Strings> = {
     staff_heading: "TA／助教管理",
     staff_note: "助教（NYCU 帳號）可檢視名單與匯出；只有 ADMIN_IDS 內的擁有者能新增/移除助教或刪除綁定。",
     staff_added_by: "加入者",
+    staff_id_label: "助教 NYCU 帳號",
     staff_id_placeholder: "NYCU 帳號（學號/教職員帳號）",
     staff_add: "新增助教",
     staff_remove: "移除",
@@ -230,7 +240,9 @@ export const T: Record<Lang, Strings> = {
     drive_heading: "用 Google Drive 分享檔案給全班",
     drive_note: "以你自己的 Google Drive 將檔案／資料夾分享給「選課∩已綁 Google」的學生（用其綁定的 Google email）。需先連結你的 Drive（完整權限）：",
     drive_connect: "連結我的 Google Drive（完整權限）→",
+    drive_file_label: "Drive 檔案或資料夾",
     drive_file_placeholder: "Drive 檔案／資料夾 ID 或分享連結",
+    drive_role_label: "分享權限",
     drive_role_reader: "檢視者（reader）",
     drive_role_commenter: "可註解（commenter）",
     drive_role_writer: "編輯者（writer）",
@@ -242,7 +254,9 @@ export const T: Record<Lang, Strings> = {
     drive_msg_tokenerror: "無法取得 Google 存取權杖（請重新連結 Drive）。",
     forms_heading: "Google 問卷",
     forms_note: "貼上 Google 表單的連結，學生會在 /me 對應課程看到並填寫。請在表單設定開啟「收集電子郵件地址／需登入」，學生即以綁定的 Google 帳號作答、可對應回學號。",
+    forms_title_label: "問卷標題",
     forms_title_ph: "問卷標題（如 課程意見調查）",
+    forms_url_label: "Google 表單連結",
     forms_url_ph: "Google 表單連結（https://docs.google.com/forms/…）",
     forms_add: "新增問卷",
     forms_remove: "移除",
@@ -302,6 +316,7 @@ export const T: Record<Lang, Strings> = {
     admin_bindings: "Bindings ({n})",
     admin_courses_heading: "Courses",
     no_courses: "No courses yet.",
+    no_bindings: "No account bindings yet.",
     course_create: "Create / update course",
     course_create_note: "course_id is alphanumeric + - _ (e.g. ds-2026); moodle_course_id is the Moodle numeric course id (used later for enrollment/grade mapping). Submitting the same course_id again updates it.",
     ph_course_id: "course_id (e.g. ds-2026)",
@@ -333,7 +348,8 @@ export const T: Record<Lang, Strings> = {
     enroll_note: "Bound to GitHub: {bound} / Google: {gbound}. Once imported, this course's bindings list and roster export narrow to enrolled ∩ bound.",
     enroll_show_list: "Show roster",
     enroll_unbound: "not bound",
-    enroll_placeholder: "Paste 學號, one per line (or comma/space separated)",
+    enroll_ids_label: "Student IDs",
+    enroll_placeholder: "Paste student IDs, one per line (or comma/space separated)",
     enroll_replace: "Replace the whole roster (sync with Moodle; drop those not listed)",
     enroll_import: "Import roster",
     export_full: "⬇ Export CSV (full bindings)",
@@ -347,6 +363,7 @@ export const T: Record<Lang, Strings> = {
     staff_heading: "TA / staff",
     staff_note: "Staff (by NYCU id) can view bindings and export; only owners (ADMIN_IDS) can add/remove staff or delete bindings.",
     staff_added_by: "Added by",
+    staff_id_label: "Staff NYCU ID",
     staff_id_placeholder: "NYCU id",
     staff_add: "Add staff",
     staff_remove: "Remove",
@@ -357,7 +374,9 @@ export const T: Record<Lang, Strings> = {
     drive_heading: "Share a Drive file with the class",
     drive_note: "Share a file/folder from your own Google Drive with enrolled students who bound Google (by their bound Google email). Connect your Drive (full access) first:",
     drive_connect: "Connect my Google Drive (full access) →",
+    drive_file_label: "Drive file or folder",
     drive_file_placeholder: "Drive file/folder ID or share link",
+    drive_role_label: "Sharing permission",
     drive_role_reader: "Viewer (reader)",
     drive_role_commenter: "Commenter",
     drive_role_writer: "Editor (writer)",
@@ -369,7 +388,9 @@ export const T: Record<Lang, Strings> = {
     drive_msg_tokenerror: "Couldn't get a Google access token (please reconnect Drive).",
     forms_heading: "Google Forms",
     forms_note: "Paste a Google Form link; enrolled students see it under the matching course on /me. In the form's settings enable “Collect email addresses / require sign-in” so students answer with their bound Google account and responses map back to a student id.",
+    forms_title_label: "Form title",
     forms_title_ph: "Form title (e.g. Course feedback)",
+    forms_url_label: "Google Form link",
     forms_url_ph: "Google Form link (https://docs.google.com/forms/…)",
     forms_add: "Add form",
     forms_remove: "Remove",
@@ -403,6 +424,8 @@ export const T: Record<Lang, Strings> = {
 // link to the same path with ?lang= set.
 export function langToggle(path: string, lang: Lang): string {
   const link = (l: Lang, label: string) =>
-    l === lang ? `<b>${label}</b>` : `<a href="${path}?lang=${l}">${label}</a>`;
-  return `<p style="text-align:right;font-size:.9em">${link("zh", "中文")} | ${link("en", "English")}</p>`;
+    l === lang
+      ? `<span aria-current="true">${label}</span>`
+      : `<a href="${path}?lang=${l}" lang="${l === "zh" ? "zh-Hant" : "en"}">${label}</a>`;
+  return `<nav class="lang-toggle" aria-label="Language">${link("zh", "中文")}<span aria-hidden="true">·</span>${link("en", "English")}</nav>`;
 }

@@ -34,6 +34,7 @@ a { color: var(--brand); text-underline-offset: 3px; }
 a:hover { color: var(--brand-hover); }
 a:focus-visible { outline: 3px solid rgba(8, 127, 91, 0.28); outline-offset: 3px; }
 .lang-switch { margin: 0 0 2rem; text-align: right; font-size: 0.9rem; color: var(--muted); }
+.lang-switch [aria-current] { padding: 0.2rem 0.45rem; border-radius: 6px; background: var(--surface-soft); color: var(--text); font-weight: 700; text-decoration: none; }
 .actions { display: flex; gap: 0.65rem; flex-wrap: wrap; margin-top: 1.5rem; }
 .button {
   display: inline-flex;
@@ -53,6 +54,8 @@ a:focus-visible { outline: 3px solid rgba(8, 127, 91, 0.28); outline-offset: 3px
 .button--primary:hover { border-color: var(--brand-hover); background: var(--brand-hover); color: #fff; }
 .hint { margin: 1.75rem 0 0.4rem; color: var(--muted); font-size: 0.92rem; }
 .result { padding: 1rem; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); }
+.result--success { border-color: #a8dac1; background: #eaf8f1; }
+.result--danger { border-color: #efb4b4; background: #fff0f0; }
 .result h1 { font-size: clamp(1.55rem, 4vw, 2rem); }
 @media (max-width: 640px) {
   html { background: var(--surface); }

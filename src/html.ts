@@ -33,6 +33,7 @@ ul{padding-left:1.35rem}li+li{margin-top:.35rem}
 form{max-width:560px}
 label{display:block;color:var(--text);font-weight:600}
 label input:not([type=checkbox]),label select{display:block;width:100%;margin-top:.35rem}
+.form-stack{display:grid!important;gap:1rem!important}.field-hint{display:block;margin-top:.3rem;color:var(--muted);font-size:.82rem;font-weight:400}.check-row{display:flex;align-items:flex-start;gap:.55rem;padding:.55rem .65rem;border-radius:8px;background:var(--surface-soft);font-weight:500}.check-row input{flex:0 0 auto;margin-top:.3rem}.check-row--danger{border:1px solid #efc3c3;background:var(--danger-soft);color:#8f1f1f}
 input:not([type=checkbox]):not([type=hidden]),select,textarea{width:100%;min-height:44px;padding:.65rem .75rem;border:1px solid #b9c7c0;border-radius:8px;background:#fff;color:var(--text);font:inherit}
 textarea{min-height:7rem;resize:vertical}
 input::placeholder,textarea::placeholder{color:#73827a}
@@ -65,6 +66,7 @@ body>p[style*="#fff3cd"]{background:var(--warning-soft)!important;border-color:#
 .section-nav{position:sticky;top:0;z-index:2;display:flex;gap:.5rem;margin:0 -1rem 1.25rem;padding:.7rem 1rem;overflow-x:auto;border-block:1px solid var(--line);background:rgba(255,255,255,.96);box-shadow:0 5px 16px rgba(20,45,34,.05);white-space:nowrap}.section-nav a{padding:.3rem .55rem;border-radius:6px;text-decoration:none;font-size:.88rem;font-weight:650}.section-nav a:hover{background:var(--surface-soft)}
 .stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem;margin:1rem 0 1.5rem}.stat{padding:.85rem;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}.stat__value{display:block;font-size:1.45rem;font-weight:750;line-height:1.2}.stat__label{display:block;margin-top:.25rem;color:var(--muted);font-size:.82rem}
 .admin-sections{display:grid;gap:1rem}.admin-section{scroll-margin-top:5rem;padding:1.2rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.admin-section>h2:first-child{margin:0 0 .75rem;padding:0;border:0}.admin-section+.admin-section{margin-top:0}.admin-section form:last-child{margin-bottom:0}
+.lang-toggle{display:inline-flex;align-items:center;gap:.5rem;color:var(--muted);font-size:.9rem}.lang-toggle [aria-current="true"]{padding:.2rem .45rem;border-radius:6px;background:var(--surface-soft);color:var(--text);font-weight:700}.empty-state{margin:.8rem 0;padding:1rem;border:1px dashed #b9c7c0;border-radius:10px;background:var(--surface-soft);color:var(--muted);text-align:center;list-style:none}.empty-cell{padding:1.4rem!important;color:var(--muted);text-align:center}.inline-actions{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap}.text-danger{color:var(--danger)}
 @media(max-width:760px){.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){html{background:var(--surface)}body{width:100%;margin:0!important;padding:1.15rem!important;border:0;border-radius:0;box-shadow:none}h1{margin-top:.75rem}h2{margin-top:1.75rem}th,td{padding:.6rem!important}button{width:100%}td button,li button{width:auto}form[style*="display:inline"]{display:inline!important}.topbar{align-items:flex-start}.topbar__actions{justify-content:flex-end}.account-grid{grid-template-columns:1fr}.section-nav{margin-inline:-1.15rem;padding-inline:1.15rem}.admin-section{padding:1rem}.course-card{padding:1rem}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
@@ -159,17 +161,17 @@ export function adminHomePage(
   }</span></li>`,
         )
         .join("\n")
-    : `<li style="color:#666">${t.no_courses}</li>`;
+    : `<li class="empty-state">${t.no_courses}</li>`;
   const createForm = opts.isOwner
     ? `<h2>${t.course_create}</h2>
-<form method="post" action="/admin/courses" style="display:grid;gap:6px;max-width:440px">
-  <input name="course_id" placeholder="${t.ph_course_id}" required pattern="[A-Za-z0-9_-]+">
-  <input name="name" placeholder="${t.ph_course_name}" required>
-  <input name="term" placeholder="${t.ph_course_term}">
-  <input name="moodle_course_id" placeholder="${t.ph_course_moodle}">
-  <input name="github_org" placeholder="${t.ph_course_org}">
-  <input name="google_classroom_id" placeholder="${t.ph_course_classroom}">
-  <input name="google_meet_url" placeholder="${t.ph_course_meet}">
+<form method="post" action="/admin/courses" class="form-stack" style="max-width:440px">
+  <label>${t.ph_course_id}<input name="course_id" placeholder="ds-2026" required pattern="[A-Za-z0-9_-]+" autocomplete="off"></label>
+  <label>${t.ph_course_name}<input name="name" placeholder="${t.ph_course_name}" required></label>
+  <label>${t.ph_course_term}<input name="term" placeholder="${t.ph_course_term}"></label>
+  <label>${t.ph_course_moodle}<input name="moodle_course_id" placeholder="${t.ph_course_moodle}" inputmode="numeric"></label>
+  <label>${t.ph_course_org}<input name="github_org" placeholder="${t.ph_course_org}" autocomplete="off"></label>
+  <label>${t.ph_course_classroom}<input name="google_classroom_id" placeholder="${t.ph_course_classroom}" autocomplete="off"></label>
+  <label>${t.ph_course_meet}<input name="google_meet_url" type="url" placeholder="https://meet.google.com/…"></label>
   <button type="submit">${t.course_create}</button>
 </form>
 <p style="color:#777;font-size:.9em">${t.course_create_note}</p>`
@@ -177,8 +179,7 @@ export function adminHomePage(
   return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
 <title>${t.admin_title}</title>
 <body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
-${langToggle("/admin", lang)}
-<p style="text-align:right;font-size:.9em"><a href="/me">${t.acct_heading}</a>　|　<a href="/logout">${t.logout}</a></p>
+<header class="topbar"><div>${langToggle("/admin", lang)}</div><div class="topbar__actions"><a href="/me">${t.acct_heading}</a><a href="/logout">${t.logout}</a></div></header>
 <h1>${t.admin_courses_heading}</h1>
 <ul>${items}</ul>
 ${createForm}
@@ -209,7 +210,7 @@ ${orgs.length ? `<p>${t.bindings_query_heading}：${orgLinks}</p>` : ""}
 <table border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>NYCU id</th><th>${t.th_name}</th><th>GitHub</th><th>${t.th_github_id}</th><th>${t.google}</th><th>${t.th_updated}</th></tr></thead>
 <tbody>
-${trs}
+${trs || `<tr><td colspan="6" class="empty-cell">${t.no_bindings}</td></tr>`}
 </tbody></table>
 </body></html>`;
 }
@@ -224,9 +225,9 @@ export function orgMembersPage(
 ): string {
   const t = T[lang];
   const badge: Record<string, string> = {
-    member: `<span style="color:#0a0">${t.org_status_member}</span>`,
-    pending: `<span style="color:#b80">${t.org_status_pending}</span>`,
-    none: `<span style="color:#999">${t.org_status_none}</span>`,
+    member: `<span class="badge badge--success">${t.org_status_member}</span>`,
+    pending: `<span class="badge badge--warning">${t.org_status_pending}</span>`,
+    none: `<span class="badge badge--neutral">${t.org_status_none}</span>`,
   };
   // Bound students sorted: in-org first (member, pending), then not-in-org.
   const order: Record<string, number> = { member: 0, pending: 1, none: 2 };
@@ -252,7 +253,7 @@ ${err ? `<p style="padding:8px;border:1px solid #c00;background:#fee">${t.org_fe
 <table border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>GitHub</th><th>NYCU id</th><th>${t.th_name}</th><th>${t.org_status_col}</th></tr></thead>
 <tbody>
-${trs}
+${trs || `<tr><td colspan="4" class="empty-cell">${t.no_bindings}</td></tr>`}
 </tbody></table>
 ${unbound}
 </body></html>`;
@@ -316,7 +317,7 @@ export function adminPage(
   };
   const banner =
     isOwner && opts.staffMsg && syncMsg[opts.staffMsg]
-      ? `<p style="padding:8px;border:1px solid #ccc;background:#f6f6f6">${syncMsg[opts.staffMsg]}</p>`
+      ? `<p class="alert alert--${opts.staffMsg === "ok" ? "success" : opts.staffMsg === "error" ? "danger" : "warning"}" role="${opts.staffMsg === "error" ? "alert" : "status"}">${syncMsg[opts.staffMsg]}</p>`
       : "";
   const trs = rows
     .map(
@@ -349,8 +350,8 @@ export function adminPage(
 <table border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>NYCU id</th><th>${t.staff_added_by}</th><th></th></tr></thead>
 <tbody>${staffRows}</tbody></table>
-<form method="post" action="${base}/staff/add" style="margin-top:8px">
-  <input name="nycu_id" placeholder="${t.staff_id_placeholder}" required>
+<form method="post" action="${base}/staff/add" class="form-stack" style="margin-top:12px">
+  <label>${t.staff_id_label}<input name="nycu_id" placeholder="${t.staff_id_placeholder}" required autocomplete="off"></label>
   <button type="submit">${t.staff_add}</button>
 </form></section>`
     : "";
@@ -362,16 +363,16 @@ export function adminPage(
   const enrolledRows = enrolled
     .map(
       (e) => `<tr><td>${h(e.student_id)}</td><td>${
-        e.github_login ? h(e.github_login) : `<span style="color:#b00">${t.enroll_unbound}</span>`
+        e.github_login ? h(e.github_login) : `<span class="badge badge--danger">${t.enroll_unbound}</span>`
       }</td><td>${
-        e.google_email ? h(e.google_email) : `<span style="color:#b00">${t.enroll_unbound}</span>`
+        e.google_email ? h(e.google_email) : `<span class="badge badge--danger">${t.enroll_unbound}</span>`
       }</td></tr>`,
     )
     .join("\n");
   const enrollImport = isOwner
-    ? `<form method="post" action="${base}/enroll" style="margin-top:8px">
-  <textarea name="student_ids" rows="4" cols="40" placeholder="${t.enroll_placeholder}"></textarea><br>
-  <label><input type="checkbox" name="replace" value="1"> ${t.enroll_replace}</label><br>
+    ? `<form method="post" action="${base}/enroll" class="form-stack" style="margin-top:12px">
+  <label>${t.enroll_ids_label}<textarea name="student_ids" rows="4" cols="40" placeholder="${t.enroll_placeholder}" required spellcheck="false"></textarea></label>
+  <label class="check-row check-row--danger"><input type="checkbox" name="replace" value="1"> <span>${t.enroll_replace}</span></label>
   <button type="submit">${t.enroll_import}</button>
 </form>`
     : "";
@@ -400,19 +401,19 @@ ${enrollImport}</section>`;
   else if (dm === "no-drive") driveBannerText = t.drive_msg_nodrive;
   else if (dm === "token-error") driveBannerText = t.drive_msg_tokenerror;
   const driveBanner = driveBannerText
-    ? `<p style="padding:8px;border:1px solid #ccc;background:#f6f6f6">${driveBannerText}</p>`
+    ? `<p class="alert alert--${dm.startsWith("done:") ? "success" : dm === "token-error" ? "danger" : "warning"}" role="${dm === "token-error" ? "alert" : "status"}">${driveBannerText}</p>`
     : "";
   const driveSection = `<section class="admin-section" id="drive"><h2>${t.drive_heading}</h2>
 <p style="color:#777;font-size:.9em">${t.drive_note} <a href="/auth/google/start?drive=1">${t.drive_connect}</a></p>
 ${driveBanner}
-<form method="post" action="${base}/drive/share" style="display:grid;gap:6px;max-width:440px">
-  <input name="file_id" placeholder="${t.drive_file_placeholder}" required>
-  <select name="role">
+<form method="post" action="${base}/drive/share" class="form-stack" style="max-width:440px">
+  <label>${t.drive_file_label}<input name="file_id" placeholder="${t.drive_file_placeholder}" required autocomplete="off"></label>
+  <label>${t.drive_role_label}<select name="role">
     <option value="reader">${t.drive_role_reader}</option>
     <option value="commenter">${t.drive_role_commenter}</option>
     <option value="writer">${t.drive_role_writer}</option>
-  </select>
-  <label><input type="checkbox" name="notify" value="1"> ${t.drive_notify}</label>
+  </select></label>
+  <label class="check-row"><input type="checkbox" name="notify" value="1"> <span>${t.drive_notify}</span></label>
   <button type="submit">${t.drive_share_btn}</button>
 </form></section>`;
 
@@ -426,7 +427,7 @@ ${driveBanner}
     "create-error": t.forms_msg_createerror,
   };
   const formsBanner = opts.formsMsg && formsMsgText[opts.formsMsg]
-    ? `<p style="padding:8px;border:1px solid #c00;background:#fee">${formsMsgText[opts.formsMsg]}</p>`
+    ? `<p class="alert alert--danger" role="alert">${formsMsgText[opts.formsMsg]}</p>`
     : "";
   const formsRows = forms.length
     ? `<ul>${forms
@@ -434,28 +435,28 @@ ${driveBanner}
           const editLink = f.form_id
             ? ` — <a href="https://docs.google.com/forms/d/${encodeURIComponent(f.form_id)}/edit" target="_blank" rel="noopener">${t.forms_edit} ↗</a>`
             : "";
-          const preBadge = f.pre_enroll ? ` <span style="color:#0a7">${t.forms_pre_enroll_badge}</span>` : "";
+          const preBadge = f.pre_enroll ? ` <span class="badge badge--neutral">${t.forms_pre_enroll_badge}</span>` : "";
           return `<li>${linkOrText(f.url, f.title)}${preBadge}${editLink}
   <form method="post" action="${base}/forms/remove" style="display:inline" onsubmit="return confirm('${t.forms_remove_confirm}')">
     <input type="hidden" name="id" value="${h(f.id)}"><button type="submit">${t.forms_remove}</button></form></li>`;
         })
         .join("\n")}</ul>`
-    : `<p style="color:#666">${t.forms_none}</p>`;
-  const preEnrollLabel = `<label><input type="checkbox" name="pre_enroll" value="1"> ${t.forms_pre_enroll_label}</label>`;
+    : `<p class="empty-state">${t.forms_none}</p>`;
+  const preEnrollLabel = `<label class="check-row"><input type="checkbox" name="pre_enroll" value="1"> <span>${t.forms_pre_enroll_label}</span></label>`;
   const formsSection = `<section class="admin-section" id="forms"><h2>${t.forms_heading}</h2>
 <p style="color:#777;font-size:.9em">${t.forms_note}</p>
 <p style="color:#777;font-size:.9em">${t.prejoin_link_label}：<code>/me/${h(course.course_id)}</code></p>
 ${formsBanner}
 ${formsRows}
-<form method="post" action="${base}/forms/add" style="display:grid;gap:6px;max-width:440px">
-  <input name="title" placeholder="${t.forms_title_ph}" required>
-  <input name="url" type="url" placeholder="${t.forms_url_ph}" required>
+<form method="post" action="${base}/forms/add" class="form-stack" style="max-width:440px">
+  <label>${t.forms_title_label}<input name="title" placeholder="${t.forms_title_ph}" required></label>
+  <label>${t.forms_url_label}<input name="url" type="url" placeholder="${t.forms_url_ph}" required inputmode="url"></label>
   ${preEnrollLabel}
   <button type="submit">${t.forms_add}</button>
 </form>
 <p style="color:#777;font-size:.9em;margin-top:.8rem">${t.forms_create_note}</p>
-<form method="post" action="${base}/forms/create" style="display:grid;gap:6px;max-width:440px">
-  <input name="title" placeholder="${t.forms_create_title_ph}" required>
+<form method="post" action="${base}/forms/create" class="form-stack" style="max-width:440px">
+  <label>${t.forms_title_label}<input name="title" placeholder="${t.forms_create_title_ph}" required></label>
   ${preEnrollLabel}
   <button type="submit">${t.forms_create_btn}</button>
 </form></section>`;
@@ -475,7 +476,7 @@ ${formsRows}
   else if (cm === "no-drive") classroomBannerText = t.classroom_msg_nodrive;
   else if (cm === "token-error") classroomBannerText = t.classroom_msg_tokenerror;
   const classroomBanner = classroomBannerText
-    ? `<p style="padding:8px;border:1px solid #ccc;background:#f6f6f6">${classroomBannerText}</p>`
+    ? `<p class="alert alert--${cm.startsWith("done:") ? "success" : cm === "token-error" ? "danger" : "warning"}" role="${cm === "token-error" ? "alert" : "status"}">${classroomBannerText}</p>`
     : "";
   const classroomSection = `<section class="admin-section" id="classroom"><h2>${t.classroom_heading}</h2>
 <p style="color:#777;font-size:.9em">${t.classroom_note}</p>
@@ -484,14 +485,14 @@ ${
     classroomId
       ? `<p>Classroom ID：<code>${h(classroomId)}</code></p>
 <form method="post" action="${base}/classroom/invite"><button type="submit">${t.classroom_invite_btn}</button></form>`
-      : `<p style="color:#b00">${t.classroom_no_id}</p>`
+      : `<p class="alert alert--warning">${t.classroom_no_id}</p>`
   }</section>`;
 
   // Course settings — owner edits name/term/Moodle/org/status (re-submits the
   // upsert with the same course_id).
   const settingsSection = isOwner
     ? `<section class="admin-section" id="settings"><h2>${t.course_settings}</h2>
-<form method="post" action="/admin/courses" style="display:grid;gap:6px;max-width:440px">
+<form method="post" action="/admin/courses" class="form-stack" style="max-width:440px">
   <input type="hidden" name="course_id" value="${h(course.course_id)}">
   <label>${t.ph_course_name}<input name="name" value="${h(course.name)}" required></label>
   <label>${t.ph_course_term}<input name="term" value="${h(course.term ?? "")}"></label>
@@ -537,7 +538,7 @@ ${banner}
 <table border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>NYCU id</th><th>${t.th_name}</th><th>GitHub</th><th>${t.th_github_id}</th><th>${t.google}</th><th>${t.th_updated}</th>${isOwner ? `<th>${t.th_actions}</th>` : ""}</tr></thead>
 <tbody>
-${trs}
+${trs || `<tr><td colspan="${isOwner ? "7" : "6"}" class="empty-cell">${t.no_bindings}</td></tr>`}
 </tbody></table></section>
 ${enrollSection}
 ${driveSection}
@@ -661,11 +662,11 @@ ${courseTable(labRows)}`
           if (rs.length) parts.push(courseBlock(rs));
           const fhtml = formsFor(cid);
           if (fhtml) parts.push(fhtml);
-          const inner = parts.length ? parts.join("") : `<p style="color:#666">${t.course_no_data}</p>`;
+          const inner = parts.length ? parts.join("") : `<p class="empty-state">${t.course_no_data}</p>`;
           return `<article class="course-card"><h3>${h(courseName(cid))}</h3>\n${inner}</article>`;
         })
         .join("\n")}</div>`
-    : `<p style="color:#666">${t.no_grades}</p>`;
+    : `<p class="empty-state">${t.no_grades}</p>`;
 
   const okFlash = flash.bound ? t.flash_bound_ok : flash.gbound ? t.flash_gbound_ok : "";
   const flashHtml = okFlash
@@ -757,7 +758,7 @@ export function coursePrejoinPage(
     : "";
   const formsHtml = forms.length
     ? `<ul>${forms.map((f) => `<li>${linkOrText(f.url, f.title)}</li>`).join("")}</ul>`
-    : `<p style="color:#666">${t.forms_none}</p>`;
+    : `<p class="empty-state">${t.forms_none}</p>`;
   return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
 <title>${h(courseName)}</title>
 <body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">

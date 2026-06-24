@@ -44,6 +44,20 @@ describe("adminPage", () => {
     expect(html).toContain('class="stats-grid"');
   });
 
+  it("gives admin form controls persistent labels and marks risky replacement", () => {
+    const html = adminPage("zh", course, [], { isOwner: true, staff: [] });
+    expect(html).toContain(`<label>學生學號<textarea name="student_ids"`);
+    expect(html).toContain(`<label>Drive 檔案或資料夾<input name="file_id"`);
+    expect(html).toContain(`<label>分享權限<select name="role"`);
+    expect(html).toContain(`<label>問卷標題<input name="title"`);
+    expect(html).toContain('class="check-row check-row--danger"');
+  });
+
+  it("renders an explicit empty state when there are no bindings", () => {
+    const html = adminPage("en", course, [], { isOwner: false, staff: [] });
+    expect(html).toContain('class="empty-cell">No account bindings yet.</td>');
+  });
+
   it("shows the Google column with the bound email", () => {
     const html = adminPage("zh", course, [{ ...rows[0], google_email: "octo@gmail.com" }]);
     expect(html).toContain("<th>Google</th>");
@@ -246,7 +260,9 @@ describe("adminHomePage (course picker)", () => {
   });
 
   it("shows the create-course form to owners only", () => {
-    expect(adminHomePage("zh", courses, { isOwner: true })).toContain('action="/admin/courses"');
+    const html = adminHomePage("zh", courses, { isOwner: true });
+    expect(html).toContain('action="/admin/courses"');
+    expect(html).toContain(`<label>課程名稱（如 資料結構 2026）<input name="name"`);
     expect(adminHomePage("zh", courses, { isOwner: false })).not.toContain('action="/admin/courses"');
   });
 
