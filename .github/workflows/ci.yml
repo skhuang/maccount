@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Prepare Worker test configuration
+        run: cp wrangler.toml.example wrangler.toml
+
       - name: Run tests
         run: npm test
 
