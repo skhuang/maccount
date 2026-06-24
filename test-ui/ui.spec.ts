@@ -126,6 +126,20 @@ test("student course card exposes a grade summary", async ({ page }) => {
   await expect(summary.locator('progress[aria-label="Total score 100 / 100"]')).toHaveAttribute("value", "100");
   const columns = await summary.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length);
   expect(columns).toBe(2);
+  await expect(page.locator(".mobile-card-table td").first()).toHaveCSS("display", "grid");
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
+test("admin tables hide secondary columns on mobile without horizontal overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setContent(adminFixture(), { waitUntil: "load" });
+  const table = page.locator("#course-bindings-table");
+  await expect(table.locator("th").filter({ hasText: "GitHub id" })).toBeHidden();
+  await expect(table.locator("th").filter({ hasText: "NYCU id" })).toBeVisible();
+  await expect(table.locator("tbody tr[data-row]").first()).toContainText("z99");
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
 });
 
 test("admin course cards collapse to one column on mobile", async ({ page }) => {

@@ -66,6 +66,8 @@ describe("adminPage", () => {
     expect(html).toContain('data-status="missing"');
     expect(html).toContain(`<option value="missing">未完整綁定</option>`);
     expect(html).toContain("data-table-search");
+    expect(html).toContain('id="course-bindings-table" class="mobile-compact"');
+    expect(html).toContain('class="mobile-secondary" data-sort-column="3"');
   });
 
   it("provides a copy action for the prospective-student link", () => {
@@ -270,6 +272,8 @@ describe("dashboardPage", () => {
     );
     expect(html).toContain('class="account-grid"');
     expect(html).toContain('class="course-card"');
+    expect(html).toContain('class="mobile-card-table"');
+    expect(html).toContain('data-label="題目"');
     expect(html).toContain('class="badge badge--success">AC</span>');
     expect(html).toContain("octo@gmail.com");
   });
