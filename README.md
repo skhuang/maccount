@@ -15,6 +15,12 @@ npm run test:ui   # Chromium 互動、手機版與 axe 無障礙測試
 npm run dev       # 本機 wrangler dev
 ```
 
+Worker 產生的 UI 以 `src/html.ts` 為公開入口；共用 renderer 位於 `src/ui/`：
+
+- `layout.ts`：HTML 文件骨架與語系標記
+- `tables.ts`：表格工具、搜尋／排序與確認對話框互動
+- `components.ts`：HTML 跳脫、表單確認屬性、徽章、時間與狀態卡片
+
 ## 部署步驟
 
 > **先後順序很重要（雞生蛋）**：OAuth 的 redirect URL 需要 Worker 的網址，但 `*.workers.dev` 網址要先部署一次才會由 Cloudflare 分配。因此順序是：**先部署拿到網址 → 再去註冊 OAuth client 填 redirect → 回填憑證後重新部署**。下面以 `<worker>` 代表 Worker 的 base URL（例如 `https://maccount-api.<你的子網域>.workers.dev`，或你綁定的自訂網域）。

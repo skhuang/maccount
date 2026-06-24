@@ -1,17 +1,11 @@
 import type { BindingRow } from "./csv";
 import type { GradeRow } from "./db/grades";
 import { T, langToggle, type Lang } from "./i18n";
+import { accountStatusCard, confirmAttrs, fmtTime, h, repoHref, verdictBadge } from "./ui/components";
+import { documentStart } from "./ui/layout";
+import { sortableTh, tableTools, uiEnhancements } from "./ui/tables";
 
-function h(v: unknown): string {
-  return String(v ?? "").replace(
-    /[&<>"']/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
-  );
-}
-
-function htmlLang(lang: Lang): string {
-  return lang === "en" ? "en" : "zh-Hant";
-}
+export { fmtTime } from "./ui/components";
 
 // Shared, dependency-free UI foundation for every Worker-rendered page. Keep
 // this inline so authenticated pages do not depend on a separate static host.
@@ -76,201 +70,6 @@ body>p[style*="#fff3cd"]{background:var(--warning-soft)!important;border-color:#
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 `;
 
-function uiHead(): string {
-  return `<meta name="viewport" content="width=device-width, initial-scale=1"><style>${UI_CSS}</style>`;
-}
-
-type TableFilterOption = { value: string; label: string };
-
-function tableTools(
-  t: (typeof T)[Lang],
-  tableId: string,
-  total: number,
-  filters: TableFilterOption[] = [],
-): string {
-  const count = t.table_showing.replace("{visible}", String(total)).replace("{total}", String(total));
-  const filter = filters.length
-    ? `<label>${t.table_filter_label}<select data-table-status>
-  <option value="">${t.table_filter_all}</option>
-  ${filters.map((f) => `<option value="${h(f.value)}">${h(f.label)}</option>`).join("")}
-</select></label>`
-    : "";
-  return `<div class="table-tools" data-table-tools data-table-id="${h(tableId)}">
-  <label>${t.table_search_label}<input type="search" data-table-search placeholder="${t.table_search_placeholder}" autocomplete="off"></label>
-  ${filter}
-  <p class="table-count" data-table-count data-template="${h(t.table_showing)}" aria-live="polite">${h(count)}</p>
-</div>`;
-}
-
-function sortableTh(
-  label: string,
-  column: number,
-  type: "text" | "number" = "text",
-  className = "",
-): string {
-  return `<th${className ? ` class="${h(className)}"` : ""} data-sort-column="${column}" data-sort-type="${type}">${h(label)}</th>`;
-}
-
-function confirmAttrs(title: string, message: string, action: string, when = ""): string {
-  return `data-confirm-title="${h(title)}" data-confirm-message="${h(message)}" data-confirm-action="${h(action)}"${
-    when ? ` data-confirm-when="${h(when)}"` : ""
-  }`;
-}
-
-function uiEnhancements(t: (typeof T)[Lang]): string {
-  return `<dialog class="confirm-dialog" data-confirm-dialog aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-message">
-  <div class="confirm-dialog__body">
-    <h2 id="confirm-dialog-title">${t.confirm_dialog_title}</h2>
-    <p id="confirm-dialog-message"></p>
-    <div class="confirm-dialog__actions">
-      <button type="button" class="button button--secondary" data-confirm-cancel>${t.confirm_cancel}</button>
-      <button type="button" class="button button--danger" data-confirm-submit>${t.confirm_continue}</button>
-    </div>
-  </div>
-</dialog><script>(()=>{
-const normalize=(value)=>value.normalize("NFKC").toLocaleLowerCase();
-document.querySelectorAll("[data-table-tools]").forEach((tools)=>{
-  const table=document.getElementById(tools.dataset.tableId||"");
-  if(!table)return;
-  const rows=[...table.querySelectorAll("tbody tr[data-row]")];
-  const search=tools.querySelector("[data-table-search]");
-  const status=tools.querySelector("[data-table-status]");
-  const count=tools.querySelector("[data-table-count]");
-  const noResults=document.createElement("tr");
-  noResults.hidden=true;noResults.dataset.noResults="";
-  const noResultsCell=document.createElement("td");
-  noResultsCell.colSpan=table.tHead?.rows[0]?.cells.length||1;
-  noResultsCell.className="empty-cell";noResultsCell.textContent=${JSON.stringify(t.table_no_results)};
-  noResults.append(noResultsCell);table.tBodies[0]?.append(noResults);
-  const apply=()=>{
-    const query=normalize(search?.value.trim()||"");
-    const wanted=status?.value||"";
-    let visible=0;
-    rows.forEach((row)=>{
-      const matchesText=!query||normalize(row.textContent||"").includes(query);
-      const matchesStatus=!wanted||row.dataset.status===wanted;
-      row.hidden=!(matchesText&&matchesStatus);
-      if(!row.hidden)visible++;
-    });
-    noResults.hidden=visible!==0||rows.length===0;
-    if(count)count.textContent=(count.dataset.template||"").replace("{visible}",String(visible)).replace("{total}",String(rows.length));
-  };
-  search?.addEventListener("input",apply);
-  status?.addEventListener("change",apply);
-  table.querySelectorAll("th[data-sort-column]").forEach((header)=>{
-    const column=Number(header.dataset.sortColumn||0);
-    const type=header.dataset.sortType||"text";
-    const label=header.textContent||"";
-    const button=document.createElement("button");
-    button.type="button";button.className="sort-button";button.append(document.createTextNode(label));
-    const icon=document.createElement("span");icon.className="sort-icon";icon.setAttribute("aria-hidden","true");icon.textContent="↕";button.append(icon);
-    header.textContent="";header.append(button);header.setAttribute("aria-sort","none");
-    button.addEventListener("click",()=>{
-      const ascending=header.getAttribute("aria-sort")!=="ascending";
-      table.querySelectorAll("th[aria-sort]").forEach((item)=>{
-        item.setAttribute("aria-sort","none");
-        const otherIcon=item.querySelector(".sort-icon");if(otherIcon)otherIcon.textContent="↕";
-      });
-      header.setAttribute("aria-sort",ascending?"ascending":"descending");
-      icon.textContent=ascending?"↑":"↓";
-      [...rows].sort((a,b)=>{
-        const av=(a.cells[column]?.dataset.sortValue||a.cells[column]?.textContent||"").trim();
-        const bv=(b.cells[column]?.dataset.sortValue||b.cells[column]?.textContent||"").trim();
-        const compared=type==="number"?(Number(av)||0)-(Number(bv)||0):av.localeCompare(bv,undefined,{numeric:true,sensitivity:"base"});
-        return ascending?compared:-compared;
-      }).forEach((row)=>table.tBodies[0]?.insertBefore(row,noResults));
-    });
-  });
-});
-document.querySelectorAll("[data-copy-path]").forEach((button)=>{
-  const original=button.textContent||"";
-  const finish=(ok)=>{
-    button.textContent=ok?${JSON.stringify(t.copied)}:${JSON.stringify(t.copy_failed)};
-    window.setTimeout(()=>{button.textContent=original;},1600);
-  };
-  button.addEventListener("click",()=>{
-    const value=new URL(button.dataset.copyPath||"/",location.origin).href;
-    if(navigator.clipboard?.writeText){
-      navigator.clipboard.writeText(value).then(()=>finish(true),()=>finish(false));
-      return;
-    }
-    const area=document.createElement("textarea");
-    area.value=value;area.style.position="fixed";area.style.opacity="0";document.body.append(area);area.select();
-    let ok=false;try{ok=document.execCommand("copy");}catch{}area.remove();finish(ok);
-  });
-});
-const confirmDialog=document.querySelector("[data-confirm-dialog]");
-if(confirmDialog){
-  const title=confirmDialog.querySelector("#confirm-dialog-title");
-  const message=confirmDialog.querySelector("#confirm-dialog-message");
-  const cancel=confirmDialog.querySelector("[data-confirm-cancel]");
-  const proceed=confirmDialog.querySelector("[data-confirm-submit]");
-  let pendingForm=null;
-  document.querySelectorAll("form[data-confirm-message]").forEach((form)=>{
-    form.addEventListener("submit",(event)=>{
-      if(form.dataset.confirmed==="true"){delete form.dataset.confirmed;return;}
-      if(form.dataset.confirmWhen==="replace"&&!form.querySelector('[name="replace"]:checked'))return;
-      event.preventDefault();pendingForm=form;
-      if(title)title.textContent=form.dataset.confirmTitle||${JSON.stringify(t.confirm_dialog_title)};
-      if(message)message.textContent=form.dataset.confirmMessage||"";
-      if(proceed)proceed.textContent=form.dataset.confirmAction||${JSON.stringify(t.confirm_continue)};
-      confirmDialog.showModal();
-    });
-  });
-  cancel?.addEventListener("click",()=>confirmDialog.close());
-  proceed?.addEventListener("click",()=>{
-    const form=pendingForm;if(!form)return;
-    form.dataset.confirmed="true";confirmDialog.close();form.requestSubmit();
-  });
-  confirmDialog.addEventListener("close",()=>{pendingForm=null;});
-}
-})();</script>`;
-}
-
-// The student's repo link for a problem: a bare owner/name → github.com; a full
-// http(s) URL (e.g. a Gitea exam repo) is used as-is. null when no repo yet.
-function repoHref(repo: string | null | undefined): string | null {
-  if (!repo) return null;
-  return /^https?:\/\//.test(repo) ? repo : `https://github.com/${repo}`;
-}
-
-function verdictBadge(verdict: string | null | undefined): string {
-  const value = (verdict ?? "-").trim() || "-";
-  const normalized = value.toUpperCase();
-  const tone = ["AC", "PASS", "PASSED", "OK"].includes(normalized)
-    ? "success"
-    : ["WA", "RE", "TLE", "MLE", "CE", "FAIL", "FAILED"].includes(normalized)
-      ? "danger"
-      : normalized === "-"
-        ? "neutral"
-        : "warning";
-  return `<span class="badge badge--${tone}">${h(value)}</span>`;
-}
-
-// Render a stored updated_at (epoch seconds/ms, or an ISO string) as a readable
-// Asia/Taipei timestamp "YYYY/MM/DD HH:MM". Falls back to the raw value.
-export function fmtTime(raw: string | null | undefined): string {
-  if (raw == null || String(raw).trim() === "") return "-";
-  const s = String(raw).trim();
-  const num = Number(s);
-  let d: Date;
-  if (Number.isFinite(num) && num > 0) {
-    d = new Date(num * (num < 1e12 ? 1000 : 1)); // seconds vs ms
-  } else {
-    d = new Date(s);
-  }
-  if (isNaN(d.getTime())) return s;
-  try {
-    return new Intl.DateTimeFormat("zh-TW", {
-      timeZone: "Asia/Taipei",
-      year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit", hour12: false,
-    }).format(d);
-  } catch {
-    return d.toISOString().slice(0, 16).replace("T", " ");
-  }
-}
-
 interface StaffLite {
   nycu_id: string;
   added_by: string | null;
@@ -331,8 +130,7 @@ export function adminHomePage(
 </form>
 <p class="muted text-small">${t.course_create_note}</p></div></details>`
     : "";
-  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
-<title>${t.admin_title}</title>
+  return `${documentStart(lang, t.admin_title, UI_CSS)}
 <body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
 <header class="topbar"><div>${langToggle("/admin", lang)}</div><div class="topbar__actions"><a href="/me">${t.acct_heading}</a><a href="/logout">${t.logout}</a></div></header>
 <h1>${t.admin_courses_heading}</h1>
@@ -356,8 +154,7 @@ export function bindingsPage(lang: Lang, rows: BindingRow[], orgs: string[] = []
   const orgLinks = orgs
     .map((o) => `<a href="/admin/org/${encodeURIComponent(o)}">${h(o)}</a>`)
     .join("　");
-  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
-<title>${t.admin_title}</title>
+  return `${documentStart(lang, t.admin_title, UI_CSS)}
 <body style="font-family:system-ui;max-width:900px;margin:2rem auto;padding:0 1rem">
 ${langToggle("/admin/bindings", lang)}
 <p style="font-size:.9em"><a href="/admin">← ${t.admin_courses_heading}</a></p>
@@ -401,8 +198,7 @@ export function orgMembersPage(
 <p class="muted text-small">${t.org_unbound_note}</p>
 <p>${view.unbound.map((l) => h(l)).join("、")}</p>`
     : "";
-  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
-<title>${t.admin_title}</title>
+  return `${documentStart(lang, t.admin_title, UI_CSS)}
 <body style="font-family:system-ui;max-width:900px;margin:2rem auto;padding:0 1rem">
 ${langToggle(`/admin/org/${encodeURIComponent(org)}`, lang)}
 <p style="font-size:.9em"><a href="/admin">← ${t.admin_courses_heading}</a>　|　<a href="/admin/bindings">${t.bindings_all_link}</a></p>
@@ -706,8 +502,7 @@ ${
   <div class="stat"><span class="stat__value">${gbound}</span><span class="stat__label">${t.google} ${t.bound}</span></div>
 </div>`;
 
-  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
-<title>${t.admin_title}</title>
+  return `${documentStart(lang, t.admin_title, UI_CSS)}
 <body style="font-family:system-ui;max-width:900px;margin:2rem auto">
 <header class="topbar"><div>${langToggle(base, lang)}</div><div class="topbar__actions"><a href="/admin">← ${t.admin_courses_heading}</a></div></header>
 <div class="identity"><h1>${h(course.name)}</h1><p class="identity__meta">${h(course.course_id)}${course.term ? ` · ${h(course.term)}` : ""}</p></div>
@@ -751,15 +546,9 @@ export function dashboardPage(
   meetByCourse: Record<string, string> = {},
 ): string {
   const t = T[lang];
-  const accountCard = (label: string, value: string | null | undefined, href: string, action: string) =>
-    `<article class="status-card">
-  <div class="status-card__head"><span class="status-card__title">${label}</span><span class="badge badge--${value ? "success" : "warning"}">${value ? t.bound : t.not_bound}</span></div>
-  <p class="status-card__value">${value ? `<b>${h(value)}</b>` : t.not_bound}</p>
-  <p class="status-card__action"><a class="${value ? "" : "button"}" href="${href}">${value ? t.rebind : action}</a></p>
-</article>`;
   const accountCards = `<div class="account-grid" aria-label="${t.acct_heading}">
-  ${accountCard(t.github, binding?.github_login, "/auth/github/start", t.bind_action)}
-  ${accountCard(t.google, binding?.google_email, "/auth/google/start", t.bind_google_action)}
+  ${accountStatusCard(t, t.github, binding?.github_login, "/auth/github/start", t.bind_action)}
+  ${accountStatusCard(t, t.google, binding?.google_email, "/auth/google/start", t.bind_google_action)}
 </div>`;
 
   // The student's own repo for the problem; link to it when present. A bare
@@ -896,8 +685,7 @@ ${courseTable(labRows)}`
       `</p>`
     : "";
 
-  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
-<title>${t.acct_title}</title>
+  return `${documentStart(lang, t.acct_title, UI_CSS)}
 <body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
 <header class="topbar"><div>${langToggle("/me", lang)}</div><div class="topbar__actions"><a href="/logout">${t.logout}</a></div></header>
 <div class="identity"><h1>${t.acct_heading}</h1><p class="identity__meta">${t.student_id}：<b>${h(nycu.id)}</b>${nycu.name ? ` · ${h(nycu.name)}` : ""}</p></div>
@@ -927,8 +715,7 @@ export function examPage(lang: Lang, assignmentId: string, rows: GradeRow[]): st
   <td data-label="${h(t.col_score)}">${g.score == null ? "-" : h(g.score)} / ${g.max_score == null ? "-" : h(g.max_score)}</td></tr>`;
     })
     .join("\n");
-  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
-<title>${h(title)}</title>
+  return `${documentStart(lang, h(title), UI_CSS)}
 <body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
 ${langToggle(`/me/exam/${encodeURIComponent(assignmentId)}`, lang)}
 <p style="font-size:.9em"><a href="/me">← ${t.acct_heading}</a></p>
@@ -955,12 +742,6 @@ export function coursePrejoinPage(
   flash: { bound?: boolean; gbound?: boolean } = {},
 ): string {
   const t = T[lang];
-  const accountCard = (label: string, value: string | null | undefined, href: string, action: string) =>
-    `<article class="status-card">
-  <div class="status-card__head"><span class="status-card__title">${label}</span><span class="badge badge--${value ? "success" : "warning"}">${value ? t.bound : t.not_bound}</span></div>
-  <p class="status-card__value">${value ? `<b>${h(value)}</b>` : t.not_bound}</p>
-  <p class="status-card__action"><a class="${value ? "" : "button"}" href="${href}">${value ? t.rebind : action}</a></p>
-</article>`;
   const okFlash = flash.bound ? t.flash_bound_ok : flash.gbound ? t.flash_gbound_ok : "";
   const flashHtml = okFlash
     ? `<p class="alert alert--success" role="status">${okFlash}</p>`
@@ -968,16 +749,15 @@ export function coursePrejoinPage(
   const formsHtml = forms.length
     ? `<ul>${forms.map((f) => `<li>${linkOrText(f.url, f.title)}</li>`).join("")}</ul>`
     : `<p class="empty-state">${t.forms_none}</p>`;
-  return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
-<title>${h(courseName)}</title>
+  return `${documentStart(lang, h(courseName), UI_CSS)}
 <body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
 <header class="topbar"><div>${langToggle(`/me/${encodeURIComponent(courseId)}`, lang)}</div><div class="topbar__actions"><a href="/me">${t.acct_heading}</a><a href="/logout">${t.logout}</a></div></header>
 <div class="identity"><h1>${h(courseName)}</h1><p class="identity__meta">${t.student_id}：<b>${h(nycu.id)}</b>${nycu.name ? ` · ${h(nycu.name)}` : ""}</p></div>
 <p style="color:#555">${t.prejoin_intro}</p>
 ${flashHtml}
 <div class="account-grid" aria-label="${t.acct_heading}">
-${accountCard(t.github, binding?.github_login, "/auth/github/start", t.bind_action)}
-${accountCard(t.google, binding?.google_email, "/auth/google/start", t.bind_google_action)}
+${accountStatusCard(t, t.github, binding?.github_login, "/auth/github/start", t.bind_action)}
+${accountStatusCard(t, t.google, binding?.google_email, "/auth/google/start", t.bind_google_action)}
 </div>
 <h2>${t.forms_student_heading}</h2>
 ${formsHtml}
