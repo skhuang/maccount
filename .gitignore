@@ -9,3 +9,7 @@ worker-configuration.d.ts
 
 # Local deploy config (copy from wrangler.toml.example, fill real values)
 wrangler.toml
+
+# Browser-test artifacts
+playwright-report/
+test-results/

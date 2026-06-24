@@ -66,7 +66,7 @@ body>p[style*="#fff3cd"]{background:var(--warning-soft)!important;border-color:#
 .section-nav{position:sticky;top:0;z-index:2;display:flex;gap:.5rem;margin:0 -1rem 1.25rem;padding:.7rem 1rem;overflow-x:auto;border-block:1px solid var(--line);background:rgba(255,255,255,.96);box-shadow:0 5px 16px rgba(20,45,34,.05);white-space:nowrap}.section-nav a{padding:.3rem .55rem;border-radius:6px;text-decoration:none;font-size:.88rem;font-weight:650}.section-nav a:hover{background:var(--surface-soft)}
 .stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem;margin:1rem 0 1.5rem}.stat{padding:.85rem;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}.stat__value{display:block;font-size:1.45rem;font-weight:750;line-height:1.2}.stat__label{display:block;margin-top:.25rem;color:var(--muted);font-size:.82rem}
 .admin-sections{display:grid;gap:1rem}.admin-section{scroll-margin-top:5rem;padding:1.2rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.admin-section>h2:first-child{margin:0 0 .75rem;padding:0;border:0}.admin-section+.admin-section{margin-top:0}.admin-section form:last-child{margin-bottom:0}
-.lang-toggle{display:inline-flex;align-items:center;gap:.5rem;color:var(--muted);font-size:.9rem}.lang-toggle [aria-current="true"]{padding:.2rem .45rem;border-radius:6px;background:var(--surface-soft);color:var(--text);font-weight:700}.empty-state{margin:.8rem 0;padding:1rem;border:1px dashed #b9c7c0;border-radius:10px;background:var(--surface-soft);color:var(--muted);text-align:center;list-style:none}.empty-cell{padding:1.4rem!important;color:var(--muted);text-align:center}.inline-actions{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap}.text-danger{color:var(--danger)}
+.lang-toggle{display:inline-flex;align-items:center;gap:.5rem;color:var(--muted);font-size:.9rem}.lang-toggle [aria-current="true"]{padding:.2rem .45rem;border-radius:6px;background:var(--surface-soft);color:var(--text);font-weight:700}.empty-state{margin:.8rem 0;padding:1rem;border:1px dashed #b9c7c0;border-radius:10px;background:var(--surface-soft);color:var(--muted);text-align:center;list-style:none}.empty-cell{padding:1.4rem!important;color:var(--muted);text-align:center}.inline-actions{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap}.text-danger{color:var(--danger)}.muted{color:var(--muted)}.text-small{font-size:.9em}
 .table-tools{display:grid;grid-template-columns:minmax(220px,1fr) minmax(160px,auto) auto;align-items:end;gap:.75rem;margin:.85rem 0}.table-tools label{font-size:.82rem}.table-tools input,.table-tools select{margin-top:.25rem}.table-count{align-self:center;margin:1.35rem 0 0;color:var(--muted);font-size:.85rem;white-space:nowrap}.copy-field{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin:.75rem 0}.button--secondary{min-height:34px;padding:.4rem .7rem;border-color:var(--line);background:#fff;color:var(--brand);font-size:.85rem}.button--secondary:hover{border-color:#9db2a7;background:var(--surface-soft);color:var(--brand-hover)}tr[hidden]{display:none}
 .sort-button{display:flex;width:100%;min-height:0;padding:0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;text-align:left}.sort-button:hover{background:transparent;color:var(--brand)}.sort-icon{margin-left:.4rem;color:var(--muted)}.course-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin:1rem 0}.course-admin-card{display:flex;min-height:150px;flex-direction:column;padding:1.1rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.course-admin-card--archived{background:var(--surface-soft)}.course-admin-card__head{display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem}.course-admin-card h2{margin:0;padding:0;border:0;font-size:1.1rem}.course-admin-card__meta{margin:.45rem 0 1rem;color:var(--muted);font-size:.88rem}.course-admin-card__action{margin:auto 0 0}.admin-disclosure{margin:1.5rem 0;background:#fff}.admin-disclosure>summary{font-size:1.05rem}.admin-disclosure__body{padding:0 1rem 1rem}.utility-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}.utility-card{padding:1rem;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}.utility-card p{margin:.35rem 0 0;color:var(--muted);font-size:.86rem}
 @media(max-width:760px){.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -255,7 +255,7 @@ export function adminHomePage(
   <article class="utility-card"><a href="/admin/bindings"><b>${t.bindings_all_link}</b></a><p>${t.bindings_query_heading}</p></article>
   ${orgLinks}
 </div>
-<p style="color:#777;font-size:.9em">${t.bindings_query_note}</p>`;
+<p class="muted text-small">${t.bindings_query_note}</p>`;
   const items = courses.length
     ? `<div class="course-grid">${courses
         .map(
@@ -282,7 +282,7 @@ export function adminHomePage(
   <label>${t.ph_course_meet}<input name="google_meet_url" type="url" placeholder="https://meet.google.com/…"></label>
   <button type="submit">${t.course_create}</button>
 </form>
-<p style="color:#777;font-size:.9em">${t.course_create_note}</p></div></details>`
+<p class="muted text-small">${t.course_create_note}</p></div></details>`
     : "";
   return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
 <title>${t.admin_title}</title>
@@ -351,7 +351,7 @@ export function orgMembersPage(
     .join("\n");
   const unbound = view.unbound.length
     ? `<h2>${t.org_unbound_heading}（${view.unbound.length}）</h2>
-<p style="color:#777;font-size:.9em">${t.org_unbound_note}</p>
+<p class="muted text-small">${t.org_unbound_note}</p>
 <p>${view.unbound.map((l) => h(l)).join("、")}</p>`
     : "";
   return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
@@ -463,7 +463,7 @@ export function adminPage(
     .join("\n");
   const staffSection = isOwner
     ? `<section class="admin-section" id="staff"><h2>${t.staff_heading}</h2>
-<p style="color:#777;font-size:.9em">${t.staff_note}</p>
+<p class="muted text-small">${t.staff_note}</p>
 <table border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>NYCU id</th><th>${t.staff_added_by}</th><th></th></tr></thead>
 <tbody>${staffRows}</tbody></table>
@@ -494,7 +494,7 @@ export function adminPage(
 </form>`
     : "";
   const enrollSection = `<section class="admin-section" id="enrollment"><h2>${t.enroll_heading.replace("{n}", String(enrolled.length))}</h2>
-<p style="color:#777;font-size:.9em">${t.enroll_note.replace("{bound}", String(bound)).replace("{gbound}", String(gbound))}</p>${
+<p class="muted text-small">${t.enroll_note.replace("{bound}", String(bound)).replace("{gbound}", String(gbound))}</p>${
     enrolled.length
       ? `
 <details><summary>${t.enroll_show_list}</summary>
@@ -522,7 +522,7 @@ ${enrollImport}</section>`;
     ? `<p class="alert alert--${dm.startsWith("done:") ? "success" : dm === "token-error" ? "danger" : "warning"}" role="${dm === "token-error" ? "alert" : "status"}">${driveBannerText}</p>`
     : "";
   const driveSection = `<section class="admin-section" id="drive"><h2>${t.drive_heading}</h2>
-<p style="color:#777;font-size:.9em">${t.drive_note} <a href="/auth/google/start?drive=1">${t.drive_connect}</a></p>
+<p class="muted text-small">${t.drive_note} <a href="/auth/google/start?drive=1">${t.drive_connect}</a></p>
 ${driveBanner}
 <form method="post" action="${base}/drive/share" class="form-stack" style="max-width:440px">
   <label>${t.drive_file_label}<input name="file_id" placeholder="${t.drive_file_placeholder}" required autocomplete="off"></label>
@@ -562,7 +562,7 @@ ${driveBanner}
     : `<p class="empty-state">${t.forms_none}</p>`;
   const preEnrollLabel = `<label class="check-row"><input type="checkbox" name="pre_enroll" value="1"> <span>${t.forms_pre_enroll_label}</span></label>`;
   const formsSection = `<section class="admin-section" id="forms"><h2>${t.forms_heading}</h2>
-<p style="color:#777;font-size:.9em">${t.forms_note}</p>
+<p class="muted text-small">${t.forms_note}</p>
 <div class="copy-field"><span>${t.prejoin_link_label}：</span><code>/me/${h(course.course_id)}</code><button type="button" class="button button--secondary" data-copy-path="/me/${h(course.course_id)}">${t.copy_link}</button></div>
 ${formsBanner}
 ${formsRows}
@@ -572,7 +572,7 @@ ${formsRows}
   ${preEnrollLabel}
   <button type="submit">${t.forms_add}</button>
 </form>
-<p style="color:#777;font-size:.9em;margin-top:.8rem">${t.forms_create_note}</p>
+<p class="muted text-small" style="margin-top:.8rem">${t.forms_create_note}</p>
 <form method="post" action="${base}/forms/create" class="form-stack" style="max-width:440px">
   <label>${t.forms_title_label}<input name="title" placeholder="${t.forms_create_title_ph}" required></label>
   ${preEnrollLabel}
@@ -597,7 +597,7 @@ ${formsRows}
     ? `<p class="alert alert--${cm.startsWith("done:") ? "success" : cm === "token-error" ? "danger" : "warning"}" role="${cm === "token-error" ? "alert" : "status"}">${classroomBannerText}</p>`
     : "";
   const classroomSection = `<section class="admin-section" id="classroom"><h2>${t.classroom_heading}</h2>
-<p style="color:#777;font-size:.9em">${t.classroom_note}</p>
+<p class="muted text-small">${t.classroom_note}</p>
 ${classroomBanner}
 ${
     classroomId
@@ -817,7 +817,7 @@ ${accountCards}
 ${orgHtml}
 <h2>${t.my_courses_heading}</h2>
 ${table}
-<p style="color:#888;font-size:.9em">${t.privacy_note}</p>
+<p class="muted text-small">${t.privacy_note}</p>
 ${adminHtml}
 </body></html>`;
 }
@@ -832,7 +832,7 @@ export function examPage(lang: Lang, assignmentId: string, rows: GradeRow[]): st
       const url = repoHref(g.repo);
       const repoCell = url
         ? `<a href="${h(url)}" target="_blank" rel="noopener">${t.exam_go_solve} ↗</a>`
-        : `<span style="color:#999">${t.exam_no_repo}</span>`;
+        : `<span class="muted">${t.exam_no_repo}</span>`;
       return `<tr><td>${h(g.problem_id)}</td><td>${repoCell}</td>
   <td>${verdictBadge(g.verdict)}</td>
   <td>${g.score == null ? "-" : h(g.score)} / ${g.max_score == null ? "-" : h(g.max_score)}</td></tr>`;
@@ -844,13 +844,13 @@ export function examPage(lang: Lang, assignmentId: string, rows: GradeRow[]): st
 ${langToggle(`/me/exam/${encodeURIComponent(assignmentId)}`, lang)}
 <p style="font-size:.9em"><a href="/me">← ${t.acct_heading}</a></p>
 <h1>${h(title)}</h1>
-<p style="color:#888;font-size:.9em">${t.exam_intro}</p>
+<p class="muted text-small">${t.exam_intro}</p>
 <table border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>${t.col_problem}</th><th>repo</th><th>${t.col_result}</th><th>${t.col_score}</th></tr></thead>
 <tbody>
 ${trs}
 </tbody></table>
-<p style="color:#888;font-size:.9em">${t.privacy_note}</p>
+<p class="muted text-small">${t.privacy_note}</p>
 </body></html>`;
 }
 
