@@ -45,14 +45,19 @@
     function render(lang) {
       const s = STR[lang];
       document.documentElement.lang = lang === "en" ? "en" : "zh-Hant";
+      document.getElementById("lang-zh").toggleAttribute("aria-current", lang === "zh");
+      document.getElementById("lang-en").toggleAttribute("aria-current", lang === "en");
       document.getElementById("t-title").textContent = s.page;
       document.getElementById("home").textContent = s.home;
       const title = document.getElementById("title");
       const msg = document.getElementById("msg");
+      const result = document.querySelector(".result");
       if (q.get("status") === "ok") {
+        result.className = "result result--success";
         title.textContent = s.ok_title;
         msg.textContent = s.ok_msg;
       } else {
+        result.className = "result result--danger";
         title.textContent = s.err_title;
         const reason = q.get("reason");
         msg.textContent = reason === "github_already_bound" ? s.already

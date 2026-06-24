@@ -56,6 +56,8 @@
     function render(lang) {
       const s = STR[lang];
       document.documentElement.lang = lang === "en" ? "en" : "zh-Hant";
+      document.getElementById("lang-zh").toggleAttribute("aria-current", lang === "zh");
+      document.getElementById("lang-en").toggleAttribute("aria-current", lang === "en");
       document.getElementById("t-title").textContent = s.title;
       document.getElementById("t-h1").textContent = s.h1;
       document.getElementById("t-intro").textContent = s.intro;
