@@ -114,6 +114,20 @@ test("student and admin pages have no automated WCAG A/AA violations", async ({ 
   }
 });
 
+test("student course card exposes a grade summary", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setContent(dashboardPage(
+    "en", { id: "a01", name: "Alice" }, bindings[1], [grade], false, {},
+    [], { "ds-2026": "Data Structures 2026" },
+  ));
+  const summary = page.locator('.course-summary[aria-label="Course grade summary"]');
+  await expect(summary).toBeVisible();
+  await expect(summary).toContainText("1 / 1");
+  await expect(summary.locator('progress[aria-label="Total score 100 / 100"]')).toHaveAttribute("value", "100");
+  const columns = await summary.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length);
+  expect(columns).toBe(2);
+});
+
 test("admin course cards collapse to one column on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.setContent(adminHomePage("zh", [course, { ...course, course_id: "old", status: "archived" }], { isOwner: true }));
