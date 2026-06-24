@@ -68,8 +68,9 @@ body>p[style*="#fff3cd"]{background:var(--warning-soft)!important;border-color:#
 .admin-sections{display:grid;gap:1rem}.admin-section{scroll-margin-top:5rem;padding:1.2rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.admin-section>h2:first-child{margin:0 0 .75rem;padding:0;border:0}.admin-section+.admin-section{margin-top:0}.admin-section form:last-child{margin-bottom:0}
 .lang-toggle{display:inline-flex;align-items:center;gap:.5rem;color:var(--muted);font-size:.9rem}.lang-toggle [aria-current="true"]{padding:.2rem .45rem;border-radius:6px;background:var(--surface-soft);color:var(--text);font-weight:700}.empty-state{margin:.8rem 0;padding:1rem;border:1px dashed #b9c7c0;border-radius:10px;background:var(--surface-soft);color:var(--muted);text-align:center;list-style:none}.empty-cell{padding:1.4rem!important;color:var(--muted);text-align:center}.inline-actions{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap}.text-danger{color:var(--danger)}
 .table-tools{display:grid;grid-template-columns:minmax(220px,1fr) minmax(160px,auto) auto;align-items:end;gap:.75rem;margin:.85rem 0}.table-tools label{font-size:.82rem}.table-tools input,.table-tools select{margin-top:.25rem}.table-count{align-self:center;margin:1.35rem 0 0;color:var(--muted);font-size:.85rem;white-space:nowrap}.copy-field{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin:.75rem 0}.button--secondary{min-height:34px;padding:.4rem .7rem;border-color:var(--line);background:#fff;color:var(--brand);font-size:.85rem}.button--secondary:hover{border-color:#9db2a7;background:var(--surface-soft);color:var(--brand-hover)}tr[hidden]{display:none}
+.sort-button{display:flex;width:100%;min-height:0;padding:0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;text-align:left}.sort-button:hover{background:transparent;color:var(--brand)}.sort-icon{margin-left:.4rem;color:var(--muted)}.course-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin:1rem 0}.course-admin-card{display:flex;min-height:150px;flex-direction:column;padding:1.1rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.course-admin-card--archived{background:var(--surface-soft)}.course-admin-card__head{display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem}.course-admin-card h2{margin:0;padding:0;border:0;font-size:1.1rem}.course-admin-card__meta{margin:.45rem 0 1rem;color:var(--muted);font-size:.88rem}.course-admin-card__action{margin:auto 0 0}.admin-disclosure{margin:1.5rem 0;background:#fff}.admin-disclosure>summary{font-size:1.05rem}.admin-disclosure__body{padding:0 1rem 1rem}.utility-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}.utility-card{padding:1rem;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}.utility-card p{margin:.35rem 0 0;color:var(--muted);font-size:.86rem}
 @media(max-width:760px){.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:640px){html{background:var(--surface)}body{width:100%;margin:0!important;padding:1.15rem!important;border:0;border-radius:0;box-shadow:none}h1{margin-top:.75rem}h2{margin-top:1.75rem}th,td{padding:.6rem!important}button{width:100%}td button,li button,.button--secondary{width:auto}form[style*="display:inline"]{display:inline!important}.topbar{align-items:flex-start}.topbar__actions{justify-content:flex-end}.account-grid{grid-template-columns:1fr}.section-nav{margin-inline:-1.15rem;padding-inline:1.15rem}.admin-section{padding:1rem}.course-card{padding:1rem}.table-tools{grid-template-columns:1fr}.table-count{margin:0}.copy-field{align-items:stretch}.copy-field code{flex:1;overflow-wrap:anywhere}}
+@media(max-width:640px){html{background:var(--surface)}body{width:100%;margin:0!important;padding:1.15rem!important;border:0;border-radius:0;box-shadow:none}h1{margin-top:.75rem}h2{margin-top:1.75rem}th,td{padding:.6rem!important}button{width:100%}td button,li button,.button--secondary,.sort-button{width:auto}form[style*="display:inline"]{display:inline!important}.topbar{align-items:flex-start}.topbar__actions{justify-content:flex-end}.account-grid{grid-template-columns:1fr}.section-nav{margin-inline:-1.15rem;padding-inline:1.15rem}.admin-section{padding:1rem}.course-card{padding:1rem}.table-tools{grid-template-columns:1fr}.table-count{margin:0}.copy-field{align-items:stretch}.copy-field code{flex:1;overflow-wrap:anywhere}.course-grid,.utility-grid{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 `;
 
@@ -99,6 +100,10 @@ function tableTools(
 </div>`;
 }
 
+function sortableTh(label: string, column: number, type: "text" | "number" = "text"): string {
+  return `<th data-sort-column="${column}" data-sort-type="${type}">${h(label)}</th>`;
+}
+
 function uiEnhancements(t: (typeof T)[Lang]): string {
   return `<script>(()=>{
 const normalize=(value)=>value.normalize("NFKC").toLocaleLowerCase();
@@ -109,6 +114,12 @@ document.querySelectorAll("[data-table-tools]").forEach((tools)=>{
   const search=tools.querySelector("[data-table-search]");
   const status=tools.querySelector("[data-table-status]");
   const count=tools.querySelector("[data-table-count]");
+  const noResults=document.createElement("tr");
+  noResults.hidden=true;noResults.dataset.noResults="";
+  const noResultsCell=document.createElement("td");
+  noResultsCell.colSpan=table.tHead?.rows[0]?.cells.length||1;
+  noResultsCell.className="empty-cell";noResultsCell.textContent=${JSON.stringify(t.table_no_results)};
+  noResults.append(noResultsCell);table.tBodies[0]?.append(noResults);
   const apply=()=>{
     const query=normalize(search?.value.trim()||"");
     const wanted=status?.value||"";
@@ -119,10 +130,35 @@ document.querySelectorAll("[data-table-tools]").forEach((tools)=>{
       row.hidden=!(matchesText&&matchesStatus);
       if(!row.hidden)visible++;
     });
+    noResults.hidden=visible!==0||rows.length===0;
     if(count)count.textContent=(count.dataset.template||"").replace("{visible}",String(visible)).replace("{total}",String(rows.length));
   };
   search?.addEventListener("input",apply);
   status?.addEventListener("change",apply);
+  table.querySelectorAll("th[data-sort-column]").forEach((header)=>{
+    const column=Number(header.dataset.sortColumn||0);
+    const type=header.dataset.sortType||"text";
+    const label=header.textContent||"";
+    const button=document.createElement("button");
+    button.type="button";button.className="sort-button";button.append(document.createTextNode(label));
+    const icon=document.createElement("span");icon.className="sort-icon";icon.setAttribute("aria-hidden","true");icon.textContent="↕";button.append(icon);
+    header.textContent="";header.append(button);header.setAttribute("aria-sort","none");
+    button.addEventListener("click",()=>{
+      const ascending=header.getAttribute("aria-sort")!=="ascending";
+      table.querySelectorAll("th[aria-sort]").forEach((item)=>{
+        item.setAttribute("aria-sort","none");
+        const otherIcon=item.querySelector(".sort-icon");if(otherIcon)otherIcon.textContent="↕";
+      });
+      header.setAttribute("aria-sort",ascending?"ascending":"descending");
+      icon.textContent=ascending?"↑":"↓";
+      [...rows].sort((a,b)=>{
+        const av=(a.cells[column]?.dataset.sortValue||a.cells[column]?.textContent||"").trim();
+        const bv=(b.cells[column]?.dataset.sortValue||b.cells[column]?.textContent||"").trim();
+        const compared=type==="number"?(Number(av)||0)-(Number(bv)||0):av.localeCompare(bv,undefined,{numeric:true,sensitivity:"base"});
+        return ascending?compared:-compared;
+      }).forEach((row)=>table.tBodies[0]?.insertBefore(row,noResults));
+    });
+  });
 });
 document.querySelectorAll("[data-copy-path]").forEach((button)=>{
   const original=button.textContent||"";
@@ -212,26 +248,30 @@ export function adminHomePage(
   // in any course yet (so the per-course views don't show them).
   const orgs = opts.orgs ?? [];
   const orgLinks = orgs
-    .map((o) => `<li><a href="/admin/org/${encodeURIComponent(o)}">${h(o)}</a></li>`)
+    .map((o) => `<article class="utility-card"><a href="/admin/org/${encodeURIComponent(o)}"><b>${h(o)}</b></a><p>GitHub org</p></article>`)
     .join("\n");
   const bindingsSection = `<h2>${t.bindings_query_heading}</h2>
-<ul>
-  <li><a href="/admin/bindings"><b>${t.bindings_all_link}</b></a></li>
+<div class="utility-grid">
+  <article class="utility-card"><a href="/admin/bindings"><b>${t.bindings_all_link}</b></a><p>${t.bindings_query_heading}</p></article>
   ${orgLinks}
-</ul>
+</div>
 <p style="color:#777;font-size:.9em">${t.bindings_query_note}</p>`;
   const items = courses.length
-    ? courses
+    ? `<div class="course-grid">${courses
         .map(
-          (c) => `<li><a href="/c/${encodeURIComponent(c.course_id)}/admin"><b>${h(c.name)}</b></a>
-  <span style="color:#999">${h(c.course_id)}${c.term ? " · " + h(c.term) : ""}${
-    c.status && c.status !== "active" ? " · " + h(c.status) : ""
-  }</span></li>`,
+          (c) => {
+            const archived = c.status === "archived";
+            return `<article class="course-admin-card${archived ? " course-admin-card--archived" : ""}">
+  <div class="course-admin-card__head"><h2>${h(c.name)}</h2><span class="badge badge--${archived ? "neutral" : "success"}">${archived ? t.course_archived : t.course_active}</span></div>
+  <p class="course-admin-card__meta"><code>${h(c.course_id)}</code>${c.term ? " · " + h(c.term) : ""}</p>
+  <p class="course-admin-card__action"><a class="button button--secondary" href="/c/${encodeURIComponent(c.course_id)}/admin">${t.course_manage} →</a></p>
+</article>`;
+          },
         )
-        .join("\n")
-    : `<li class="empty-state">${t.no_courses}</li>`;
+        .join("\n")}</div>`
+    : `<p class="empty-state">${t.no_courses}</p>`;
   const createForm = opts.isOwner
-    ? `<h2>${t.course_create}</h2>
+    ? `<details class="admin-disclosure"${courses.length ? "" : " open"}><summary>${t.course_create_expand}</summary><div class="admin-disclosure__body">
 <form method="post" action="/admin/courses" class="form-stack" style="max-width:440px">
   <label>${t.ph_course_id}<input name="course_id" placeholder="ds-2026" required pattern="[A-Za-z0-9_-]+" autocomplete="off"></label>
   <label>${t.ph_course_name}<input name="name" placeholder="${t.ph_course_name}" required></label>
@@ -242,14 +282,15 @@ export function adminHomePage(
   <label>${t.ph_course_meet}<input name="google_meet_url" type="url" placeholder="https://meet.google.com/…"></label>
   <button type="submit">${t.course_create}</button>
 </form>
-<p style="color:#777;font-size:.9em">${t.course_create_note}</p>`
+<p style="color:#777;font-size:.9em">${t.course_create_note}</p></div></details>`
     : "";
   return `<!doctype html><html lang="${htmlLang(lang)}"><meta charset="utf-8">${uiHead()}
 <title>${t.admin_title}</title>
 <body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
 <header class="topbar"><div>${langToggle("/admin", lang)}</div><div class="topbar__actions"><a href="/me">${t.acct_heading}</a><a href="/logout">${t.logout}</a></div></header>
 <h1>${t.admin_courses_heading}</h1>
-<ul>${items}</ul>
+<p class="identity__meta">${t.course_count.replace("{n}", String(courses.length))}</p>
+${items}
 ${createForm}
 ${bindingsSection}
 </body></html>`;
@@ -277,7 +318,7 @@ ${langToggle("/admin/bindings", lang)}
 ${orgs.length ? `<p>${t.bindings_query_heading}：${orgLinks}</p>` : ""}
 ${rows.length ? tableTools(t, "bindings-table", rows.length) : ""}
 <table id="bindings-table" border="1" cellpadding="6" cellspacing="0">
-<thead><tr><th>NYCU id</th><th>${t.th_name}</th><th>GitHub</th><th>${t.th_github_id}</th><th>${t.google}</th><th>${t.th_updated}</th></tr></thead>
+<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("GitHub", 2)}${sortableTh(t.th_github_id, 3, "number")}<th>Google</th>${sortableTh(t.th_updated, 5)}</tr></thead>
 <tbody>
 ${trs || `<tr><td colspan="6" class="empty-cell">${t.no_bindings}</td></tr>`}
 </tbody></table>
@@ -326,7 +367,7 @@ ${sorted.length ? tableTools(t, "org-members-table", sorted.length, [
     { value: "none", label: t.org_status_none },
   ]) : ""}
 <table id="org-members-table" border="1" cellpadding="6" cellspacing="0">
-<thead><tr><th>GitHub</th><th>NYCU id</th><th>${t.th_name}</th><th>${t.org_status_col}</th></tr></thead>
+<thead><tr>${sortableTh("GitHub", 0)}${sortableTh("NYCU id", 1)}${sortableTh(t.th_name, 2)}${sortableTh(t.org_status_col, 3)}</tr></thead>
 <tbody>
 ${trs || `<tr><td colspan="4" class="empty-cell">${t.no_bindings}</td></tr>`}
 </tbody></table>
@@ -459,7 +500,7 @@ export function adminPage(
 <details><summary>${t.enroll_show_list}</summary>
 ${tableTools(t, "enrollment-table", enrolled.length, [{ value: "missing", label: t.table_filter_unbound }])}
 <table id="enrollment-table" border="1" cellpadding="6" cellspacing="0">
-<thead><tr><th>NYCU id</th><th>GitHub</th><th>Google</th></tr></thead>
+<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh("GitHub", 1)}<th>Google</th></tr></thead>
 <tbody>${enrolledRows}</tbody></table></details>`
       : ""
   }
@@ -614,7 +655,7 @@ ${banner}
 <p><a href="${base}/export.csv">${t.export_full}</a>　|　<a href="${base}/roster.csv">${t.export_roster}</a></p>
 ${rows.length ? tableTools(t, "course-bindings-table", rows.length) : ""}
 <table id="course-bindings-table" border="1" cellpadding="6" cellspacing="0">
-<thead><tr><th>NYCU id</th><th>${t.th_name}</th><th>GitHub</th><th>${t.th_github_id}</th><th>${t.google}</th><th>${t.th_updated}</th>${isOwner ? `<th>${t.th_actions}</th>` : ""}</tr></thead>
+<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("GitHub", 2)}${sortableTh(t.th_github_id, 3, "number")}<th>Google</th>${sortableTh(t.th_updated, 5)}${isOwner ? `<th>${t.th_actions}</th>` : ""}</tr></thead>
 <tbody>
 ${trs || `<tr><td colspan="${isOwner ? "7" : "6"}" class="empty-cell">${t.no_bindings}</td></tr>`}
 </tbody></table></section>

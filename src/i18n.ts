@@ -55,7 +55,13 @@ export interface Strings {
   table_filter_all: string;
   table_filter_unbound: string;
   table_showing: string; // {visible} {total}
+  table_no_results: string;
   course_create: string;
+  course_create_expand: string;
+  course_count: string; // {n}
+  course_manage: string;
+  course_active: string;
+  course_archived: string;
   course_create_note: string;
   ph_course_id: string;
   ph_course_name: string;
@@ -198,7 +204,13 @@ export const T: Record<Lang, Strings> = {
     table_filter_all: "全部狀態",
     table_filter_unbound: "未完整綁定",
     table_showing: "顯示 {visible} / {total} 筆",
+    table_no_results: "沒有符合目前條件的資料。",
     course_create: "建立／更新課程",
+    course_create_expand: "新增或更新課程",
+    course_count: "共 {n} 門課程",
+    course_manage: "管理課程",
+    course_active: "進行中",
+    course_archived: "已封存",
     course_create_note: "course_id 為英數與 - _（如 ds-2026）；moodle_course_id 為 Moodle 課程數字 id（之後對應選課/成績用）。再次送出相同 course_id 即更新。",
     ph_course_id: "course_id（如 ds-2026）",
     ph_course_name: "課程名稱（如 資料結構 2026）",
@@ -341,7 +353,13 @@ export const T: Record<Lang, Strings> = {
     table_filter_all: "All statuses",
     table_filter_unbound: "Missing a binding",
     table_showing: "Showing {visible} of {total}",
+    table_no_results: "No rows match the current filters.",
     course_create: "Create / update course",
+    course_create_expand: "Add or update a course",
+    course_count: "{n} courses",
+    course_manage: "Manage course",
+    course_active: "Active",
+    course_archived: "Archived",
     course_create_note: "course_id is alphanumeric + - _ (e.g. ds-2026); moodle_course_id is the Moodle numeric course id (used later for enrollment/grade mapping). Submitting the same course_id again updates it.",
     ph_course_id: "course_id (e.g. ds-2026)",
     ph_course_name: "Course name (e.g. Data Structures 2026)",

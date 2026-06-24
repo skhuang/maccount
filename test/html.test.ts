@@ -225,6 +225,9 @@ describe("admin list tools", () => {
     expect(html).toContain('data-table-id="bindings-table"');
     expect(html).toContain('<table id="bindings-table"');
     expect(html).toContain("Showing {visible} of {total}");
+    expect(html).toContain('data-sort-column="0"');
+    expect(html).toContain('header.setAttribute("aria-sort",ascending?"ascending":"descending")');
+    expect(html).toContain("No rows match the current filters.");
   });
 
   it("adds membership status filters to the org list", () => {
@@ -307,11 +310,18 @@ describe("adminHomePage (course picker)", () => {
     expect(html).toContain('href="/c/ds-2026/admin"');
     expect(html).toContain('href="/c/swtest-2027/admin"');
     expect(html).toContain("資料結構 2026");
+    expect(html).toContain('class="course-grid"');
+    expect(html).toContain("進行中");
+    expect(html).toContain("已封存");
+    expect(html).toContain('class="course-admin-card course-admin-card--archived"');
+    expect(html).toContain("共 2 門課程");
   });
 
   it("shows the create-course form to owners only", () => {
     const html = adminHomePage("zh", courses, { isOwner: true });
     expect(html).toContain('action="/admin/courses"');
+    expect(html).toContain('class="admin-disclosure"');
+    expect(html).toContain("新增或更新課程");
     expect(html).toContain(`<label>課程名稱（如 資料結構 2026）<input name="name"`);
     expect(adminHomePage("zh", courses, { isOwner: false })).not.toContain('action="/admin/courses"');
   });
