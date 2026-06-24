@@ -274,6 +274,24 @@ describe("dashboardPage", () => {
     expect(html).toContain("octo@gmail.com");
   });
 
+  it("summarizes graded work, accepted results, score, and latest update", () => {
+    const html = dashboardPage(
+      "zh", { id: "0856001", name: "學生" }, null,
+      [
+        grade,
+        { ...grade, problem_id: "lab02", verdict: "WA", score: 30, max_score: 50, updated_at: "2026-06-24T02:00:00Z" },
+        { ...grade, problem_id: "lab03", verdict: null, score: null, max_score: 50, updated_at: "2026-06-24T01:00:00Z" },
+      ],
+      false, {},
+    );
+    expect(html).toContain('class="stats-grid course-summary"');
+    expect(html).toContain('<span class="stat__value">2 / 3</span>');
+    expect(html).toContain('<span class="stat__value">1</span><span class="stat__label">已通過</span>');
+    expect(html).toContain('<span class="stat__value">130 / 150</span>');
+    expect(html).toContain('aria-label="總分 130 / 150"');
+    expect(html).toContain("2026/06/24 10:00");
+  });
+
   it("keeps unknown verdict text escaped and uses a warning badge", () => {
     const html = dashboardPage(
       "en", { id: "0856001", name: "Student" }, null,

@@ -65,6 +65,7 @@ body>p[style*="#fff3cd"]{background:var(--warning-soft)!important;border-color:#
 .course-list{display:grid;gap:1rem}.course-card{padding:1.1rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.course-card h3{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:0 0 .8rem}.course-card h3::after{content:"";width:.55rem;height:.55rem;border-radius:50%;background:var(--brand)}.course-card>p:last-child{margin-bottom:0}.course-card table{margin-top:.45rem}
 .section-nav{position:sticky;top:0;z-index:2;display:flex;gap:.5rem;margin:0 -1rem 1.25rem;padding:.7rem 1rem;overflow-x:auto;border-block:1px solid var(--line);background:rgba(255,255,255,.96);box-shadow:0 5px 16px rgba(20,45,34,.05);white-space:nowrap}.section-nav a{padding:.3rem .55rem;border-radius:6px;text-decoration:none;font-size:.88rem;font-weight:650}.section-nav a:hover{background:var(--surface-soft)}
 .stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem;margin:1rem 0 1.5rem}.stat{padding:.85rem;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}.stat__value{display:block;font-size:1.45rem;font-weight:750;line-height:1.2}.stat__label{display:block;margin-top:.25rem;color:var(--muted);font-size:.82rem}
+.course-summary{margin:.25rem 0 1rem}.course-summary .stat{padding:.7rem}.course-summary .stat__value{font-size:1.1rem}.course-summary progress{display:block;width:100%;height:.45rem;margin-top:.45rem;accent-color:var(--brand)}
 .admin-sections{display:grid;gap:1rem}.admin-section{scroll-margin-top:5rem;padding:1.2rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.admin-section>h2:first-child{margin:0 0 .75rem;padding:0;border:0}.admin-section+.admin-section{margin-top:0}.admin-section form:last-child{margin-bottom:0}
 .lang-toggle{display:inline-flex;align-items:center;gap:.5rem;color:var(--muted);font-size:.9rem}.lang-toggle [aria-current="true"]{padding:.2rem .45rem;border-radius:6px;background:var(--surface-soft);color:var(--text);font-weight:700}.empty-state{margin:.8rem 0;padding:1rem;border:1px dashed #b9c7c0;border-radius:10px;background:var(--surface-soft);color:var(--muted);text-align:center;list-style:none}.empty-cell{padding:1.4rem!important;color:var(--muted);text-align:center}.inline-actions{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap}.text-danger{color:var(--danger)}.muted{color:var(--muted)}.text-small{font-size:.9em}
 .table-tools{display:grid;grid-template-columns:minmax(220px,1fr) minmax(160px,auto) auto;align-items:end;gap:.75rem;margin:.85rem 0}.table-tools label{font-size:.82rem}.table-tools input,.table-tools select{margin-top:.25rem}.table-count{align-self:center;margin:1.35rem 0 0;color:var(--muted);font-size:.85rem;white-space:nowrap}.copy-field{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin:.75rem 0}.button--secondary{min-height:34px;padding:.4rem .7rem;border-color:var(--line);background:#fff;color:var(--brand);font-size:.85rem}.button--secondary:hover{border-color:#9db2a7;background:var(--surface-soft);color:var(--brand-hover)}tr[hidden]{display:none}
@@ -730,6 +731,31 @@ export function dashboardPage(
 ${renderRows(rs)}
 </tbody></table>`;
 
+  const courseSummary = (rs: GradeRow[]) => {
+    const withResults = rs.filter((g) => g.verdict != null || g.score != null);
+    const accepted = withResults.filter((g) =>
+      ["AC", "PASS", "PASSED", "OK"].includes((g.verdict ?? "").trim().toUpperCase()),
+    ).length;
+    const scored = rs.filter((g) => g.score != null && g.max_score != null);
+    const score = scored.reduce((sum, g) => sum + Number(g.score), 0);
+    const max = scored.reduce((sum, g) => sum + Number(g.max_score), 0);
+    const latest = rs
+      .map((g, index) => ({ raw: g.updated_at, time: Date.parse(g.updated_at ?? ""), index }))
+      .filter((item) => Number.isFinite(item.time))
+      .sort((a, b) => b.time - a.time || b.index - a.index)[0]?.raw ?? rs.at(-1)?.updated_at;
+    const scoreText = max > 0 ? `${score} / ${max}` : "-";
+    const progressLabel = h(t.grade_summary_progress.replace("{score}", String(score)).replace("{max}", String(max)));
+    const progress = max > 0
+      ? `<progress value="${h(score)}" max="${h(max)}" aria-label="${progressLabel}">${scoreText}</progress>`
+      : "";
+    return `<div class="stats-grid course-summary" aria-label="${h(t.grade_summary_label)}">
+  <div class="stat"><span class="stat__value">${withResults.length} / ${rs.length}</span><span class="stat__label">${t.grade_summary_graded}</span></div>
+  <div class="stat"><span class="stat__value">${accepted}</span><span class="stat__label">${t.grade_summary_accepted}</span></div>
+  <div class="stat"><span class="stat__value">${scoreText}</span><span class="stat__label">${t.grade_summary_score}</span>${progress}</div>
+  <div class="stat"><span class="stat__value text-small">${h(fmtTime(latest))}</span><span class="stat__label">${t.grade_summary_latest}</span></div>
+</div>`;
+  };
+
   // Within a course: labs/assignments (and untyped) shown flat; exams grouped
   // into an exam list the student enters at /me/exam/<assignment_id>.
   const courseBlock = (rs: GradeRow[]) => {
@@ -779,7 +805,7 @@ ${courseTable(labRows)}`
           const parts: string[] = [];
           const meet = meetByCourse[cid];
           if (meet) parts.push(`<p>${linkOrText(meet, t.meet_join)}</p>`);
-          if (rs.length) parts.push(courseBlock(rs));
+          if (rs.length) parts.push(courseSummary(rs), courseBlock(rs));
           const fhtml = formsFor(cid);
           if (fhtml) parts.push(fhtml);
           const inner = parts.length ? parts.join("") : `<p class="empty-state">${t.course_no_data}</p>`;

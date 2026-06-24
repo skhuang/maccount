@@ -29,6 +29,12 @@ export interface Strings {
   my_courses_heading: string;
   assignments_heading: string;
   course_no_data: string;
+  grade_summary_label: string;
+  grade_summary_graded: string;
+  grade_summary_accepted: string;
+  grade_summary_score: string;
+  grade_summary_latest: string;
+  grade_summary_progress: string; // "{score}" and "{max}" placeholders
   col_problem: string;
   col_result: string;
   col_score: string;
@@ -180,6 +186,12 @@ export const T: Record<Lang, Strings> = {
     my_courses_heading: "我的課程",
     assignments_heading: "作業",
     course_no_data: "此課程目前沒有作業或成績。",
+    grade_summary_label: "課程成績摘要",
+    grade_summary_graded: "已有結果",
+    grade_summary_accepted: "已通過",
+    grade_summary_score: "總分",
+    grade_summary_latest: "最後更新",
+    grade_summary_progress: "總分 {score} / {max}",
     col_problem: "題目",
     col_result: "結果",
     col_score: "分數",
@@ -329,6 +341,12 @@ export const T: Record<Lang, Strings> = {
     my_courses_heading: "My Courses",
     assignments_heading: "Assignments",
     course_no_data: "No assignments or grades in this course yet.",
+    grade_summary_label: "Course grade summary",
+    grade_summary_graded: "With results",
+    grade_summary_accepted: "Accepted",
+    grade_summary_score: "Total score",
+    grade_summary_latest: "Last updated",
+    grade_summary_progress: "Total score {score} / {max}",
     col_problem: "Problem",
     col_result: "Result",
     col_score: "Score",
