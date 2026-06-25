@@ -1,7 +1,7 @@
 import type { BindingRow } from "./csv";
 import type { GradeRow } from "./db/grades";
 import { T, langToggle, type Lang } from "./i18n";
-import { accountStatusCard, confirmAttrs, fmtTime, h, repoHref, verdictBadge } from "./ui/components";
+import { accountStatusCard, confirmAttrs, fmtTime, h, helpHint, repoHref, verdictBadge } from "./ui/components";
 import { documentStart } from "./ui/layout";
 import { sortableTh, tableTools, uiEnhancements } from "./ui/tables";
 
@@ -55,6 +55,7 @@ body>p[style*="#fff3cd"]{background:var(--warning-soft)!important;border-color:#
 .identity{margin-bottom:1.25rem}.identity h1{margin-bottom:.25rem}.identity__meta{margin:0;color:var(--muted)}
 .account-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin:1.25rem 0 1.5rem}.status-card{padding:1rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface-soft)}.status-card__head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.55rem}.status-card__title{font-weight:700}.status-card__value{min-height:1.65rem;margin:0 0 .75rem;overflow-wrap:anywhere}.status-card__action{margin:0;font-size:.9rem}
 .badge{display:inline-flex;align-items:center;gap:.35rem;padding:.18rem .5rem;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--muted);font-size:.78rem;font-weight:700;line-height:1.3;white-space:nowrap}.badge::before{content:"";width:.45rem;height:.45rem;border-radius:50%;background:currentColor}.badge--success{border-color:#a8dac1;background:var(--success-soft);color:#08734f}.badge--warning{border-color:#ead483;background:var(--warning-soft);color:#8a6500}.badge--danger{border-color:#efb4b4;background:var(--danger-soft);color:var(--danger)}.badge--neutral{color:#647269}
+.with-help{display:inline-flex;align-items:center;gap:.4rem;flex-wrap:wrap}.help-hint{position:relative;display:inline-flex;align-items:center;margin-left:.35rem;vertical-align:middle}.help-hint__button{width:1.35rem;min-width:1.35rem;height:1.35rem;min-height:1.35rem;padding:0;border:1px solid #aac0b6;border-radius:999px;background:#fff;color:var(--brand);font-size:.82rem;font-weight:800;line-height:1}.help-hint__button:hover{background:var(--surface-soft);color:var(--brand-hover)}.help-hint__button[aria-expanded=true]{border-color:var(--brand);background:var(--brand);color:#fff}.help-hint__panel{position:absolute;right:0;top:calc(100% + .45rem);z-index:6;width:min(18rem,80vw);padding:.65rem .75rem;border:1px solid var(--line);border-radius:10px;background:#17211d;color:#fff;box-shadow:0 12px 32px rgba(20,45,34,.18);font-size:.85rem;font-weight:500;line-height:1.5;letter-spacing:0;white-space:normal}.help-hint__panel::before{content:"";position:absolute;top:-.4rem;right:.45rem;border:.4rem solid transparent;border-top:0;border-bottom-color:#17211d}
 .alert{padding:.8rem 1rem;border:1px solid var(--line);border-radius:9px}.alert--success{border-color:#b8e4ce;background:var(--success-soft)}.alert--warning{border-color:#eedc93;background:var(--warning-soft)}.alert--danger{border-color:#f1b6b6;background:var(--danger-soft)}
 .confirm-dialog{width:min(32rem,calc(100% - 2rem));padding:0;border:1px solid var(--line);border-radius:14px;background:#fff;color:var(--text);box-shadow:0 24px 70px rgba(20,45,34,.24)}.confirm-dialog::backdrop{background:rgba(14,25,20,.56)}.confirm-dialog__body{padding:1.35rem}.confirm-dialog h2{margin:0 0 .65rem;padding:0;border:0}.confirm-dialog p{margin:.5rem 0 1.25rem;color:var(--muted)}.confirm-dialog__actions{display:flex;justify-content:flex-end;gap:.65rem}.button--danger{background:var(--danger)}.button--danger:hover{background:#a61e1e}
 .course-list{display:grid;gap:1rem}.course-card{padding:1.1rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.course-card h3{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:0 0 .8rem}.course-card h3::after{content:"";width:.55rem;height:.55rem;border-radius:50%;background:var(--brand)}.course-card>p:last-child{margin-bottom:0}.course-card table{margin-top:.45rem}
@@ -66,7 +67,7 @@ body>p[style*="#fff3cd"]{background:var(--warning-soft)!important;border-color:#
 .table-tools{display:grid;grid-template-columns:minmax(220px,1fr) minmax(160px,auto) auto;align-items:end;gap:.75rem;margin:.85rem 0}.table-tools label{font-size:.82rem}.table-tools input,.table-tools select{margin-top:.25rem}.table-count{align-self:center;margin:1.35rem 0 0;color:var(--muted);font-size:.85rem;white-space:nowrap}.copy-field{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin:.75rem 0}.button--secondary{min-height:34px;padding:.4rem .7rem;border-color:var(--line);background:#fff;color:var(--brand);font-size:.85rem}.button--secondary:hover{border-color:#9db2a7;background:var(--surface-soft);color:var(--brand-hover)}tr[hidden]{display:none}
 .sort-button{display:flex;width:100%;min-height:0;padding:0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;text-align:left}.sort-button:hover{background:transparent;color:var(--brand)}.sort-icon{margin-left:.4rem;color:var(--muted)}.course-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin:1rem 0}.course-admin-card{display:flex;min-height:150px;flex-direction:column;padding:1.1rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.course-admin-card--archived{background:var(--surface-soft)}.course-admin-card__head{display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem}.course-admin-card h2{margin:0;padding:0;border:0;font-size:1.1rem}.course-admin-card__meta{margin:.45rem 0 1rem;color:var(--muted);font-size:.88rem}.course-admin-card__action{margin:auto 0 0}.admin-disclosure{margin:1.5rem 0;background:#fff}.admin-disclosure>summary{font-size:1.05rem}.admin-disclosure__body{padding:0 1rem 1rem}.utility-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}.utility-card{padding:1rem;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}.utility-card p{margin:.35rem 0 0;color:var(--muted);font-size:.86rem}
 @media(max-width:760px){.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:640px){html{background:var(--surface)}body{width:100%;margin:0!important;padding:1.15rem!important;border:0;border-radius:0;box-shadow:none}h1{margin-top:.75rem}h2{margin-top:1.75rem}th,td{padding:.6rem!important}button{width:100%}td button,li button,.button--secondary,.sort-button{width:auto}form[style*="display:inline"]{display:inline!important}.topbar{align-items:flex-start}.topbar__actions{justify-content:flex-end}.account-grid{grid-template-columns:1fr}.section-nav{margin-inline:-1.15rem;padding-inline:1.15rem}.admin-section{padding:1rem}.course-card{padding:1rem}.table-tools{grid-template-columns:1fr}.table-count{margin:0}.copy-field{align-items:stretch}.copy-field code{flex:1;overflow-wrap:anywhere}.course-grid,.utility-grid{grid-template-columns:1fr}.mobile-compact{display:table;table-layout:auto;overflow:visible;white-space:normal}.mobile-compact th,.mobile-compact td{overflow-wrap:anywhere}.mobile-compact .mobile-secondary,.mobile-compact th:nth-child(5){display:none}.mobile-card-table{overflow:visible;white-space:normal}.mobile-card-table thead{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}.mobile-card-table tbody,.mobile-card-table tr,.mobile-card-table td{display:block;width:100%}.mobile-card-table tr{margin-bottom:.75rem;overflow:hidden;border:1px solid var(--line);border-radius:10px;background:#fff}.mobile-card-table td{display:grid;grid-template-columns:minmax(6.5rem,40%) minmax(0,1fr);gap:.75rem;border:0;border-bottom:1px solid var(--line);white-space:normal;overflow-wrap:anywhere}.mobile-card-table td:last-child{border-bottom:0}.mobile-card-table td::before{content:attr(data-label);color:var(--muted);font-size:.82rem;font-weight:700}.mobile-card-table tbody tr:nth-child(even),.mobile-card-table tbody tr:hover{background:#fff}}
+@media(max-width:640px){html{background:var(--surface)}body{width:100%;margin:0!important;padding:1.15rem!important;border:0;border-radius:0;box-shadow:none}h1{margin-top:.75rem}h2{margin-top:1.75rem}th,td{padding:.6rem!important}button{width:100%}.help-hint__button{width:1.45rem;min-width:1.45rem}.help-hint__panel{right:auto;left:50%;transform:translateX(-50%);width:min(18rem,calc(100vw - 2rem))}.help-hint__panel::before{right:auto;left:50%;transform:translateX(-50%)}td button,li button,.button--secondary,.sort-button{width:auto}form[style*="display:inline"]{display:inline!important}.topbar{align-items:flex-start}.topbar__actions{justify-content:flex-end}.account-grid{grid-template-columns:1fr}.section-nav{margin-inline:-1.15rem;padding-inline:1.15rem}.admin-section{padding:1rem}.course-card{padding:1rem}.table-tools{grid-template-columns:1fr}.table-count{margin:0}.copy-field{align-items:stretch}.copy-field code{flex:1;overflow-wrap:anywhere}.course-grid,.utility-grid{grid-template-columns:1fr}.mobile-compact{display:table;table-layout:auto;overflow:visible;white-space:normal}.mobile-compact th,.mobile-compact td{overflow-wrap:anywhere}.mobile-compact .mobile-secondary,.mobile-compact th:nth-child(5){display:none}.mobile-card-table{overflow:visible;white-space:normal}.mobile-card-table thead{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}.mobile-card-table tbody,.mobile-card-table tr,.mobile-card-table td{display:block;width:100%}.mobile-card-table tr{margin-bottom:.75rem;overflow:hidden;border:1px solid var(--line);border-radius:10px;background:#fff}.mobile-card-table td{display:grid;grid-template-columns:minmax(6.5rem,40%) minmax(0,1fr);gap:.75rem;border:0;border-bottom:1px solid var(--line);white-space:normal;overflow-wrap:anywhere}.mobile-card-table td:last-child{border-bottom:0}.mobile-card-table td::before{content:attr(data-label);color:var(--muted);font-size:.82rem;font-weight:700}.mobile-card-table tbody tr:nth-child(even),.mobile-card-table tbody tr:hover{background:#fff}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 `;
 
@@ -117,7 +118,7 @@ export function adminHomePage(
         .join("\n")}</div>`
     : `<p class="empty-state">${t.no_courses}</p>`;
   const createForm = opts.isOwner
-    ? `<details class="admin-disclosure"${courses.length ? "" : " open"}><summary>${t.course_create_expand}</summary><div class="admin-disclosure__body">
+    ? `<details class="admin-disclosure"${courses.length ? "" : " open"}><summary>${t.course_create_expand}${helpHint(t.help_course_create, t.help_label)}</summary><div class="admin-disclosure__body">
 <form method="post" action="/admin/courses" class="form-stack" style="max-width:440px">
   <label>${t.ph_course_id}<input name="course_id" placeholder="ds-2026" required pattern="[A-Za-z0-9_-]+" autocomplete="off"></label>
   <label>${t.ph_course_name}<input name="name" placeholder="${t.ph_course_name}" required></label>
@@ -138,6 +139,7 @@ export function adminHomePage(
 ${items}
 ${createForm}
 ${bindingsSection}
+${uiEnhancements(t)}
 </body></html>`;
 }
 
@@ -313,7 +315,7 @@ export function adminPage(
     )
     .join("\n");
   const staffSection = isOwner
-    ? `<section class="admin-section" id="staff"><h2>${t.staff_heading}</h2>
+    ? `<section class="admin-section" id="staff"><h2 class="with-help">${t.staff_heading}${helpHint(t.help_staff, t.help_label)}</h2>
 <p class="muted text-small">${t.staff_note}</p>
 <table class="mobile-compact" border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>NYCU id</th><th class="mobile-secondary">${t.staff_added_by}</th><th></th></tr></thead>
@@ -345,11 +347,11 @@ export function adminPage(
       "replace",
     )}>
   <label>${t.enroll_ids_label}<textarea name="student_ids" rows="4" cols="40" placeholder="${t.enroll_placeholder}" required spellcheck="false"></textarea></label>
-  <label class="check-row check-row--danger"><input type="checkbox" name="replace" value="1"> <span>${t.enroll_replace}</span></label>
+  <label class="check-row check-row--danger"><input type="checkbox" name="replace" value="1"> <span>${t.enroll_replace}${helpHint(t.help_roster_replace, t.help_label)}</span></label>
   <button type="submit">${t.enroll_import}</button>
 </form>`
     : "";
-  const enrollSection = `<section class="admin-section" id="enrollment"><h2>${t.enroll_heading.replace("{n}", String(enrolled.length))}</h2>
+  const enrollSection = `<section class="admin-section" id="enrollment"><h2 class="with-help">${t.enroll_heading.replace("{n}", String(enrolled.length))}${helpHint(t.help_enrollment, t.help_label)}</h2>
 <p class="muted text-small">${t.enroll_note.replace("{bound}", String(bound)).replace("{gbound}", String(gbound))}</p>${
     enrolled.length
       ? `
@@ -377,7 +379,7 @@ ${enrollImport}</section>`;
   const driveBanner = driveBannerText
     ? `<p class="alert alert--${dm.startsWith("done:") ? "success" : dm === "token-error" ? "danger" : "warning"}" role="${dm === "token-error" ? "alert" : "status"}">${driveBannerText}</p>`
     : "";
-  const driveSection = `<section class="admin-section" id="drive"><h2>${t.drive_heading}</h2>
+  const driveSection = `<section class="admin-section" id="drive"><h2 class="with-help">${t.drive_heading}${helpHint(t.help_drive, t.help_label)}</h2>
 <p class="muted text-small">${t.drive_note} <a href="/auth/google/start?drive=1">${t.drive_connect}</a></p>
 ${driveBanner}
 <form method="post" action="${base}/drive/share" class="form-stack" style="max-width:440px">
@@ -421,9 +423,9 @@ ${driveBanner}
         .join("\n")}</ul>`
     : `<p class="empty-state">${t.forms_none}</p>`;
   const preEnrollLabel = `<label class="check-row"><input type="checkbox" name="pre_enroll" value="1"> <span>${t.forms_pre_enroll_label}</span></label>`;
-  const formsSection = `<section class="admin-section" id="forms"><h2>${t.forms_heading}</h2>
+  const formsSection = `<section class="admin-section" id="forms"><h2 class="with-help">${t.forms_heading}${helpHint(t.help_forms, t.help_label)}</h2>
 <p class="muted text-small">${t.forms_note}</p>
-<div class="copy-field"><span>${t.prejoin_link_label}：</span><code>/me/${h(course.course_id)}</code><button type="button" class="button button--secondary" data-copy-path="/me/${h(course.course_id)}">${t.copy_link}</button></div>
+<div class="copy-field"><span>${t.prejoin_link_label}${helpHint(t.help_prejoin_link, t.help_label)}：</span><code>/me/${h(course.course_id)}</code><button type="button" class="button button--secondary" data-copy-path="/me/${h(course.course_id)}">${t.copy_link}</button></div>
 ${formsBanner}
 ${formsRows}
 <form method="post" action="${base}/forms/add" class="form-stack" style="max-width:440px">
@@ -456,7 +458,7 @@ ${formsRows}
   const classroomBanner = classroomBannerText
     ? `<p class="alert alert--${cm.startsWith("done:") ? "success" : cm === "token-error" ? "danger" : "warning"}" role="${cm === "token-error" ? "alert" : "status"}">${classroomBannerText}</p>`
     : "";
-  const classroomSection = `<section class="admin-section" id="classroom"><h2>${t.classroom_heading}</h2>
+  const classroomSection = `<section class="admin-section" id="classroom"><h2 class="with-help">${t.classroom_heading}${helpHint(t.help_classroom, t.help_label)}</h2>
 <p class="muted text-small">${t.classroom_note}</p>
 ${classroomBanner}
 ${
@@ -469,7 +471,7 @@ ${
   // Course settings — owner edits name/term/Moodle/org/status (re-submits the
   // upsert with the same course_id).
   const settingsSection = isOwner
-    ? `<section class="admin-section" id="settings"><h2>${t.course_settings}</h2>
+    ? `<section class="admin-section" id="settings"><h2 class="with-help">${t.course_settings}${helpHint(t.help_settings, t.help_label)}</h2>
 <form method="post" action="/admin/courses" class="form-stack" style="max-width:440px">
   <input type="hidden" name="course_id" value="${h(course.course_id)}">
   <label>${t.ph_course_name}<input name="name" value="${h(course.name)}" required></label>
@@ -509,9 +511,9 @@ ${
 ${stats}
 ${adminNav}
 <div class="admin-sections">
-<section class="admin-section" id="bindings"><h2>${t.admin_bindings.replace("{n}", String(rows.length))}</h2>
+<section class="admin-section" id="bindings"><h2 class="with-help">${t.admin_bindings.replace("{n}", String(rows.length))}${helpHint(t.help_bindings, t.help_label)}</h2>
 ${banner}
-<p><a href="${base}/export.csv">${t.export_full}</a>　|　<a href="${base}/roster.csv">${t.export_roster}</a></p>
+<p><a href="${base}/export.csv">${t.export_full}</a>　|　<a href="${base}/roster.csv">${t.export_roster}</a>${helpHint(t.help_exports, t.help_label)}</p>
 ${rows.length ? tableTools(t, "course-bindings-table", rows.length) : ""}
 <table id="course-bindings-table" class="mobile-compact" border="1" cellpadding="6" cellspacing="0">
 <thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("GitHub", 2)}${sortableTh(t.th_github_id, 3, "number", "mobile-secondary")}<th>Google</th>${sortableTh(t.th_updated, 5, "text", "mobile-secondary")}${isOwner ? `<th>${t.th_actions}</th>` : ""}</tr></thead>
@@ -547,8 +549,8 @@ export function dashboardPage(
 ): string {
   const t = T[lang];
   const accountCards = `<div class="account-grid" aria-label="${t.acct_heading}">
-  ${accountStatusCard(t, t.github, binding?.github_login, "/auth/github/start", t.bind_action)}
-  ${accountStatusCard(t, t.google, binding?.google_email, "/auth/google/start", t.bind_google_action)}
+  ${accountStatusCard(t, t.github, binding?.github_login, "/auth/github/start", t.bind_action, t.help_account_binding)}
+  ${accountStatusCard(t, t.google, binding?.google_email, "/auth/google/start", t.bind_google_action, t.help_account_binding)}
 </div>`;
 
   // The student's own repo for the problem; link to it when present. A bare
@@ -602,7 +604,7 @@ ${renderRows(rs)}
       : "";
     return `<div class="stats-grid course-summary" aria-label="${h(t.grade_summary_label)}">
   <div class="stat"><span class="stat__value">${withResults.length} / ${rs.length}</span><span class="stat__label">${t.grade_summary_graded}</span></div>
-  <div class="stat"><span class="stat__value">${accepted}</span><span class="stat__label">${t.grade_summary_accepted}</span></div>
+  <div class="stat"><span class="stat__value">${accepted}</span><span class="stat__label">${t.grade_summary_accepted}${helpHint(t.help_verdict, t.help_label)}</span></div>
   <div class="stat"><span class="stat__value">${scoreText}</span><span class="stat__label">${t.grade_summary_score}</span>${progress}</div>
   <div class="stat"><span class="stat__value text-small">${h(fmtTime(latest))}</span><span class="stat__label">${t.grade_summary_latest}</span></div>
 </div>`;
@@ -661,7 +663,7 @@ ${courseTable(labRows)}`
           const fhtml = formsFor(cid);
           if (fhtml) parts.push(fhtml);
           const inner = parts.length ? parts.join("") : `<p class="empty-state">${t.course_no_data}</p>`;
-          return `<article class="course-card"><h3>${h(courseName(cid))}</h3>\n${inner}</article>`;
+          return `<article class="course-card"><h3>${h(courseName(cid))}${rs.length ? helpHint(t.help_grade_summary, t.help_label) : ""}</h3>\n${inner}</article>`;
         })
         .join("\n")}</div>`
     : `<p class="empty-state">${t.no_grades}</p>`;
@@ -696,6 +698,7 @@ ${orgHtml}
 ${table}
 <p class="muted text-small">${t.privacy_note}</p>
 ${adminHtml}
+${uiEnhancements(t)}
 </body></html>`;
 }
 
@@ -708,7 +711,7 @@ export function examPage(lang: Lang, assignmentId: string, rows: GradeRow[]): st
     .map((g) => {
       const url = repoHref(g.repo);
       const repoCell = url
-        ? `<a href="${h(url)}" target="_blank" rel="noopener">${t.exam_go_solve} ↗</a>`
+        ? `<a href="${h(url)}" target="_blank" rel="noopener">${t.exam_go_solve} ↗</a>${helpHint(t.help_exam_repo, t.help_label)}`
         : `<span class="muted">${t.exam_no_repo}</span>`;
       return `<tr><td data-label="${h(t.col_problem)}">${h(g.problem_id)}</td><td data-label="repo">${repoCell}</td>
   <td data-label="${h(t.col_result)}">${verdictBadge(g.verdict)}</td>
@@ -727,6 +730,7 @@ ${langToggle(`/me/exam/${encodeURIComponent(assignmentId)}`, lang)}
 ${trs}
 </tbody></table>
 <p class="muted text-small">${t.privacy_note}</p>
+${uiEnhancements(t)}
 </body></html>`;
 }
 
@@ -756,10 +760,11 @@ export function coursePrejoinPage(
 <p style="color:#555">${t.prejoin_intro}</p>
 ${flashHtml}
 <div class="account-grid" aria-label="${t.acct_heading}">
-${accountStatusCard(t, t.github, binding?.github_login, "/auth/github/start", t.bind_action)}
-${accountStatusCard(t, t.google, binding?.google_email, "/auth/google/start", t.bind_google_action)}
+${accountStatusCard(t, t.github, binding?.github_login, "/auth/github/start", t.bind_action, t.help_account_binding)}
+${accountStatusCard(t, t.google, binding?.google_email, "/auth/google/start", t.bind_google_action, t.help_account_binding)}
 </div>
-<h2>${t.forms_student_heading}</h2>
+<h2 class="with-help">${t.forms_student_heading}${helpHint(t.help_forms, t.help_label)}</h2>
 ${formsHtml}
+${uiEnhancements(t)}
 </body></html>`;
 }

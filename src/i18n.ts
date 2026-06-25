@@ -167,6 +167,23 @@ export interface Strings {
   copy_link: string;
   copied: string;
   copy_failed: string;
+  help_label: string;
+  help_account_binding: string;
+  help_grade_summary: string;
+  help_verdict: string;
+  help_exam_repo: string;
+  help_course_create: string;
+  help_bindings: string;
+  help_exports: string;
+  help_table_search: string;
+  help_enrollment: string;
+  help_roster_replace: string;
+  help_drive: string;
+  help_forms: string;
+  help_prejoin_link: string;
+  help_classroom: string;
+  help_staff: string;
+  help_settings: string;
   prejoin_intro: string;
   classroom_heading: string;
   classroom_note: string;
@@ -332,6 +349,23 @@ export const T: Record<Lang, Strings> = {
     copy_link: "複製連結",
     copied: "已複製",
     copy_failed: "無法複製",
+    help_label: "說明",
+    help_account_binding: "把你的 NYCU 身分連到 GitHub / Google；課程邀請、repo 與問卷會用這些帳號對應。",
+    help_grade_summary: "摘要只統計目前已同步到 maccount 的結果；若剛交作業，請等 OJ 或匯入流程更新。",
+    help_verdict: "AC/PASS 代表通過；WA/RE/TLE 等代表尚未通過或執行異常；只顯示判定與分數，不顯示測資內容。",
+    help_exam_repo: "開啟你的個人 repo 後 clone、提交並 push；OJ 會依課程設定評分。",
+    help_course_create: "相同 course_id 再送出會更新既有課程，不會建立第二門；course_id 建議固定且不要隨意更名。",
+    help_bindings: "綁定名單是學生全域帳號對應；刪除綁定會影響所有課程，但不會刪除成績或選課資料。",
+    help_exports: "完整 CSV 含所有綁定欄位；roster.csv 只輸出 github_login 與 student_id，適合匯入評分或課程工具。",
+    help_table_search: "可搜尋目前表格中的學號、姓名、GitHub、Google 等文字；搭配篩選可快速找未綁定學生。",
+    help_enrollment: "選課名單控制本課 roster；已綁定且在選課名單中的學生會出現在課程匯出。",
+    help_roster_replace: "勾選後，新名單會覆蓋整份本課選課名單；未出現在貼上內容中的學生會從本課移除。",
+    help_drive: "以你授權的 Google Drive 分享給已選課且已綁定 Google 的學生；未綁定者會被略過。",
+    help_forms: "學生會在 /me 對應課程看到這些表單；請在 Google 表單設定要求登入並收集 email。",
+    help_prejoin_link: "給尚未正式選課的學生使用；他們可先綁定帳號並填寫報到問卷。",
+    help_classroom: "用已綁定的 Google email 邀請學生加入 Classroom；你本人需要是該 Classroom 的老師。",
+    help_staff: "助教可檢視與匯出本課資料；擁有者才能新增/移除助教或刪除全域綁定。",
+    help_settings: "修改課程名稱、學期、Moodle/GitHub/Google 設定；封存課程會在列表中標示但保留資料。",
     prejoin_intro: "尚未選課也沒關係！請先綁定你的 GitHub / Google 帳號，並填寫下方問卷，老師會據此將你加入課程。",
     classroom_heading: "Google Classroom",
     classroom_note: "把「選課∩已綁 Google」的學生以其 Google email 邀請加入本課的 Google Classroom（你需先「連結我的 Google Drive（完整權限）」一次，且你本人須為該 Classroom 的老師）。Classroom ID 請於上方設定區填寫。",
@@ -495,6 +529,23 @@ export const T: Record<Lang, Strings> = {
     copy_link: "Copy link",
     copied: "Copied",
     copy_failed: "Couldn't copy",
+    help_label: "Help",
+    help_account_binding: "Links your NYCU identity to GitHub / Google; course invites, repos, and forms use these accounts for matching.",
+    help_grade_summary: "The summary only counts results currently synced to maccount. If you just submitted, wait for the OJ/import job to update.",
+    help_verdict: "AC/PASS means accepted. WA/RE/TLE and similar verdicts are not accepted or had runtime issues. Only verdicts and scores are shown; test data is not exposed.",
+    help_exam_repo: "Open your personal repo, clone it, commit, and push. The OJ grades according to the course setup.",
+    help_course_create: "Submitting the same course_id updates the existing course instead of creating another one. Keep course_id stable.",
+    help_bindings: "Bindings are global student-account mappings. Deleting one affects every course, but keeps grades and enrollment data.",
+    help_exports: "The full CSV includes all binding fields; roster.csv contains only github_login and student_id for grading/course tools.",
+    help_table_search: "Search within the current table by student ID, name, GitHub, Google, and other visible text. Combine with filters to find missing bindings.",
+    help_enrollment: "The roster controls this course's enrollment. Bound students on the roster are included in course exports.",
+    help_roster_replace: "When checked, the pasted list replaces the entire roster for this course; students not listed are removed from this course.",
+    help_drive: "Shares from your authorized Google Drive to enrolled students who bound Google. Students without Google binding are skipped.",
+    help_forms: "Students see these forms under the matching course on /me. Configure the Google Form to require sign-in and collect email.",
+    help_prejoin_link: "For students not officially enrolled yet. They can bind accounts and fill in the pre-enrollment form first.",
+    help_classroom: "Invites students by their bound Google email. You must be a teacher in that Classroom.",
+    help_staff: "Staff can view and export this course's data. Only owners can add/remove staff or delete global bindings.",
+    help_settings: "Edit course name, term, Moodle/GitHub/Google settings. Archiving marks the course in lists while keeping data.",
     prejoin_intro: "Not enrolled yet? No problem — bind your GitHub / Google account and fill in the form below; the instructor will enroll you based on it.",
     classroom_heading: "Google Classroom",
     classroom_note: "Invite enrolled students who bound Google (by their Google email) into this course's Google Classroom. Connect your Google Drive (full access) once first, and you must be a teacher of that Classroom. Set the Classroom ID in “Course settings” above.",

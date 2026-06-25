@@ -13,15 +13,23 @@ export function confirmAttrs(title: string, message: string, action: string, whe
   }`;
 }
 
+export function helpHint(text: string, label: string): string {
+  return `<span class="help-hint" data-help-hint>
+  <button type="button" class="help-hint__button" aria-label="${h(label)}：${h(text)}" aria-expanded="false" data-help-toggle>?</button>
+  <span class="help-hint__panel" role="tooltip" hidden data-help-panel>${h(text)}</span>
+</span>`;
+}
+
 export function accountStatusCard(
   t: Strings,
   label: string,
   value: string | null | undefined,
   href: string,
   action: string,
+  hint = "",
 ): string {
   return `<article class="status-card">
-  <div class="status-card__head"><span class="status-card__title">${label}</span><span class="badge badge--${value ? "success" : "warning"}">${value ? t.bound : t.not_bound}</span></div>
+  <div class="status-card__head"><span class="status-card__title">${label}${hint ? helpHint(hint, t.help_label) : ""}</span><span class="badge badge--${value ? "success" : "warning"}">${value ? t.bound : t.not_bound}</span></div>
   <p class="status-card__value">${value ? `<b>${h(value)}</b>` : t.not_bound}</p>
   <p class="status-card__action"><a class="${value ? "" : "button"}" href="${href}">${value ? t.rebind : action}</a></p>
 </article>`;
