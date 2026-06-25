@@ -131,6 +131,23 @@ test("destructive admin actions use an accessible confirmation dialog", async ({
   await expect.poll(() => posts).toBe(1);
 });
 
+test("help hints open on click and close with Escape", async ({ page }) => {
+  await page.setContent(adminFixture(), { waitUntil: "load" });
+  const hint = page.locator("#bindings [data-help-hint]").first();
+  const button = hint.locator("[data-help-toggle]");
+  const panel = hint.locator("[data-help-panel]");
+
+  await expect(panel).toBeHidden();
+  await button.click();
+  await expect(button).toHaveAttribute("aria-expanded", "true");
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText("綁定名單是學生全域帳號對應");
+
+  await page.keyboard.press("Escape");
+  await expect(button).toHaveAttribute("aria-expanded", "false");
+  await expect(panel).toBeHidden();
+});
+
 test("student and admin pages have no automated WCAG A/AA violations", async ({ page }) => {
   const student = dashboardPage(
     "zh",

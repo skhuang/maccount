@@ -294,7 +294,7 @@ describe("dashboardPage", () => {
     );
     expect(html).toContain('class="stats-grid course-summary"');
     expect(html).toContain('<span class="stat__value">2 / 3</span>');
-    expect(html).toContain('<span class="stat__value">1</span><span class="stat__label">已通過</span>');
+    expect(html).toContain('<span class="stat__value">1</span><span class="stat__label">已通過');
     expect(html).toContain('<span class="stat__value">130 / 150</span>');
     expect(html).toContain('aria-label="總分 130 / 150"');
     expect(html).toContain("2026/06/24 10:00");
@@ -322,6 +322,16 @@ describe("coursePrejoinPage", () => {
     expect(html).toContain("/auth/github/start");
     expect(html).toContain("/auth/google/start");
     expect(html).toContain("尚未綁定"); // not-bound state for both
+  });
+});
+
+describe("help hints", () => {
+  it("renders accessible help buttons with localized text", () => {
+    const html = adminPage("zh", course, rows, { isOwner: true, staff: [] });
+    expect(html).toContain('class="help-hint" data-help-hint');
+    expect(html).toContain('aria-label="說明：綁定名單是學生全域帳號對應');
+    expect(html).toContain('data-help-toggle');
+    expect(html).toContain('data-help-panel');
   });
 });
 

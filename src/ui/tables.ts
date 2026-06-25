@@ -1,5 +1,5 @@
 import type { Strings } from "../i18n";
-import { h } from "./components";
+import { h, helpHint } from "./components";
 
 type TableFilterOption = { value: string; label: string };
 
@@ -17,7 +17,7 @@ export function tableTools(
 </select></label>`
     : "";
   return `<div class="table-tools" data-table-tools data-table-id="${h(tableId)}">
-  <label>${t.table_search_label}<input type="search" data-table-search placeholder="${t.table_search_placeholder}" autocomplete="off"></label>
+  <label>${t.table_search_label}${helpHint(t.help_table_search, t.help_label)}<input type="search" data-table-search placeholder="${t.table_search_placeholder}" autocomplete="off"></label>
   ${filter}
   <p class="table-count" data-table-count data-template="${h(t.table_showing)}" aria-live="polite">${h(count)}</p>
 </div>`;
@@ -113,6 +113,44 @@ document.querySelectorAll("[data-copy-path]").forEach((button)=>{
     area.value=value;area.style.position="fixed";area.style.opacity="0";document.body.append(area);area.select();
     let ok=false;try{ok=document.execCommand("copy");}catch{}area.remove();finish(ok);
   });
+});
+const closeHelp=(hint)=>{
+  if(!hint)return;
+  const toggle=hint.querySelector("[data-help-toggle]");
+  const panel=hint.querySelector("[data-help-panel]");
+  if(toggle)toggle.setAttribute("aria-expanded","false");
+  if(panel)panel.hidden=true;
+};
+const openHelp=(hint)=>{
+  if(!hint)return;
+  const toggle=hint.querySelector("[data-help-toggle]");
+  const panel=hint.querySelector("[data-help-panel]");
+  document.querySelectorAll("[data-help-hint].is-open").forEach((other)=>{if(other!==hint){other.classList.remove("is-open");closeHelp(other);}});
+  hint.classList.add("is-open");
+  if(toggle)toggle.setAttribute("aria-expanded","true");
+  if(panel)panel.hidden=false;
+};
+document.querySelectorAll("[data-help-hint]").forEach((hint)=>{
+  const toggle=hint.querySelector("[data-help-toggle]");
+  toggle?.addEventListener("click",(event)=>{
+    event.stopPropagation();
+    if(hint.dataset.openedByFocus==="true"){delete hint.dataset.openedByFocus;openHelp(hint);return;}
+    if(hint.classList.contains("is-open")){hint.classList.remove("is-open");closeHelp(hint);return;}
+    openHelp(hint);
+  });
+  toggle?.addEventListener("focus",()=>{hint.dataset.openedByFocus="true";openHelp(hint);});
+  hint.addEventListener("pointerenter",()=>openHelp(hint));
+  hint.addEventListener("pointerleave",()=>{if(document.activeElement!==toggle){hint.classList.remove("is-open");closeHelp(hint);}});
+});
+document.addEventListener("click",(event)=>{
+  document.querySelectorAll("[data-help-hint].is-open").forEach((hint)=>{
+    if(!hint.contains(event.target)){hint.classList.remove("is-open");closeHelp(hint);}
+  });
+});
+document.addEventListener("keydown",(event)=>{
+  if(event.key==="Escape"){
+    document.querySelectorAll("[data-help-hint].is-open").forEach((hint)=>{hint.classList.remove("is-open");closeHelp(hint);});
+  }
 });
 const confirmDialog=document.querySelector("[data-confirm-dialog]");
 if(confirmDialog){
