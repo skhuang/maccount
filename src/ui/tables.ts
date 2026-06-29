@@ -97,14 +97,15 @@ document.querySelectorAll("[data-table-tools]").forEach((tools)=>{
     });
   });
 });
-document.querySelectorAll("[data-copy-path]").forEach((button)=>{
+document.querySelectorAll("[data-copy-path],[data-copy-target]").forEach((button)=>{
   const original=button.textContent||"";
   const finish=(ok)=>{
     button.textContent=ok?${JSON.stringify(t.copied)}:${JSON.stringify(t.copy_failed)};
     window.setTimeout(()=>{button.textContent=original;},1600);
   };
   button.addEventListener("click",()=>{
-    const value=new URL(button.dataset.copyPath||"/",location.origin).href;
+    const target=button.dataset.copyTarget?document.getElementById(button.dataset.copyTarget):null;
+    const value=target?("value" in target?target.value:target.textContent||""):new URL(button.dataset.copyPath||"/",location.origin).href;
     if(navigator.clipboard?.writeText){
       navigator.clipboard.writeText(value).then(()=>finish(true),()=>finish(false));
       return;

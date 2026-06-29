@@ -197,6 +197,11 @@ describe("adminPage", () => {
     expect(html).toContain('action="/c/ds-2026/admin/forms/group/sync"');
     expect(html).toContain("同步 Google Group 成員");
     expect(html).toContain("OWNER、MANAGER");
+    expect(html).toContain("Google Groups 匯入名單");
+    expect(html).toContain('id="forms-group-email-list" readonly');
+    expect(html).toContain("alice@gmail.com\nalice@nycu.edu.tw\nbob@gmail.com");
+    expect(html).toContain('data-copy-target="forms-group-email-list"');
+    expect(html).toContain("複製 email 名單");
   });
 
   it("shows an edit link for an API-created form (has form_id)", () => {
