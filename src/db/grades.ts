@@ -70,9 +70,16 @@ export async function upsertGrades(db: D1Database, rows: GradeInput[]): Promise<
 
 // A student's grades across all their courses (each row carries course_id +
 // assignment_* so /me can group labs flat and exams into an exam list).
+// Excludes assignments an instructor has hidden from the student dashboard.
+// (assignment_id NULL never matches -> ungrouped grades are never hidden.)
+const NOT_HIDDEN =
+  "NOT EXISTS (SELECT 1 FROM assignment_visibility v" +
+  " WHERE v.course_id = grades.course_id AND v.assignment_id = grades.assignment_id" +
+  " AND v.hidden = 1)";
+
 export async function listGradesFor(db: D1Database, student_id: string): Promise<GradeRow[]> {
   const { results } = await db
-    .prepare(`SELECT ${COLS} FROM grades WHERE student_id = ? ORDER BY course_id, problem_id`)
+    .prepare(`SELECT ${COLS} FROM grades WHERE student_id = ? AND ${NOT_HIDDEN} ORDER BY course_id, problem_id`)
     .bind(student_id)
     .all<GradeRow>();
   return results ?? [];
@@ -83,7 +90,7 @@ export async function listGradesForStudentAssignment(
   db: D1Database, student_id: string, assignment_id: string,
 ): Promise<GradeRow[]> {
   const { results } = await db
-    .prepare(`SELECT ${COLS} FROM grades WHERE student_id = ? AND assignment_id = ? ORDER BY problem_id`)
+    .prepare(`SELECT ${COLS} FROM grades WHERE student_id = ? AND assignment_id = ? AND ${NOT_HIDDEN} ORDER BY problem_id`)
     .bind(student_id, assignment_id)
     .all<GradeRow>();
   return results ?? [];
@@ -100,4 +107,30 @@ export async function listGradesForProblem(
   const stmt = course_id ? db.prepare(sql).bind(problem_id, course_id) : db.prepare(sql).bind(problem_id);
   const { results } = await stmt.all<GradeRow>();
   return results ?? [];
+}
+
+// Instructor toggle: hide/show an assignment on the student dashboard (/me).
+// Independent of the grade rows, so the dsjudge upsert never resets it.
+export async function setAssignmentVisibility(
+  db: D1Database, course_id: string, assignment_id: string, hidden: boolean,
+  updated_at: string,
+): Promise<void> {
+  await db
+    .prepare(
+      "INSERT INTO assignment_visibility (course_id, assignment_id, hidden, updated_at)" +
+      " VALUES (?, ?, ?, ?)" +
+      " ON CONFLICT(course_id, assignment_id) DO UPDATE SET hidden = ?, updated_at = ?")
+    .bind(course_id, assignment_id, hidden ? 1 : 0, updated_at, hidden ? 1 : 0, updated_at)
+    .run();
+}
+
+// Hidden assignment ids for a course (for a staff overview).
+export async function listHiddenAssignments(
+  db: D1Database, course_id: string,
+): Promise<string[]> {
+  const { results } = await db
+    .prepare("SELECT assignment_id FROM assignment_visibility WHERE course_id = ? AND hidden = 1 ORDER BY assignment_id")
+    .bind(course_id)
+    .all<{ assignment_id: string }>();
+  return (results ?? []).map((r) => r.assignment_id);
 }

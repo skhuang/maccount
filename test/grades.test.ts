@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { env, applyD1Migrations } from "cloudflare:test";
-import { upsertGrades, listGradesFor } from "../src/db/grades";
+import {
+  upsertGrades, listGradesFor, listGradesForStudentAssignment,
+  setAssignmentVisibility, listHiddenAssignments,
+} from "../src/db/grades";
 
 beforeAll(async () => {
   await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
@@ -55,5 +58,53 @@ describe("grades db", () => {
       ["ds-2026", 100],
       ["ds-2027", 40],
     ]);
+  });
+});
+
+describe("assignment visibility (hide/publish on /me)", () => {
+  beforeEach(async () => {
+    await env.DB.prepare("DELETE FROM assignment_visibility").run();
+  });
+  const A = "ds2026-practice6";
+  const ga = (over = {}) => g({ assignment_id: A, ...over });
+
+  it("hiding an assignment removes its rows from listGradesFor", async () => {
+    await upsertGrades(env.DB, [
+      ga({ problem_id: "lab01-stack" }),
+      ga({ problem_id: "lab02-queue" }),
+      g({ problem_id: "other", assignment_id: "ds2026-mid" }),  // different assignment
+    ]);
+    expect((await listGradesFor(env.DB, "314561004")).length).toBe(3);
+    await setAssignmentVisibility(env.DB, "ds-2026", A, true, "t");
+    const rows = await listGradesFor(env.DB, "314561004");
+    expect(rows.map((r) => r.problem_id)).toEqual(["other"]);   // only the other assignment
+  });
+
+  it("un-hiding (hidden:false) brings the rows back", async () => {
+    await upsertGrades(env.DB, [ga()]);
+    await setAssignmentVisibility(env.DB, "ds-2026", A, true, "t1");
+    expect(await listGradesFor(env.DB, "314561004")).toHaveLength(0);
+    await setAssignmentVisibility(env.DB, "ds-2026", A, false, "t2");  // publish again
+    expect(await listGradesFor(env.DB, "314561004")).toHaveLength(1);
+  });
+
+  it("ungrouped grades (assignment_id NULL) are never hidden", async () => {
+    await upsertGrades(env.DB, [g({ problem_id: "lonelab" })]);   // no assignment_id
+    await setAssignmentVisibility(env.DB, "ds-2026", A, true, "t");
+    expect(await listGradesFor(env.DB, "314561004")).toHaveLength(1);
+  });
+
+  it("hide is scoped to the course", async () => {
+    await upsertGrades(env.DB, [ga(), ga({ course_id: "ds-2027" })]);
+    await setAssignmentVisibility(env.DB, "ds-2026", A, true, "t");  // only ds-2026
+    const rows = await listGradesFor(env.DB, "314561004");
+    expect(rows.map((r) => r.course_id)).toEqual(["ds-2027"]);
+  });
+
+  it("hidden exam also drops from the /me/exam query + listHiddenAssignments", async () => {
+    await upsertGrades(env.DB, [ga()]);
+    await setAssignmentVisibility(env.DB, "ds-2026", A, true, "t");
+    expect(await listGradesForStudentAssignment(env.DB, "314561004", A)).toHaveLength(0);
+    expect(await listHiddenAssignments(env.DB, "ds-2026")).toEqual([A]);
   });
 });

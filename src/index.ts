@@ -39,6 +39,7 @@ import {
 } from "./db/bindings";
 import {
   upsertGrades, listGradesFor, listGradesForProblem, listGradesForStudentAssignment, GradeInput,
+  setAssignmentVisibility,
 } from "./db/grades";
 import {
   listStaff, addStaff, removeStaff, isStaffAnywhere, isStaffMember, coursesForStaff,
@@ -80,6 +81,8 @@ export default {
       if (mc && req.method === "GET") return await meCourse(req, env, url, mc[1]);
       if (p === "/api/grades/ingest" && req.method === "POST")
         return await gradesIngest(req, env);
+      if (p === "/api/assignment-visibility" && req.method === "POST")
+        return await assignmentVisibility(req, env);
       if (p === "/api/roster" && req.method === "GET") return await apiRoster(req, env);
       if (p === "/api/grades" && req.method === "GET") return await apiGrades(req, env, url);
       if (p === "/api/enrollments/ingest" && req.method === "POST")
@@ -562,6 +565,25 @@ async function gradesIngest(req: Request, env: Env): Promise<Response> {
   return new Response(JSON.stringify({ ok: true, upserted }), {
     headers: { "Content-Type": "application/json" },
   });
+}
+
+// Hide/show an assignment on the student dashboard (/me). Same Bearer token as
+// /api/grades/ingest. Body: {course_id?, assignment_id, hidden}. course_id falls
+// back to the default course. Hidden assignments vanish from the student views
+// (dashboard + /me/exam) without touching any grades; flip hidden:false to show.
+async function assignmentVisibility(req: Request, env: Env): Promise<Response> {
+  if (!bearerOk(req, env)) return new Response("Unauthorized", { status: 401 });
+  const x = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!x || typeof x.assignment_id !== "string" || !x.assignment_id) {
+    return new Response("Bad request: assignment_id required", { status: 400 });
+  }
+  const course_id = (typeof x.course_id === "string" && x.course_id) || defaultCourse(env);
+  const hidden = x.hidden === true || x.hidden === 1 || x.hidden === "1" || x.hidden === "true";
+  await setAssignmentVisibility(
+    env.DB, course_id, x.assignment_id, hidden, new Date(Date.now()).toISOString());
+  return new Response(
+    JSON.stringify({ ok: true, course_id, assignment_id: x.assignment_id, hidden }),
+    { headers: { "Content-Type": "application/json" } });
 }
 
 // Owner = a bootstrap admin in ADMIN_IDS (manages staff + destructive ops).
