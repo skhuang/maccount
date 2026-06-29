@@ -284,7 +284,9 @@ ${uiEnhancements(t)}
 
 interface EnrolledLite {
   student_id: string;
+  name?: string | null;
   email?: string | null;
+  nycu_name?: string | null;
   github_login: string | null;
   google_email?: string | null;
 }
@@ -395,13 +397,18 @@ export function adminPage(
   const gbound = enrolled.filter((e) => e.google_email).length;
   const enrolledRows = enrolled
     .map(
-      (e) => `<tr data-row data-status="${e.github_login && e.google_email ? "complete" : "missing"}"><td>${h(e.student_id)}</td><td>${
+      (e) => {
+        const displayName = e.name || e.nycu_name || "";
+        return `<tr data-row data-status="${e.github_login && e.google_email ? "complete" : "missing"}"><td>${h(e.student_id)}</td><td>${
+          displayName ? h(displayName) : ""
+        }</td><td>${
         e.email ? h(e.email) : ""
       }</td><td>${
         e.github_login ? h(e.github_login) : `<span class="badge badge--danger">${t.enroll_unbound}</span>`
       }</td><td>${
         e.google_email ? h(e.google_email) : `<span class="badge badge--danger">${t.enroll_unbound}</span>`
-      }</td></tr>`,
+      }</td></tr>`;
+      },
     )
     .join("\n");
   const enrollImport = isOwner
@@ -423,7 +430,7 @@ export function adminPage(
 <details><summary>${t.enroll_show_list}</summary>
 ${tableTools(t, "enrollment-table", enrolled.length, [{ value: "missing", label: t.table_filter_unbound }])}
 <table id="enrollment-table" class="mobile-compact" border="1" cellpadding="6" cellspacing="0">
-<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh("Moodle email", 1)}${sortableTh("GitHub", 2)}<th>Google</th></tr></thead>
+<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("Moodle email", 2)}${sortableTh("GitHub", 3)}<th>Google</th></tr></thead>
 <tbody>${enrolledRows}</tbody></table></details>`
       : ""
   }

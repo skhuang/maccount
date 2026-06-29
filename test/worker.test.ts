@@ -1049,24 +1049,24 @@ describe("course edit + enrollment", () => {
     await env.DB.prepare("UPDATE courses SET moodle_course_id=NULL WHERE course_id='ds-2026'").run();
   });
 
-  it("token API ingest stores Moodle participant email rows", async () => {
+  it("token API ingest stores Moodle participant name and email rows", async () => {
     const res = await call("/api/enrollments/ingest", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer ingest-secret" },
       body: JSON.stringify({
         course_id: "ds-2026",
         students: [
-          { student_id: "m1", email: "m1@nycu.edu.tw" },
-          { student_id: "m2", email: "" },
+          { student_id: "m1", name: "王小明", email: "m1@nycu.edu.tw" },
+          { student_id: "m2", name: "", email: "" },
         ],
         replace: true,
       }),
     });
     expect(res.status).toBe(200);
-    const { results } = await env.DB.prepare("SELECT student_id, email FROM enrollments WHERE course_id='ds-2026' ORDER BY student_id").all();
+    const { results } = await env.DB.prepare("SELECT student_id, name, email FROM enrollments WHERE course_id='ds-2026' ORDER BY student_id").all();
     expect(results).toEqual([
-      { student_id: "m1", email: "m1@nycu.edu.tw" },
-      { student_id: "m2", email: null },
+      { student_id: "m1", name: "王小明", email: "m1@nycu.edu.tw" },
+      { student_id: "m2", name: null, email: null },
     ]);
   });
 

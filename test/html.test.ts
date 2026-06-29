@@ -134,12 +134,15 @@ describe("adminPage", () => {
         isOwner: true,
         staff: [],
         enrolled: [
-          { student_id: "a01", github_login: "alice" },
-          { student_id: "b02", github_login: null },
+          { student_id: "a01", name: "王小明", github_login: "alice" },
+          { student_id: "b02", name: "李小華", github_login: null },
         ],
       },
     );
     expect(html).toContain("選課名單（2）");
+    expect(html).toContain(">姓名<");
+    expect(html).toContain("王小明");
+    expect(html).toContain("李小華");
     expect(html).toContain("alice");
     expect(html).toContain("未綁定"); // b02 has no binding
     expect(html).toContain(`action="/c/ds-2026/admin/enroll"`);
@@ -154,11 +157,12 @@ describe("adminPage", () => {
       isOwner: true,
       staff: [],
       enrolled: [
-        { student_id: "a01", github_login: "alice", google_email: "a01@gmail.com" },
-        { student_id: "b02", github_login: null, google_email: null },
+        { student_id: "a01", name: "Alice", github_login: "alice", google_email: "a01@gmail.com" },
+        { student_id: "b02", name: "Bob", github_login: null, google_email: null },
       ],
     });
     expect(html).toContain("<th>Google</th>");
+    expect(html).toContain("Alice");
     expect(html).toContain("a01@gmail.com"); // a01's bound Google
     expect(html).toContain("未綁定"); // b02 unbound (github + google)
   });
