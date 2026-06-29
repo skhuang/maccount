@@ -30,6 +30,20 @@ describe("enrollments db", () => {
     expect(ids).toEqual(["c", "d"]);
   });
 
+  it("stores Moodle email on enrollment rows", async () => {
+    await replaceEnrollments(env.DB, C, [
+      { student_id: "a", email: "a@nycu.edu.tw" },
+      { student_id: "b", email: "" },
+    ], now);
+    const rows = await listEnrolledWithBinding(env.DB, C);
+    expect(rows).toMatchObject([
+      { student_id: "a", email: "a@nycu.edu.tw" },
+      { student_id: "b", email: null },
+    ]);
+    await bulkEnroll(env.DB, C, [{ student_id: "b", email: "b@nycu.edu.tw" }], now);
+    expect((await listEnrolledWithBinding(env.DB, C)).find((r) => r.student_id === "b")?.email).toBe("b@nycu.edu.tw");
+  });
+
   it("replace is scoped to the course (does not touch other courses)", async () => {
     await bulkEnroll(env.DB, "ds-2026", ["a"], now);
     await bulkEnroll(env.DB, "ds-2027", ["x"], now);
@@ -44,8 +58,8 @@ describe("enrollments db", () => {
     await bulkEnroll(env.DB, C, ["a", "b"], now);
     const rows = await listEnrolledWithBinding(env.DB, C);
     expect(rows).toEqual([
-      { student_id: "a", nycu_name: "甲", github_login: "alice", github_id: 1, google_email: "alice@gmail.com" },
-      { student_id: "b", nycu_name: null, github_login: null, github_id: null, google_email: null },
+      { student_id: "a", email: null, nycu_name: "甲", github_login: "alice", github_id: 1, google_email: "alice@gmail.com" },
+      { student_id: "b", email: null, nycu_name: null, github_login: null, github_id: null, google_email: null },
     ]);
   });
 
