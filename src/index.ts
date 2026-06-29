@@ -49,7 +49,7 @@ import {
 } from "./db/forms";
 import {
   bulkEnroll, replaceEnrollments, enrollmentCount, listEnrolledWithBinding, listEnrollments,
-  coursesForStudent,
+  coursesForStudent, studentIdsForMoodleEmail,
 } from "./db/enrollments";
 import { toCsv, toRosterCsv } from "./csv";
 import {
@@ -278,6 +278,11 @@ function googleScope(env: Env): string {
   return env.GOOGLE_SCOPE?.trim() || DEFAULT_GOOGLE_SCOPE;
 }
 
+function isAllowedEnrollmentLoginEmail(email: string): boolean {
+  const domain = String(email || "").trim().toLowerCase().split("@").pop() || "";
+  return domain === "gmail.com" || domain === "googlemail.com" || domain === "nycu.edu.tw";
+}
+
 // Bind a Google account, started from the logged-in dashboard. Requests offline
 // access so we get a refresh token (encrypted, stored) for later Drive ops.
 // `?drive=1` (staff "connect Drive") requests the full drive scope so the token
@@ -317,10 +322,37 @@ async function googleCallback(req: Request, env: Env, url: URL): Promise<Respons
   const g = await fetchGoogleUser(tokens.accessToken);
 
   // LOGIN mode (no NYCU in session): identify via the bound google_sub. Do NOT
-  // touch the stored tokens (this flow has no refresh token to save).
+  // touch the stored tokens for existing bindings (this flow has no refresh
+  // token to save). If the Google account is not yet bound, a conservative
+  // fallback allows login when the verified Google email is a Gmail or NYCU
+  // Workspace address that uniquely matches a Moodle enrollment email. That
+  // first login creates a Google binding, so subsequent logins use google_sub
+  // directly.
   if (!session.nycu) {
     const b = await getBindingByGoogleSub(env.DB, g.sub);
-    if (!b) return redirectDone(env, "err", "google_not_bound");
+    if (!b) {
+      if (!isAllowedEnrollmentLoginEmail(g.email)) return redirectDone(env, "err", "google_not_bound");
+      const ids = await studentIdsForMoodleEmail(env.DB, g.email);
+      if (ids.length === 0) return redirectDone(env, "err", "google_not_bound");
+      if (ids.length > 1) return redirectDone(env, "err", "google_email_ambiguous");
+      const now = new Date(Date.now()).toISOString();
+      await upsertGoogleBinding(env.DB, {
+        nycu_id: ids[0],
+        nycu_name: ids[0],
+        google_sub: g.sub,
+        google_email: g.email,
+        refresh_token: null,
+        scope: tokens.scope,
+        now,
+      });
+      return redirect(
+        "/me",
+        setCookie(await signSession(
+          { exp: Date.now() + TTL_MS, nycu: { id: ids[0], name: ids[0] } },
+          env.SESSION_SECRET,
+        )),
+      );
+    }
     return redirect(
       "/me",
       setCookie(await signSession(
