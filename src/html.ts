@@ -223,6 +223,7 @@ ${uiEnhancements(t)}
 
 interface EnrolledLite {
   student_id: string;
+  email?: string | null;
   github_login: string | null;
   google_email?: string | null;
 }
