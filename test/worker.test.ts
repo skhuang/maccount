@@ -57,6 +57,26 @@ function call(path: string, init?: RequestInit, e: Env = testEnv) {
   return worker.fetch(new Request(`https://api.example${path}`, init), e);
 }
 
+describe("public pages", () => {
+  it("serves the privacy policy without authentication", async () => {
+    const res = await call("/privacy?lang=en");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toContain("text/html");
+    const body = await res.text();
+    expect(body).toContain("maccount Privacy Policy");
+    expect(body).toContain("Google OAuth permissions");
+  });
+
+  it("serves the terms of service without authentication", async () => {
+    const res = await call("/terms?lang=en");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toContain("text/html");
+    const body = await res.text();
+    expect(body).toContain("maccount Terms of Service");
+    expect(body).toContain("Acceptable use");
+  });
+});
+
 describe("/auth/nycu/start", () => {
   it("redirects to NYCU and sets a session cookie", async () => {
     const res = await call("/auth/nycu/start");

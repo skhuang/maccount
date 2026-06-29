@@ -6,6 +6,8 @@ import {
   coursePrejoinPage,
   dashboardPage,
   orgMembersPage,
+  privacyPage,
+  termsPage,
 } from "../src/html";
 import type { BindingRow } from "../src/csv";
 import type { GradeRow } from "../src/db/grades";
@@ -303,6 +305,8 @@ describe("dashboardPage", () => {
     expect(html).toContain('data-label="題目"');
     expect(html).toContain('class="badge badge--success">AC</span>');
     expect(html).toContain("octo@gmail.com");
+    expect(html).toContain('href="/privacy"');
+    expect(html).toContain('href="/terms"');
   });
 
   it("summarizes graded work, accepted results, score, and latest update", () => {
@@ -345,6 +349,45 @@ describe("coursePrejoinPage", () => {
     expect(html).toContain("/auth/github/start");
     expect(html).toContain("/auth/google/start");
     expect(html).toContain("尚未綁定"); // not-bound state for both
+    expect(html).toContain('href="/privacy"');
+    expect(html).toContain('href="/terms"');
+  });
+});
+
+describe("privacyPage", () => {
+  it("renders a public privacy policy suitable for OAuth configuration", () => {
+    const html = privacyPage("zh");
+    expect(html).toContain("maccount 隱私權政策");
+    expect(html).toContain("Google OAuth 權限");
+    expect(html).toContain("Directory group member");
+    expect(html).toContain("保存與刪除");
+    expect(html).toContain('href="/privacy?lang=en"');
+  });
+
+  it("renders the English policy", () => {
+    const html = privacyPage("en");
+    expect(html).toContain("maccount Privacy Policy");
+    expect(html).toContain("Google OAuth permissions");
+    expect(html).toContain("Retention and deletion");
+  });
+});
+
+describe("termsPage", () => {
+  it("renders a public terms page suitable for OAuth configuration", () => {
+    const html = termsPage("zh");
+    expect(html).toContain("maccount 服務條款");
+    expect(html).toContain("服務用途");
+    expect(html).toContain("可接受使用");
+    expect(html).toContain("第三方服務");
+    expect(html).toContain('href="/terms?lang=en"');
+    expect(html).toContain('href="/privacy"');
+  });
+
+  it("renders the English terms", () => {
+    const html = termsPage("en");
+    expect(html).toContain("maccount Terms of Service");
+    expect(html).toContain("Acceptable use");
+    expect(html).toContain("Third-party services");
   });
 });
 
@@ -374,6 +417,8 @@ describe("adminHomePage (course picker)", () => {
     expect(html).toContain("已封存");
     expect(html).toContain('class="course-admin-card course-admin-card--archived"');
     expect(html).toContain("共 2 門課程");
+    expect(html).toContain('href="/privacy"');
+    expect(html).toContain('href="/terms"');
   });
 
   it("shows the create-course form to owners only", () => {
