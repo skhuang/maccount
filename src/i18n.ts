@@ -205,6 +205,10 @@ export interface Strings {
   forms_responder_empty: string;
   forms_responder_source_moodle: string;
   forms_responder_source_google: string;
+  forms_group_copy_heading: string;
+  forms_group_copy_note: string;
+  forms_group_copy_label: string;
+  forms_group_copy_btn: string;
   forms_group_heading: string;
   forms_group_missing: string;
   forms_group_ready: string; // "{n}" placeholder
@@ -480,6 +484,10 @@ export const T: Record<Lang, Strings> = {
     forms_responder_empty: "目前沒有可用 email；請先匯入 Moodle 選課名單，或請學生綁定 Google。",
     forms_responder_source_moodle: "Moodle",
     forms_responder_source_google: "綁定 Google",
+    forms_group_copy_heading: "Google Groups 匯入名單",
+    forms_group_copy_note: "若 OAuth 品牌驗證或 Admin SDK 權限尚未通過，可先複製這份一行一個 email 的名單，貼到 groups.google.com 的群組成員新增/匯入欄位。",
+    forms_group_copy_label: "可複製 email 名單",
+    forms_group_copy_btn: "複製 email 名單",
     forms_group_heading: "課程 Google Group",
     forms_group_missing: "尚未設定課程 Google Group。請擁有者先填入 group email。",
     forms_group_ready: "已設定；目前建議同步 {n} 個填答帳號到此 group。",
@@ -753,6 +761,10 @@ export const T: Record<Lang, Strings> = {
     forms_responder_empty: "No usable emails yet. Import the Moodle roster or ask students to bind Google first.",
     forms_responder_source_moodle: "Moodle",
     forms_responder_source_google: "Bound Google",
+    forms_group_copy_heading: "Google Groups import list",
+    forms_group_copy_note: "If OAuth brand verification or Admin SDK permission is not ready yet, copy this one-email-per-line list and paste it into the member add/import field on groups.google.com.",
+    forms_group_copy_label: "Copy-ready email list",
+    forms_group_copy_btn: "Copy email list",
     forms_group_heading: "Course Google Group",
     forms_group_missing: "No course Google Group is configured yet. Ask an owner to add the group email first.",
     forms_group_ready: "Configured. Currently {n} responder accounts should be synced to this group.",
