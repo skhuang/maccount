@@ -57,6 +57,7 @@ import {
 import { toCsv, toRosterCsv } from "./csv";
 import {
   adminPage, adminHomePage, bindingsPage, orgMembersPage, dashboardPage, examPage, coursePrejoinPage,
+  privacyPage, termsPage,
 } from "./html";
 import { pickLang, langCookie } from "./i18n";
 
@@ -75,6 +76,8 @@ export default {
       if (p === "/auth/google/start") return await startGoogle(req, env, url);
       if (p === "/auth/google/login") return await startOAuthLogin(req, env, url, "google");
       if (p === "/auth/google/callback") return await googleCallback(req, env, url);
+      if (p === "/privacy" && req.method === "GET") return publicPage(privacyPage(pickLang(url, req.headers.get("Cookie"))));
+      if (p === "/terms" && req.method === "GET") return publicPage(termsPage(pickLang(url, req.headers.get("Cookie"))));
       if (p === "/logout") return logout(env);
       if (p === "/me" && req.method === "GET") return await mePage(req, env, url);
       const em = p.match(/^\/me\/exam\/([A-Za-z0-9._-]+)$/);
@@ -108,6 +111,10 @@ export default {
     }
   },
 };
+
+function publicPage(html: string): Response {
+  return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+}
 
 function redirect(location: string, cookie?: string | string[]): Response {
   const headers = new Headers({ Location: location });

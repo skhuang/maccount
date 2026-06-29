@@ -71,6 +71,62 @@ body>p[style*="#fff3cd"]{background:var(--warning-soft)!important;border-color:#
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 `;
 
+function legalFooter(t: (typeof T)[Lang]): string {
+  return `<footer class="muted text-small" style="margin-top:2rem;padding-top:1rem;border-top:1px solid var(--line)"><a href="/privacy">${t.privacy_link}</a><span aria-hidden="true"> · </span><a href="/terms">${t.terms_link}</a></footer>`;
+}
+
+function listItems(items: string[]): string {
+  return items.map((item) => `<li>${h(item)}</li>`).join("\n");
+}
+
+export function privacyPage(lang: Lang): string {
+  const t = T[lang];
+  return `${documentStart(lang, t.privacy_title, UI_CSS)}
+<body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
+<header class="topbar"><div>${langToggle("/privacy", lang)}</div><div class="topbar__actions"><a href="/me">${t.acct_heading}</a></div></header>
+<h1>${t.privacy_title}</h1>
+<p class="identity__meta">${t.privacy_updated}</p>
+<p>${t.privacy_intro}</p>
+<h2>${t.privacy_collect_heading}</h2>
+<ul>${listItems(t.privacy_collect_items)}</ul>
+<h2>${t.privacy_use_heading}</h2>
+<ul>${listItems(t.privacy_use_items)}</ul>
+<h2>${t.privacy_oauth_heading}</h2>
+<ul>${listItems(t.privacy_oauth_items)}</ul>
+<h2>${t.privacy_share_heading}</h2>
+<ul>${listItems(t.privacy_share_items)}</ul>
+<h2>${t.privacy_retention_heading}</h2>
+<ul>${listItems(t.privacy_retention_items)}</ul>
+<h2>${t.privacy_contact_heading}</h2>
+<p>${t.privacy_contact}</p>
+${legalFooter(t)}
+</body></html>`;
+}
+
+export function termsPage(lang: Lang): string {
+  const t = T[lang];
+  return `${documentStart(lang, t.terms_title, UI_CSS)}
+<body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
+<header class="topbar"><div>${langToggle("/terms", lang)}</div><div class="topbar__actions"><a href="/me">${t.acct_heading}</a></div></header>
+<h1>${t.terms_title}</h1>
+<p class="identity__meta">${t.terms_updated}</p>
+<p>${t.terms_intro}</p>
+<h2>${t.terms_use_heading}</h2>
+<ul>${listItems(t.terms_use_items)}</ul>
+<h2>${t.terms_account_heading}</h2>
+<ul>${listItems(t.terms_account_items)}</ul>
+<h2>${t.terms_acceptable_heading}</h2>
+<ul>${listItems(t.terms_acceptable_items)}</ul>
+<h2>${t.terms_thirdparty_heading}</h2>
+<ul>${listItems(t.terms_thirdparty_items)}</ul>
+<h2>${t.terms_changes_heading}</h2>
+<ul>${listItems(t.terms_changes_items)}</ul>
+<h2>${t.terms_contact_heading}</h2>
+<p>${t.terms_contact}</p>
+${legalFooter(t)}
+</body></html>`;
+}
+
 interface StaffLite {
   nycu_id: string;
   added_by: string | null;
@@ -141,6 +197,7 @@ export function adminHomePage(
 ${items}
 ${createForm}
 ${bindingsSection}
+${legalFooter(t)}
 ${uiEnhancements(t)}
 </body></html>`;
 }
@@ -170,6 +227,7 @@ ${rows.length ? tableTools(t, "bindings-table", rows.length) : ""}
 <tbody>
 ${trs || `<tr><td colspan="6" class="empty-cell">${t.no_bindings}</td></tr>`}
 </tbody></table>
+${legalFooter(t)}
 ${uiEnhancements(t)}
 </body></html>`;
 }
@@ -219,6 +277,7 @@ ${sorted.length ? tableTools(t, "org-members-table", sorted.length, [
 ${trs || `<tr><td colspan="4" class="empty-cell">${t.no_bindings}</td></tr>`}
 </tbody></table>
 ${unbound}
+${legalFooter(t)}
 ${uiEnhancements(t)}
 </body></html>`;
 }
@@ -589,6 +648,7 @@ ${classroomSection}
 ${staffSection}
 ${settingsSection}
 </div>
+${legalFooter(t)}
 ${uiEnhancements(t)}
 </body></html>`;
 }
@@ -760,6 +820,7 @@ ${orgHtml}
 ${table}
 <p class="muted text-small">${t.privacy_note}</p>
 ${adminHtml}
+${legalFooter(t)}
 ${uiEnhancements(t)}
 </body></html>`;
 }
@@ -792,6 +853,7 @@ ${langToggle(`/me/exam/${encodeURIComponent(assignmentId)}`, lang)}
 ${trs}
 </tbody></table>
 <p class="muted text-small">${t.privacy_note}</p>
+${legalFooter(t)}
 ${uiEnhancements(t)}
 </body></html>`;
 }
@@ -827,6 +889,7 @@ ${accountStatusCard(t, t.google, binding?.google_email, "/auth/google/start", t.
 </div>
 <h2 class="with-help">${t.forms_student_heading}${helpHint(t.help_forms, t.help_label)}</h2>
 ${formsHtml}
+${legalFooter(t)}
 ${uiEnhancements(t)}
 </body></html>`;
 }

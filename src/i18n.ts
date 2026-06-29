@@ -41,6 +41,38 @@ export interface Strings {
   col_updated: string;
   no_grades: string;
   privacy_note: string;
+  privacy_link: string;
+  privacy_title: string;
+  privacy_updated: string;
+  privacy_intro: string;
+  privacy_collect_heading: string;
+  privacy_collect_items: string[];
+  privacy_use_heading: string;
+  privacy_use_items: string[];
+  privacy_oauth_heading: string;
+  privacy_oauth_items: string[];
+  privacy_share_heading: string;
+  privacy_share_items: string[];
+  privacy_retention_heading: string;
+  privacy_retention_items: string[];
+  privacy_contact_heading: string;
+  privacy_contact: string;
+  terms_link: string;
+  terms_title: string;
+  terms_updated: string;
+  terms_intro: string;
+  terms_use_heading: string;
+  terms_use_items: string[];
+  terms_account_heading: string;
+  terms_account_items: string[];
+  terms_acceptable_heading: string;
+  terms_acceptable_items: string[];
+  terms_thirdparty_heading: string;
+  terms_thirdparty_items: string[];
+  terms_changes_heading: string;
+  terms_changes_items: string[];
+  terms_contact_heading: string;
+  terms_contact: string;
   admin_link: string;
   logout: string;
   join_org_prompt: string;
@@ -242,6 +274,80 @@ export const T: Record<Lang, Strings> = {
     col_updated: "更新時間",
     no_grades: "目前沒有成績資料。送出程式並完成評分後，結果會顯示在這裡。",
     privacy_note: "僅顯示分數與判定結果（AC/WA/TLE…）。測資內容不對外公開。",
+    privacy_link: "隱私權政策",
+    privacy_title: "maccount 隱私權政策",
+    privacy_updated: "最後更新：2026-06-29",
+    privacy_intro: "maccount 是課程帳號綁定與課務輔助系統，用於協助修課學生連結 NYCU、GitHub 與 Google 帳號，並讓課程工作人員管理名單、成績摘要與課程資源存取。",
+    privacy_collect_heading: "我們收集的資料",
+    privacy_collect_items: [
+      "NYCU 登入後提供的帳號識別與姓名。",
+      "學生主動綁定的 GitHub 帳號識別、登入名稱與 Google 帳號 email。",
+      "課程選課資料、Moodle email、課程工作人員名單與課程設定。",
+      "課程成績摘要，例如題目、判定結果、分數與更新時間；不公開測試資料內容。",
+      "必要的 OAuth refresh token，僅用於使用者授權的 Google Drive、Forms、Classroom 與 Google Group 同步操作。",
+    ],
+    privacy_use_heading: "資料使用方式",
+    privacy_use_items: [
+      "確認學生身分、顯示個人課程與成績摘要。",
+      "產生課程 roster、匯出課務 CSV，並協助 GitHub 組織/團隊邀請。",
+      "依課程工作人員操作，分享 Google Drive 資源、建立 Google Forms、邀請 Google Classroom 或同步課程 Google Group 成員。",
+      "保護系統安全、偵錯與維持服務可用性。",
+    ],
+    privacy_oauth_heading: "Google OAuth 權限",
+    privacy_oauth_items: [
+      "學生登入/綁定主要使用 openid 與 email，用來確認 Google 帳號 email。",
+      "課程工作人員若選擇連結 Google Drive，系統會要求 Drive、Forms、Classroom roster 與 Directory group member 權限，用於其明確觸發的管理操作。",
+      "系統不會讀取個人信件內容，也不會把 Google OAuth token 提供給第三方。",
+    ],
+    privacy_share_heading: "資料分享",
+    privacy_share_items: [
+      "資料僅提供給本系統管理員、該課程工作人員與使用者本人依權限查看。",
+      "依使用者操作，系統可能呼叫 NYCU、GitHub、Google 與 Cloudflare 服務完成登入、邀請、分享、表單或群組同步。",
+      "除非法律要求或課程管理必要，不會出售或任意揭露個人資料。",
+    ],
+    privacy_retention_heading: "保存與刪除",
+    privacy_retention_items: [
+      "資料會保存至課程管理與成績查詢不再需要為止。",
+      "學生或課程工作人員可聯絡課程管理者要求更正或刪除不再需要的綁定資料。",
+      "刪除帳號綁定不會自動刪除既有課程成績、選課紀錄或外部服務中的資料；這些資料依課程與各服務政策處理。",
+    ],
+    privacy_contact_heading: "聯絡方式",
+    privacy_contact: "如需查詢、更正或刪除資料，請聯絡課程管理者或系統維護者。",
+    terms_link: "服務條款",
+    terms_title: "maccount 服務條款",
+    terms_updated: "最後更新：2026-06-29",
+    terms_intro: "使用 maccount 即表示你同意本服務條款。maccount 是課程帳號綁定與課務輔助系統，僅供授權的課程、學生與課程工作人員使用。",
+    terms_use_heading: "服務用途",
+    terms_use_items: [
+      "maccount 用於連結 NYCU、GitHub 與 Google 帳號，協助課程名單、成績摘要、課程資源存取與相關教學行政流程。",
+      "系統提供的名單、匯出檔、分數摘要與外部服務同步結果，應僅用於課程管理與學習活動。",
+      "實際課程規則、評分與成績認定仍以授課教師與學校正式公告為準。",
+    ],
+    terms_account_heading: "帳號與授權",
+    terms_account_items: [
+      "使用者應使用自己的 NYCU、GitHub 與 Google 帳號登入或綁定，不得冒用他人身分。",
+      "課程工作人員連結 Google Drive 或執行 GitHub/Google 管理操作時，代表其授權系統代為執行該次課程管理工作。",
+      "若發現帳號誤綁、權限異常或不應存取的資料，請儘速通知課程管理者或系統維護者。",
+    ],
+    terms_acceptable_heading: "可接受使用",
+    terms_acceptable_items: [
+      "不得嘗試繞過登入、權限、課程範圍或外部服務的安全限制。",
+      "不得上傳、輸入或同步與課程無關、違法、侵害他人權益或干擾服務運作的資料。",
+      "不得以自動化或大量請求方式造成系統、GitHub、Google、NYCU 或 Cloudflare 服務負擔。",
+    ],
+    terms_thirdparty_heading: "第三方服務",
+    terms_thirdparty_items: [
+      "maccount 會依使用者操作連接 NYCU、GitHub、Google 與 Cloudflare；這些服務各自適用其服務條款與隱私政策。",
+      "外部服務的可用性、權限規則、API 限制或政策變更，可能影響 maccount 的部分功能。",
+    ],
+    terms_changes_heading: "服務變更與責任限制",
+    terms_changes_items: [
+      "系統可能因課程需求、安全修正或外部 API 變更而調整功能、權限或介面。",
+      "我們會合理維護服務正確性與可用性，但不保證服務不會中斷或完全無錯誤。",
+      "在法律允許範圍內，maccount 對因使用或無法使用本服務造成的間接或衍生損害不負責。",
+    ],
+    terms_contact_heading: "聯絡方式",
+    terms_contact: "如對本服務條款有疑問，請聯絡課程管理者或系統維護者。",
     admin_link: "🔧 管理功能（綁定名單、匯出 CSV / roster）",
     logout: "登出（換帳號）",
     join_org_prompt: "尚未加入課程 GitHub 組織?（需先用你綁定的 GitHub 登入;已加入可忽略）",
@@ -441,6 +547,80 @@ export const T: Record<Lang, Strings> = {
     col_updated: "Updated",
     no_grades: "No grades yet. Results appear here after you submit and it is graded.",
     privacy_note: "Only the score and verdict (AC/WA/TLE…) are shown; test data is never disclosed.",
+    privacy_link: "Privacy Policy",
+    privacy_title: "maccount Privacy Policy",
+    privacy_updated: "Last updated: 2026-06-29",
+    privacy_intro: "maccount is a course account-linking and administration helper. It helps enrolled students connect NYCU, GitHub, and Google accounts, and helps course staff manage rosters, grade summaries, and access to course resources.",
+    privacy_collect_heading: "Information we collect",
+    privacy_collect_items: [
+      "NYCU account identifier and name provided after NYCU sign-in.",
+      "GitHub account identifier/login and Google account email that students voluntarily bind.",
+      "Course enrollment data, Moodle email, course staff lists, and course settings.",
+      "Course grade summaries such as problem, verdict, score, and update time; test data contents are not disclosed.",
+      "OAuth refresh tokens required for user-authorized Google Drive, Forms, Classroom, and Google Group synchronization actions.",
+    ],
+    privacy_use_heading: "How we use information",
+    privacy_use_items: [
+      "Verify student identity and show personal courses and grade summaries.",
+      "Generate course rosters, export course CSV files, and help invite students or staff to GitHub organizations/teams.",
+      "When course staff explicitly request it, share Google Drive resources, create Google Forms, invite Google Classroom students, or sync course Google Group members.",
+      "Protect the service, debug issues, and keep the system available.",
+    ],
+    privacy_oauth_heading: "Google OAuth permissions",
+    privacy_oauth_items: [
+      "Student sign-in/binding primarily uses openid and email to identify the Google account email.",
+      "When course staff connect Google Drive, the app requests Drive, Forms, Classroom roster, and Directory group member permissions for staff-triggered management actions.",
+      "The app does not read personal email contents and does not provide Google OAuth tokens to third parties.",
+    ],
+    privacy_share_heading: "Information sharing",
+    privacy_share_items: [
+      "Information is shown only to system administrators, authorized course staff, and the user according to their permissions.",
+      "Based on user actions, the app may call NYCU, GitHub, Google, and Cloudflare services for sign-in, invitations, sharing, forms, or group synchronization.",
+      "We do not sell personal information or disclose it except as required by law or necessary for course administration.",
+    ],
+    privacy_retention_heading: "Retention and deletion",
+    privacy_retention_items: [
+      "Information is retained while it is needed for course administration and grade lookup.",
+      "Students or course staff may contact the course administrator to request correction or deletion of no-longer-needed binding data.",
+      "Deleting an account binding does not automatically delete existing course grades, enrollment records, or data stored in external services; those are handled according to course and service policies.",
+    ],
+    privacy_contact_heading: "Contact",
+    privacy_contact: "To request access, correction, or deletion, contact the course administrator or system maintainer.",
+    terms_link: "Terms of Service",
+    terms_title: "maccount Terms of Service",
+    terms_updated: "Last updated: 2026-06-29",
+    terms_intro: "By using maccount, you agree to these Terms of Service. maccount is a course account-linking and administration helper for authorized courses, students, and course staff.",
+    terms_use_heading: "Service purpose",
+    terms_use_items: [
+      "maccount links NYCU, GitHub, and Google accounts to support course rosters, grade summaries, course resource access, and related teaching administration workflows.",
+      "Rosters, exports, grade summaries, and external-service sync results must be used only for course administration and learning activities.",
+      "Official course rules, grading, and grade determinations remain governed by the instructor and university announcements.",
+    ],
+    terms_account_heading: "Accounts and authorization",
+    terms_account_items: [
+      "Users must sign in or bind only their own NYCU, GitHub, and Google accounts and must not impersonate others.",
+      "When course staff connect Google Drive or trigger GitHub/Google management actions, they authorize the system to perform that course administration action on their behalf.",
+      "If you notice an incorrect account binding, unexpected permission, or data you should not be able to access, notify the course administrator or system maintainer promptly.",
+    ],
+    terms_acceptable_heading: "Acceptable use",
+    terms_acceptable_items: [
+      "Do not attempt to bypass sign-in, authorization, course scoping, or security limits of maccount or connected services.",
+      "Do not upload, enter, or sync data that is unrelated to the course, unlawful, harmful, infringing, or disruptive to the service.",
+      "Do not use automation or excessive requests in a way that burdens maccount, GitHub, Google, NYCU, or Cloudflare services.",
+    ],
+    terms_thirdparty_heading: "Third-party services",
+    terms_thirdparty_items: [
+      "maccount connects to NYCU, GitHub, Google, and Cloudflare based on user actions; those services are governed by their own terms and privacy policies.",
+      "Availability, permission rules, API limits, or policy changes in external services may affect parts of maccount.",
+    ],
+    terms_changes_heading: "Changes and limitation of liability",
+    terms_changes_items: [
+      "The system may change features, permissions, or interfaces for course needs, security fixes, or external API changes.",
+      "We make reasonable efforts to maintain correctness and availability, but the service is not guaranteed to be uninterrupted or error-free.",
+      "To the extent permitted by law, maccount is not liable for indirect or consequential damages arising from use of, or inability to use, the service.",
+    ],
+    terms_contact_heading: "Contact",
+    terms_contact: "If you have questions about these Terms, contact the course administrator or system maintainer.",
     admin_link: "🔧 Admin (bindings list, export CSV / roster)",
     logout: "Sign out (switch account)",
     join_org_prompt: "Not in the course GitHub org yet? (sign in with your linked GitHub first; ignore if already joined)",
