@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  shareFileWithUser, asDriveRole, scopeHasFullDrive, parseDriveFileId,
-  DRIVE_SCOPE, STAFF_GOOGLE_SCOPE,
+  shareFileWithUser, asDriveRole, scopeHasFullDrive, scopeHasGroupMember, parseDriveFileId,
+  DRIVE_SCOPE, GROUP_MEMBER_SCOPE, STAFF_GOOGLE_SCOPE,
 } from "../src/oauth/drive";
 
 describe("drive helpers", () => {
@@ -18,6 +18,12 @@ describe("drive helpers", () => {
     expect(scopeHasFullDrive("openid email https://www.googleapis.com/auth/drive.file")).toBe(false);
     expect(scopeHasFullDrive("openid email")).toBe(false);
     expect(scopeHasFullDrive(null)).toBe(false);
+  });
+
+  it("staff Google scope includes Google Group member management", () => {
+    expect(STAFF_GOOGLE_SCOPE).toContain(GROUP_MEMBER_SCOPE);
+    expect(scopeHasGroupMember(STAFF_GOOGLE_SCOPE)).toBe(true);
+    expect(scopeHasGroupMember(`openid email ${DRIVE_SCOPE}`)).toBe(false);
   });
 
   it("parseDriveFileId extracts the id from common share URLs", () => {

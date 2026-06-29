@@ -12,6 +12,10 @@ export interface Env {
   // CLIENT_ID in wrangler.toml [vars]; CLIENT_SECRET via secret put.
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
+  // Optional separate External Google OAuth client for sign-in only
+  // (/auth/google/login). Falls back to GOOGLE_CLIENT_* when unset.
+  GOOGLE_LOGIN_CLIENT_ID?: string;
+  GOOGLE_LOGIN_CLIENT_SECRET?: string;
   // OAuth scope requested at consent. Empty → DEFAULT_GOOGLE_SCOPE
   // (openid email + drive.file). wrangler.toml [vars] (not a secret).
   GOOGLE_SCOPE: string;

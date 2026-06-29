@@ -3,6 +3,7 @@ export interface SessionData {
   nstate?: string; // CSRF state for the NYCU leg (pre-login)
   gstate?: string; // CSRF state for the GitHub leg (while binding)
   gostate?: string; // CSRF state for the Google leg (while binding)
+  googleMode?: "bind" | "login"; // which Google OAuth client minted the code
   next?: string; // post-login redirect target (validated relative path, e.g. /me/<course>)
   nycu?: { id: string; name: string }; // present once logged in; admin is derived via isAdmin()
 }

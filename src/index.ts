@@ -19,9 +19,11 @@ import {
   DEFAULT_GOOGLE_SCOPE,
 } from "./oauth/google";
 import {
-  shareFileWithUser, asDriveRole, scopeHasFullDrive, parseDriveFileId, STAFF_GOOGLE_SCOPE,
+  shareFileWithUser, asDriveRole, scopeHasFullDrive, scopeHasGroupMember,
+  parseDriveFileId, STAFF_GOOGLE_SCOPE,
 } from "./oauth/drive";
 import { createGoogleForm } from "./oauth/google_forms";
+import { syncGoogleGroupMembers } from "./oauth/groups";
 import { inviteToClassroom, parseClassroomId } from "./oauth/classroom";
 import { encryptSecret, decryptSecret } from "./crypto";
 import {
@@ -187,7 +189,7 @@ async function startOAuthLogin(
   const session: SessionData =
     provider === "github"
       ? { exp: Date.now() + TTL_MS, gstate: state }
-      : { exp: Date.now() + TTL_MS, gostate: state };
+      : { exp: Date.now() + TTL_MS, gostate: state, googleMode: "login" };
   const cookies = [setCookie(await signSession(session, env.SESSION_SECRET))];
   const lang = url.searchParams.get("lang");
   if (lang === "en" || lang === "zh") cookies.push(langCookie(lang));
@@ -195,7 +197,7 @@ async function startOAuthLogin(
     provider === "github"
       ? githubAuthorizeUrl(env.GITHUB_CLIENT_ID, `${env.PUBLIC_BASE_URL}/auth/github/callback`, state)
       : googleAuthorizeUrl(
-          env.GOOGLE_CLIENT_ID,
+          googleClient(env, "login").id,
           `${env.PUBLIC_BASE_URL}/auth/google/callback`,
           state,
           "openid email",
@@ -281,6 +283,18 @@ function googleScope(env: Env): string {
   return env.GOOGLE_SCOPE?.trim() || DEFAULT_GOOGLE_SCOPE;
 }
 
+function googleClient(env: Env, mode: "bind" | "login"): { id: string; secret: string } {
+  const loginId = env.GOOGLE_LOGIN_CLIENT_ID?.trim();
+  const loginSecret = env.GOOGLE_LOGIN_CLIENT_SECRET?.trim();
+  if (mode === "login" && loginId) {
+    if (!loginSecret) {
+      throw new Error("GOOGLE_LOGIN_CLIENT_SECRET is required when GOOGLE_LOGIN_CLIENT_ID is set");
+    }
+    return { id: loginId, secret: loginSecret };
+  }
+  return { id: env.GOOGLE_CLIENT_ID, secret: env.GOOGLE_CLIENT_SECRET };
+}
+
 function isAllowedEnrollmentLoginEmail(email: string): boolean {
   const domain = String(email || "").trim().toLowerCase().split("@").pop() || "";
   return domain === "gmail.com" || domain === "googlemail.com" || domain === "nycu.edu.tw";
@@ -294,11 +308,11 @@ async function startGoogle(req: Request, env: Env, url: URL): Promise<Response> 
   const s = await requireLogin(req, env);
   if (s instanceof Response) return s;
   const gostate = randomState();
-  const next: SessionData = { exp: Date.now() + TTL_MS, nycu: s.nycu, gostate };
+  const next: SessionData = { exp: Date.now() + TTL_MS, nycu: s.nycu, gostate, googleMode: "bind" };
   const token = await signSession(next, env.SESSION_SECRET);
   const scope = url.searchParams.get("drive") === "1" ? STAFF_GOOGLE_SCOPE : googleScope(env);
   const gUrl = googleAuthorizeUrl(
-    env.GOOGLE_CLIENT_ID,
+    googleClient(env, "bind").id,
     `${env.PUBLIC_BASE_URL}/auth/google/callback`,
     gostate,
     scope,
@@ -316,9 +330,10 @@ async function googleCallback(req: Request, env: Env, url: URL): Promise<Respons
   if (!session || !session.gostate || session.gostate !== state || !code) {
     return new Response("Invalid Google callback", { status: 400 });
   }
+  const client = googleClient(env, session.googleMode === "login" && !session.nycu ? "login" : "bind");
   const tokens = await exchangeGoogleCode({
-    clientId: env.GOOGLE_CLIENT_ID,
-    clientSecret: env.GOOGLE_CLIENT_SECRET,
+    clientId: client.id,
+    clientSecret: client.secret,
     code,
     redirectUri: `${env.PUBLIC_BASE_URL}/auth/google/callback`,
   });
@@ -737,6 +752,7 @@ async function courseUpsert(req: Request, env: Env): Promise<Response> {
       github_org: String(form.get("github_org") ?? "").trim() || null,
       google_classroom_id: String(form.get("google_classroom_id") ?? "").trim() || null,
       google_meet_url: String(form.get("google_meet_url") ?? "").trim() || null,
+      google_group_email: String(form.get("google_group_email") ?? "").trim() || null,
       status: statusIn === "archived" ? "archived" : "active",
     },
     new Date(Date.now()).toISOString(),
@@ -762,6 +778,7 @@ async function courseAdminRouter(
   if (sub === "/forms/add" && m === "POST") return await formAdd(req, env, courseId);
   if (sub === "/forms/create" && m === "POST") return await formCreate(req, env, courseId);
   if (sub === "/forms/remove" && m === "POST") return await formRemove(req, env, courseId);
+  if (sub === "/forms/group/sync" && m === "POST") return await formGroupSync(req, env, courseId);
   if (sub === "/classroom/invite" && m === "POST") return await classroomInvite(req, env, courseId);
   return new Response("Not found", { status: 404 });
 }
@@ -918,6 +935,20 @@ function formsRedirect(courseId: string, msg?: string): Response {
   return redirect(msg ? `${base}?forms_msg=${encodeURIComponent(msg)}` : base);
 }
 
+function formResponderEmailsFromEnrollments(
+  enrolled: Array<{ email?: string | null; google_email?: string | null }>,
+): string[] {
+  const emails = new Map<string, string>();
+  for (const e of enrolled) {
+    for (const raw of [e.email, e.google_email]) {
+      const email = (raw ?? "").trim();
+      const key = email.toLocaleLowerCase();
+      if (key.includes("@") && !emails.has(key)) emails.set(key, email);
+    }
+  }
+  return [...emails.values()];
+}
+
 // POST /c/<id>/admin/forms/add — attach a Google Form (title + share URL) to the
 // course. Students see it on /me and answer signed into Google (the form's own
 // settings enforce sign-in / email collection). Course staff may manage forms.
@@ -965,6 +996,39 @@ async function formCreate(req: Request, env: Env, courseId: string): Promise<Res
     return formsRedirect(courseId, "create-error");
   }
   return formsRedirect(courseId);
+}
+
+// POST /c/<id>/admin/forms/group/sync — sync Moodle emails + bound Google
+// emails into the course Google Group so Google Forms responder access can be
+// granted to one group. Removes only ordinary MEMBER users not in the target
+// list; OWNER/MANAGER and nested GROUP members are protected.
+async function formGroupSync(req: Request, env: Env, courseId: string): Promise<Response> {
+  const s = await requireCourseStaff(req, env, courseId);
+  if (s instanceof Response) return s;
+  const course = await getCourse(env.DB, courseId);
+  if (!course) return new Response("Course not found", { status: 404 });
+  const groupEmail = (course.google_group_email ?? "").trim();
+  if (!groupEmail) return formsRedirect(courseId, "group-missing");
+
+  const tok = await getGoogleTokenRow(env.DB, s.nycu!.id);
+  if (!tok?.google_refresh_token || !scopeHasFullDrive(tok.google_scope)) return formsRedirect(courseId, "no-drive");
+  if (!scopeHasGroupMember(tok.google_scope)) return formsRedirect(courseId, "group-scope");
+
+  const at = await staffGoogleAccessToken(env, s.nycu!.id);
+  if ("error" in at) return formsRedirect(courseId, at.error);
+
+  const enrolled = await listEnrolledWithBinding(env.DB, courseId);
+  const targetEmails = formResponderEmailsFromEnrollments(enrolled);
+  try {
+    const result = await syncGoogleGroupMembers(at.token, groupEmail, targetEmails);
+    return formsRedirect(
+      courseId,
+      `group-done:${result.added}:${result.removed}:${result.kept}:${result.skippedProtected}:${result.errors}`,
+    );
+  } catch (e) {
+    console.error("group sync failed:", (e as Error).message);
+    return formsRedirect(courseId, "group-error");
+  }
 }
 
 function classroomRedirect(courseId: string, msg: string): Response {

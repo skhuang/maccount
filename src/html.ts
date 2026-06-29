@@ -65,7 +65,7 @@ body>p[style*="#fff3cd"]{background:var(--warning-soft)!important;border-color:#
 .admin-sections{display:grid;gap:1rem}.admin-section{scroll-margin-top:5rem;padding:1.2rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.admin-section>h2:first-child{margin:0 0 .75rem;padding:0;border:0}.admin-section+.admin-section{margin-top:0}.admin-section form:last-child{margin-bottom:0}
 .lang-toggle{display:inline-flex;align-items:center;gap:.5rem;color:var(--muted);font-size:.9rem}.lang-toggle [aria-current="true"]{padding:.2rem .45rem;border-radius:6px;background:var(--surface-soft);color:var(--text);font-weight:700}.empty-state{margin:.8rem 0;padding:1rem;border:1px dashed #b9c7c0;border-radius:10px;background:var(--surface-soft);color:var(--muted);text-align:center;list-style:none}.empty-cell{padding:1.4rem!important;color:var(--muted);text-align:center}.inline-actions{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap}.text-danger{color:var(--danger)}.muted{color:var(--muted)}.text-small{font-size:.9em}
 .table-tools{display:grid;grid-template-columns:minmax(220px,1fr) minmax(160px,auto) auto;align-items:end;gap:.75rem;margin:.85rem 0}.table-tools label{font-size:.82rem}.table-tools input,.table-tools select{margin-top:.25rem}.table-count{align-self:center;margin:1.35rem 0 0;color:var(--muted);font-size:.85rem;white-space:nowrap}.copy-field{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin:.75rem 0}.button--secondary{min-height:34px;padding:.4rem .7rem;border-color:var(--line);background:#fff;color:var(--brand);font-size:.85rem}.button--secondary:hover{border-color:#9db2a7;background:var(--surface-soft);color:var(--brand-hover)}tr[hidden]{display:none}
-.sort-button{display:flex;width:100%;min-height:0;padding:0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;text-align:left}.sort-button:hover{background:transparent;color:var(--brand)}.sort-icon{margin-left:.4rem;color:var(--muted)}.course-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin:1rem 0}.course-admin-card{display:flex;min-height:150px;flex-direction:column;padding:1.1rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.course-admin-card--archived{background:var(--surface-soft)}.course-admin-card__head{display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem}.course-admin-card h2{margin:0;padding:0;border:0;font-size:1.1rem}.course-admin-card__meta{margin:.45rem 0 1rem;color:var(--muted);font-size:.88rem}.course-admin-card__action{margin:auto 0 0}.admin-disclosure{margin:1.5rem 0;background:#fff}.admin-disclosure>summary{font-size:1.05rem}.admin-disclosure__body{padding:0 1rem 1rem}.utility-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}.utility-card{padding:1rem;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}.utility-card p{margin:.35rem 0 0;color:var(--muted);font-size:.86rem}
+.sort-button{display:flex;width:100%;min-height:0;padding:0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;text-align:left}.sort-button:hover{background:transparent;color:var(--brand)}.sort-icon{margin-left:.4rem;color:var(--muted)}.course-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin:1rem 0}.course-admin-card{display:flex;min-height:150px;flex-direction:column;padding:1.1rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.course-admin-card--archived{background:var(--surface-soft)}.course-admin-card__head{display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem}.course-admin-card h2{margin:0;padding:0;border:0;font-size:1.1rem}.course-admin-card__meta{margin:.45rem 0 1rem;color:var(--muted);font-size:.88rem}.course-admin-card__action{margin:auto 0 0}.admin-disclosure{margin:1.5rem 0;background:#fff}.admin-disclosure>summary{font-size:1.05rem}.admin-disclosure__body{padding:0 1rem 1rem}.email-list{display:grid;gap:.45rem;margin:.8rem 0;padding:0;list-style:none}.email-list li{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.5rem .65rem;border:1px solid var(--line);border-radius:8px;background:#fff}.email-list code{overflow-wrap:anywhere}.utility-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}.utility-card{padding:1rem;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}.utility-card p{margin:.35rem 0 0;color:var(--muted);font-size:.86rem}
 @media(max-width:760px){.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){html{background:var(--surface)}body{width:100%;margin:0!important;padding:1.15rem!important;border:0;border-radius:0;box-shadow:none}h1{margin-top:.75rem}h2{margin-top:1.75rem}th,td{padding:.6rem!important}button{width:100%}.help-hint__button{width:1.45rem;min-width:1.45rem}.help-hint__panel{right:auto;left:50%;transform:translateX(-50%);width:min(18rem,calc(100vw - 2rem))}.help-hint__panel::before{right:auto;left:50%;transform:translateX(-50%)}td button,li button,.button--secondary,.sort-button{width:auto}form[style*="display:inline"]{display:inline!important}.topbar{align-items:flex-start}.topbar__actions{justify-content:flex-end}.account-grid{grid-template-columns:1fr}.section-nav{margin-inline:-1.15rem;padding-inline:1.15rem}.admin-section{padding:1rem}.course-card{padding:1rem}.table-tools{grid-template-columns:1fr}.table-count{margin:0}.copy-field{align-items:stretch}.copy-field code{flex:1;overflow-wrap:anywhere}.course-grid,.utility-grid{grid-template-columns:1fr}.mobile-compact{display:table;table-layout:auto;overflow:visible;white-space:normal}.mobile-compact th,.mobile-compact td{overflow-wrap:anywhere}.mobile-compact .mobile-secondary,.mobile-compact th:nth-child(5){display:none}.mobile-card-table{overflow:visible;white-space:normal}.mobile-card-table thead{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}.mobile-card-table tbody,.mobile-card-table tr,.mobile-card-table td{display:block;width:100%}.mobile-card-table tr{margin-bottom:.75rem;overflow:hidden;border:1px solid var(--line);border-radius:10px;background:#fff}.mobile-card-table td{display:grid;grid-template-columns:minmax(6.5rem,40%) minmax(0,1fr);gap:.75rem;border:0;border-bottom:1px solid var(--line);white-space:normal;overflow-wrap:anywhere}.mobile-card-table td:last-child{border-bottom:0}.mobile-card-table td::before{content:attr(data-label);color:var(--muted);font-size:.82rem;font-weight:700}.mobile-card-table tbody tr:nth-child(even),.mobile-card-table tbody tr:hover{background:#fff}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
@@ -118,7 +118,8 @@ export function adminHomePage(
         .join("\n")}</div>`
     : `<p class="empty-state">${t.no_courses}</p>`;
   const createForm = opts.isOwner
-    ? `<details class="admin-disclosure"${courses.length ? "" : " open"}><summary>${t.course_create_expand}${helpHint(t.help_course_create, t.help_label)}</summary><div class="admin-disclosure__body">
+    ? `<details class="admin-disclosure"${courses.length ? "" : " open"}><summary>${t.course_create_expand}</summary><div class="admin-disclosure__body">
+<p class="muted text-small">${t.course_create_note}${helpHint(t.help_course_create, t.help_label)}</p>
 <form method="post" action="/admin/courses" class="form-stack" style="max-width:440px">
   <label>${t.ph_course_id}<input name="course_id" placeholder="ds-2026" required pattern="[A-Za-z0-9_-]+" autocomplete="off"></label>
   <label>${t.ph_course_name}<input name="name" placeholder="${t.ph_course_name}" required></label>
@@ -127,9 +128,10 @@ export function adminHomePage(
   <label>${t.ph_course_org}<input name="github_org" placeholder="${t.ph_course_org}" autocomplete="off"></label>
   <label>${t.ph_course_classroom}<input name="google_classroom_id" placeholder="${t.ph_course_classroom}" autocomplete="off"></label>
   <label>${t.ph_course_meet}<input name="google_meet_url" type="url" placeholder="https://meet.google.com/…"></label>
+  <label>${t.ph_course_group}<input name="google_group_email" type="email" placeholder="maccount-ds-2026@example.edu" autocomplete="off"></label>
   <button type="submit">${t.course_create}</button>
 </form>
-<p class="muted text-small">${t.course_create_note}</p></div></details>`
+</div></details>`
     : "";
   return `${documentStart(lang, t.admin_title, UI_CSS)}
 <body style="font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6">
@@ -254,6 +256,7 @@ export function adminPage(
     github_org?: string | null;
     google_classroom_id?: string | null;
     google_meet_url?: string | null;
+    google_group_email?: string | null;
     status?: string;
   },
   rows: BindingRow[],
@@ -399,15 +402,68 @@ ${driveBanner}
   // Google Forms attached to the course (any course staff). Students see these
   // on /me under the matching course and answer signed into Google.
   const forms = opts.forms ?? [];
-  const formsMsgText: Record<string, string> = {
-    bad: t.forms_msg_bad,
-    "no-drive": t.forms_msg_nodrive,
-    "token-error": t.forms_msg_tokenerror,
-    "create-error": t.forms_msg_createerror,
-  };
-  const formsBanner = opts.formsMsg && formsMsgText[opts.formsMsg]
-    ? `<p class="alert alert--danger" role="alert">${formsMsgText[opts.formsMsg]}</p>`
+  const fm = opts.formsMsg ?? "";
+  let formsBannerText = "";
+  if (fm.startsWith("group-done:")) {
+    const [, added = "0", removed = "0", kept = "0", protectedCount = "0", errors = "0"] = fm.split(":");
+    formsBannerText = t.forms_msg_groupdone
+      .replace("{added}", added).replace("{removed}", removed)
+      .replace("{kept}", kept).replace("{protected}", protectedCount).replace("{errors}", errors);
+  } else if (fm === "bad") formsBannerText = t.forms_msg_bad;
+  else if (fm === "no-drive") formsBannerText = t.forms_msg_nodrive;
+  else if (fm === "token-error") formsBannerText = t.forms_msg_tokenerror;
+  else if (fm === "create-error") formsBannerText = t.forms_msg_createerror;
+  else if (fm === "group-missing") formsBannerText = t.forms_msg_groupmissing;
+  else if (fm === "group-scope") formsBannerText = t.forms_msg_groupscope;
+  else if (fm === "group-error") formsBannerText = t.forms_msg_grouperror;
+  const formsBanner = formsBannerText
+    ? `<p class="alert alert--${fm.startsWith("group-done:") ? "success" : fm === "bad" || fm === "group-missing" || fm === "group-scope" ? "warning" : "danger"}" role="${fm.startsWith("group-done:") ? "status" : "alert"}">${formsBannerText}</p>`
     : "";
+  const formResponderEmails = new Map<string, { email: string; moodle: boolean; google: boolean }>();
+  const addResponderEmail = (raw: string | null | undefined, source: "moodle" | "google") => {
+    const email = (raw ?? "").trim();
+    if (!email || !email.includes("@")) return;
+    const key = email.toLocaleLowerCase();
+    const item = formResponderEmails.get(key) ?? { email, moodle: false, google: false };
+    item[source] = true;
+    formResponderEmails.set(key, item);
+  };
+  for (const e of enrolled) {
+    addResponderEmail(e.email, "moodle");
+    addResponderEmail(e.google_email, "google");
+  }
+  const responderRows = [...formResponderEmails.values()]
+    .sort((a, b) => a.email.localeCompare(b.email, undefined, { sensitivity: "base" }))
+    .map((r) => {
+      const sources = [
+        r.moodle ? t.forms_responder_source_moodle : "",
+        r.google ? t.forms_responder_source_google : "",
+      ].filter(Boolean).join(" + ");
+      return `<li><code>${h(r.email)}</code><span class="badge badge--neutral">${h(sources)}</span></li>`;
+    })
+    .join("\n");
+  const responderAllowlist = `<details class="admin-disclosure"><summary>${t.forms_responder_heading.replace("{n}", String(formResponderEmails.size))}</summary><div class="admin-disclosure__body">
+<p class="muted text-small">${t.forms_responder_note}${helpHint(t.help_forms_responders, t.help_label)}</p>
+${formResponderEmails.size ? `<ul class="email-list">${responderRows}</ul>` : `<p class="empty-state">${t.forms_responder_empty}</p>`}
+</div></details>`;
+  const groupEmail = (course.google_group_email ?? "").trim();
+  const googleGroupPanel = `<div class="utility-card">
+  <p><b>${t.forms_group_heading}</b>${helpHint(t.help_forms_group, t.help_label)}</p>
+  ${
+    groupEmail
+      ? `<p><code>${h(groupEmail)}</code></p>
+  <p>${t.forms_group_ready.replace("{n}", String(formResponderEmails.size))}</p>
+  <p class="muted text-small">${t.forms_group_next}</p>
+  <form method="post" action="${base}/forms/group/sync" ${confirmAttrs(
+    t.forms_group_sync_confirm,
+    t.forms_group_sync_confirm_detail,
+    t.forms_group_sync,
+  )}>
+    <button type="submit">${t.forms_group_sync}</button>
+  </form>`
+      : `<p class="alert alert--warning">${t.forms_group_missing}</p>`
+  }
+</div>`;
   const formsRows = forms.length
     ? `<ul>${forms
         .map((f) => {
@@ -429,6 +485,8 @@ ${driveBanner}
   const formsSection = `<section class="admin-section" id="forms"><h2 class="with-help">${t.forms_heading}${helpHint(t.help_forms, t.help_label)}</h2>
 <p class="muted text-small">${t.forms_note}</p>
 <div class="copy-field"><span>${t.prejoin_link_label}${helpHint(t.help_prejoin_link, t.help_label)}：</span><code>/me/${h(course.course_id)}</code><button type="button" class="button button--secondary" data-copy-path="/me/${h(course.course_id)}">${t.copy_link}</button></div>
+${googleGroupPanel}
+${responderAllowlist}
 ${formsBanner}
 ${formsRows}
 <form method="post" action="${base}/forms/add" class="form-stack" style="max-width:440px">
@@ -483,6 +541,7 @@ ${
   <label>${t.ph_course_org}<input name="github_org" value="${h(course.github_org ?? "")}"></label>
   <label>${t.ph_course_classroom}<input name="google_classroom_id" value="${h(course.google_classroom_id ?? "")}"></label>
   <label>${t.ph_course_meet}<input name="google_meet_url" value="${h(course.google_meet_url ?? "")}"></label>
+  <label>${t.ph_course_group}<input name="google_group_email" type="email" value="${h(course.google_group_email ?? "")}"></label>
   <label>${t.course_status}
     <select name="status">
       <option value="active"${course.status !== "archived" ? " selected" : ""}>active</option>

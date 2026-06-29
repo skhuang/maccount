@@ -4,7 +4,7 @@ import worker from "../src/index";
 import { signSession, SESSION_COOKIE } from "../src/session";
 import { listBindings } from "../src/db/bindings";
 import { encryptSecret } from "../src/crypto";
-import { STAFF_GOOGLE_SCOPE } from "../src/oauth/drive";
+import { GROUP_MEMBER_SCOPE, STAFF_GOOGLE_SCOPE } from "../src/oauth/drive";
 import type { Env } from "../src/env";
 
 const SECRET = "test-secret";
@@ -19,6 +19,8 @@ const testEnv: Env = {
   GITHUB_CLIENT_SECRET: "gh_secret",
   GOOGLE_CLIENT_ID: "g_id",
   GOOGLE_CLIENT_SECRET: "g_secret",
+  GOOGLE_LOGIN_CLIENT_ID: "g_login_id",
+  GOOGLE_LOGIN_CLIENT_SECRET: "g_login_secret",
   GOOGLE_SCOPE: "openid email https://www.googleapis.com/auth/drive.file",
   GOOGLE_TOKEN_KEY: "test-token-key",
   NYCU_AUTHORIZE_URL: "https://id.nycu.edu.tw/o/authorize/",
@@ -224,7 +226,9 @@ describe("/auth/google/start (bind from the dashboard)", () => {
     );
     const res = await call("/auth/google/start", { headers: cookie(session) });
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toContain("accounts.google.com/o/oauth2/v2/auth");
+    const loc = new URL(res.headers.get("Location")!);
+    expect(loc.origin + loc.pathname).toBe("https://accounts.google.com/o/oauth2/v2/auth");
+    expect(loc.searchParams.get("client_id")).toBe("g_id");
     expect(res.headers.get("Set-Cookie")).toContain(SESSION_COOKIE);
   });
 
@@ -449,8 +453,16 @@ describe("sign in with GitHub / Google (login via an existing binding)", () => {
     const res = await call("/auth/google/login");
     const loc = new URL(res.headers.get("Location")!);
     expect(loc.origin + loc.pathname).toBe("https://accounts.google.com/o/oauth2/v2/auth");
+    expect(loc.searchParams.get("client_id")).toBe("g_login_id");
     expect(loc.searchParams.get("scope")).toBe("openid email");
     expect(loc.searchParams.get("access_type")).toBe(null);
+  });
+
+  it("/auth/google/login falls back to the binding client when no separate login client is configured", async () => {
+    const fallbackEnv: Env = { ...testEnv, GOOGLE_LOGIN_CLIENT_ID: "", GOOGLE_LOGIN_CLIENT_SECRET: undefined };
+    const res = await call("/auth/google/login", undefined, fallbackEnv);
+    const loc = new URL(res.headers.get("Location")!);
+    expect(loc.searchParams.get("client_id")).toBe("g_id");
   });
 
   it("GitHub login resolves the binding and logs in as that NYCU account", async () => {
@@ -496,15 +508,20 @@ describe("sign in with GitHub / Google (login via an existing binding)", () => {
     await env.DB.prepare(
       "INSERT INTO bindings (nycu_id, nycu_name, github_id, google_sub, google_email, created_at, updated_at) VALUES ('0856001','王小明',NULL,'108sub','m@gmail.com','t','t')",
     ).run();
-    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+    let tokenBody = "";
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input instanceof Request ? input.url : input);
-      if (url.includes("oauth2.googleapis.com/token"))
+      if (url.includes("oauth2.googleapis.com/token")) {
+        tokenBody = String(init?.body ?? "");
         return new Response(JSON.stringify({ access_token: "t" }), { headers: { "Content-Type": "application/json" } });
+      }
       return new Response(JSON.stringify({ sub: "108sub", email: "m@gmail.com" }), { headers: { "Content-Type": "application/json" } });
     }));
-    const session = await signSession({ exp: Date.now() + 60000, gostate: "GO" }, SECRET); // NO nycu
+    const session = await signSession({ exp: Date.now() + 60000, gostate: "GO", googleMode: "login" }, SECRET); // NO nycu
     const res = await call("/auth/google/callback?code=abc&state=GO", { headers: cookie(session) });
     expect(res.headers.get("Location")).toBe("/me");
+    expect(new URLSearchParams(tokenBody).get("client_id")).toBe("g_login_id");
+    expect(new URLSearchParams(tokenBody).get("client_secret")).toBe("g_login_secret");
     const me = await call("/me", { headers: cookie(sessionToken(res)) });
     expect(await me.text()).toContain("0856001");
   });
@@ -516,7 +533,7 @@ describe("sign in with GitHub / Google (login via an existing binding)", () => {
         return new Response(JSON.stringify({ access_token: "t" }), { headers: { "Content-Type": "application/json" } });
       return new Response(JSON.stringify({ sub: "unknown", email: "x@gmail.com" }), { headers: { "Content-Type": "application/json" } });
     }));
-    const session = await signSession({ exp: Date.now() + 60000, gostate: "GO" }, SECRET);
+    const session = await signSession({ exp: Date.now() + 60000, gostate: "GO", googleMode: "login" }, SECRET);
     const res = await call("/auth/google/callback?code=abc&state=GO", { headers: cookie(session) });
     expect(res.headers.get("Location")).toBe(
       "https://skhuang.github.io/maccount/done.html?status=err&reason=google_not_bound",
@@ -533,7 +550,7 @@ describe("sign in with GitHub / Google (login via an existing binding)", () => {
         return new Response(JSON.stringify({ access_token: "t", scope: "openid email" }), { headers: { "Content-Type": "application/json" } });
       return new Response(JSON.stringify({ sub: "newsub", email: "m@gmail.com" }), { headers: { "Content-Type": "application/json" } });
     }));
-    const session = await signSession({ exp: Date.now() + 60000, gostate: "GO" }, SECRET);
+    const session = await signSession({ exp: Date.now() + 60000, gostate: "GO", googleMode: "login" }, SECRET);
     const res = await call("/auth/google/callback?code=abc&state=GO", { headers: cookie(session) });
     expect(res.headers.get("Location")).toBe("/me");
     const me = await call("/me", { headers: cookie(sessionToken(res)) });
@@ -552,7 +569,7 @@ describe("sign in with GitHub / Google (login via an existing binding)", () => {
         return new Response(JSON.stringify({ access_token: "t", scope: "openid email" }), { headers: { "Content-Type": "application/json" } });
       return new Response(JSON.stringify({ sub: "nycusub", email: "student@nycu.edu.tw" }), { headers: { "Content-Type": "application/json" } });
     }));
-    const session = await signSession({ exp: Date.now() + 60000, gostate: "GO" }, SECRET);
+    const session = await signSession({ exp: Date.now() + 60000, gostate: "GO", googleMode: "login" }, SECRET);
     const res = await call("/auth/google/callback?code=abc&state=GO", { headers: cookie(session) });
     expect(res.headers.get("Location")).toBe("/me");
     const me = await call("/me", { headers: cookie(sessionToken(res)) });
@@ -571,7 +588,7 @@ describe("sign in with GitHub / Google (login via an existing binding)", () => {
         return new Response(JSON.stringify({ access_token: "t", scope: "openid email" }), { headers: { "Content-Type": "application/json" } });
       return new Response(JSON.stringify({ sub: "newsub", email: "student@example.com" }), { headers: { "Content-Type": "application/json" } });
     }));
-    const session = await signSession({ exp: Date.now() + 60000, gostate: "GO" }, SECRET);
+    const session = await signSession({ exp: Date.now() + 60000, gostate: "GO", googleMode: "login" }, SECRET);
     const res = await call("/auth/google/callback?code=abc&state=GO", { headers: cookie(session) });
     expect(res.headers.get("Location")).toBe(
       "https://skhuang.github.io/maccount/done.html?status=err&reason=google_not_bound",
@@ -589,7 +606,7 @@ describe("sign in with GitHub / Google (login via an existing binding)", () => {
         return new Response(JSON.stringify({ access_token: "t", scope: "openid email" }), { headers: { "Content-Type": "application/json" } });
       return new Response(JSON.stringify({ sub: "newsub", email: "same@gmail.com" }), { headers: { "Content-Type": "application/json" } });
     }));
-    const session = await signSession({ exp: Date.now() + 60000, gostate: "GO" }, SECRET);
+    const session = await signSession({ exp: Date.now() + 60000, gostate: "GO", googleMode: "login" }, SECRET);
     const res = await call("/auth/google/callback?code=abc&state=GO", { headers: cookie(session) });
     expect(res.headers.get("Location")).toBe(
       "https://skhuang.github.io/maccount/done.html?status=err&reason=google_email_ambiguous",
@@ -942,6 +959,18 @@ describe("course edit + enrollment", () => {
     expect(row).toMatchObject({ google_meet_url: "https://meet.google.com/abc-defg-hij" });
     const body = await (await call("/c/ds-2026/admin", { headers: cookie(await owner()) })).text();
     expect(body).toContain('name="google_meet_url" value="https://meet.google.com/abc-defg-hij"');
+    await post("/admin/courses", { course_id: "ds-2026", name: "資料結構 2026" }, await owner()); // restore
+  });
+
+  it("owner sets an optional google_group_email (persists + prefills the form)", async () => {
+    const group = "maccount-ds-2026@example.edu";
+    const res = await post("/admin/courses", { course_id: "ds-2026", name: "資料結構 2026", google_group_email: group }, await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin");
+    const row = await env.DB.prepare("SELECT google_group_email FROM courses WHERE course_id='ds-2026'").first();
+    expect(row).toMatchObject({ google_group_email: group });
+    const body = await (await call("/c/ds-2026/admin", { headers: cookie(await owner()) })).text();
+    expect(body).toContain(`name="google_group_email" type="email" value="${group}"`);
+    expect(body).toContain(`<code>${group}</code>`);
     await post("/admin/courses", { course_id: "ds-2026", name: "資料結構 2026" }, await owner()); // restore
   });
 
@@ -1455,12 +1484,21 @@ describe("course Google Forms", () => {
 
   // Seed the acting staff (admin1) with a connected Drive (full scope) token so
   // the Forms API create can act as them.
-  const connectAdminDrive = async () => {
+  const connectAdminDrive = async (scope = STAFF_GOOGLE_SCOPE) => {
     const enc = await encryptSecret("r_admin", "test-token-key");
     await env.DB.prepare(
       "INSERT INTO bindings (nycu_id, nycu_name, github_id, google_sub, google_email, google_refresh_token, google_scope, google_token_updated_at, created_at, updated_at) VALUES ('admin1','A',NULL,'adminsub','admin@gmail.com',?,?, 't','t','t')",
-    ).bind(enc, STAFF_GOOGLE_SCOPE).run();
+    ).bind(enc, scope).run();
   };
+  const setGroup = (group: string | null) =>
+    env.DB.prepare("UPDATE courses SET google_group_email=? WHERE course_id='ds-2026'").bind(group).run();
+  const bindStudent = (sid: string, email: string | null) =>
+    env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, github_id, google_sub, google_email, created_at, updated_at) VALUES (?,?,NULL,?,?,'t','t')",
+    ).bind(sid, sid, `sub-${sid}`, email).run();
+  const enroll = (sid: string, email: string | null = null) =>
+    env.DB.prepare("INSERT INTO enrollments (course_id, student_id, email, role, created_at) VALUES ('ds-2026',?,?,'student','t')")
+      .bind(sid, email).run();
 
   it("creates a Google Form via the API and attaches it (stores form_id + responderUri)", async () => {
     await connectAdminDrive();
@@ -1505,6 +1543,66 @@ describe("course Google Forms", () => {
     const res = await post("/c/ds-2026/admin/forms/create", { title: "x" }, await owner());
     expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?forms_msg=create-error");
     expect(await env.DB.prepare("SELECT 1 FROM course_forms").first()).toBe(null);
+  });
+
+  it("syncs suggested responder emails into the configured Google Group", async () => {
+    await setGroup("course-group@example.edu");
+    await connectAdminDrive();
+    await bindStudent("s1", "s1@gmail.com");
+    await bindStudent("s2", "same@gmail.com");
+    await enroll("s1", "s1@nycu.edu.tw");
+    await enroll("s2", "same@gmail.com"); // duplicate with bound Google
+    const calls: Array<{ url: string; method: string; body?: unknown }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input instanceof Request ? input.url : input);
+      const method = init?.method ?? "GET";
+      if (url.includes("oauth2.googleapis.com/token"))
+        return new Response(JSON.stringify({ access_token: "fresh" }), { headers: { "Content-Type": "application/json" } });
+      calls.push({ url, method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      if (method === "GET" && url.includes("admin.googleapis.com/admin/directory/v1/groups"))
+        return new Response(JSON.stringify({
+          members: [
+            { id: "old-id", email: "old@gmail.com", role: "MEMBER", type: "USER" },
+            { id: "owner-id", email: "owner@example.edu", role: "OWNER", type: "USER" },
+            { id: "s1-id", email: "s1@gmail.com", role: "MEMBER", type: "USER" },
+          ],
+        }), { headers: { "Content-Type": "application/json" } });
+      if (method === "POST" && url.includes("/members"))
+        return new Response("{}", { headers: { "Content-Type": "application/json" } });
+      if (method === "DELETE" && url.includes("/members/old-id"))
+        return new Response(null, { status: 204 });
+      throw new Error("unexpected fetch " + method + " " + url);
+    }));
+
+    const res = await post("/c/ds-2026/admin/forms/group/sync", {}, await owner());
+
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?forms_msg=group-done%3A2%3A1%3A1%3A1%3A0");
+    expect(calls).toContainEqual(expect.objectContaining({ method: "POST", body: { email: "s1@nycu.edu.tw", role: "MEMBER" } }));
+    expect(calls).toContainEqual(expect.objectContaining({ method: "POST", body: { email: "same@gmail.com", role: "MEMBER" } }));
+    expect(calls).toContainEqual(expect.objectContaining({ method: "DELETE", url: expect.stringContaining("/members/old-id") }));
+    expect(calls.some((c) => c.url.includes("owner-id"))).toBe(false);
+    await setGroup(null);
+  });
+
+  it("group sync flashes group-missing without calling Google when no group is configured", async () => {
+    await setGroup(null);
+    await connectAdminDrive();
+    const fetchSpy = vi.fn(async () => new Response("{}", { headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchSpy);
+    const res = await post("/c/ds-2026/admin/forms/group/sync", {}, await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?forms_msg=group-missing");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("group sync asks staff to reconnect Google when the token lacks the group-member scope", async () => {
+    await setGroup("course-group@example.edu");
+    await connectAdminDrive(STAFF_GOOGLE_SCOPE.replace(` ${GROUP_MEMBER_SCOPE}`, ""));
+    const fetchSpy = vi.fn(async () => new Response("{}", { headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchSpy);
+    const res = await post("/c/ds-2026/admin/forms/group/sync", {}, await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?forms_msg=group-scope");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    await setGroup(null);
   });
 });
 
