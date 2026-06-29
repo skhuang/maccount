@@ -961,16 +961,25 @@ function parseStudentIds(blob: string): string[] {
 }
 
 // POST /api/enrollments/ingest — token-auth roster import for automation
-// (e.g. seminar-moodle pushing Moodle participants). Body:
-// { course_id | moodle_course_id, student_ids: [...], replace?: bool }.
+// (e.g. seminar-moodle pushing Moodle participants). Body supports either:
+// { course_id | moodle_course_id, students: [{ student_id, email? }], replace?: bool }
+// or the legacy { course_id | moodle_course_id, student_ids: [...], replace?: bool }.
 // moodle_course_id is resolved to a course_id via courses.moodle_course_id, so
 // the caller can send the Moodle numeric id it already has.
 async function enrollmentsIngest(req: Request, env: Env): Promise<Response> {
   if (!bearerOk(req, env)) return new Response("Unauthorized", { status: 401 });
   const body = (await req.json().catch(() => null)) as
-    | { course_id?: unknown; moodle_course_id?: unknown; student_ids?: unknown; replace?: unknown }
+    | { course_id?: unknown; moodle_course_id?: unknown; students?: unknown; student_ids?: unknown; replace?: unknown }
     | null;
-  const list = Array.isArray(body?.student_ids) ? body!.student_ids : null;
+  const studentRows = Array.isArray(body?.students)
+    ? body!.students
+        .map((x) => ({
+          student_id: typeof x === "object" && x != null && "student_id" in x ? String(x.student_id ?? "").trim() : "",
+          email: typeof x === "object" && x != null && "email" in x ? String(x.email ?? "").trim() : "",
+        }))
+        .filter((x) => x.student_id)
+    : null;
+  const list = studentRows ?? (Array.isArray(body?.student_ids) ? body!.student_ids : null);
   if (!list) return new Response("Bad request", { status: 400 });
   let course_id = typeof body?.course_id === "string" ? body.course_id : "";
   const moodleId = body?.moodle_course_id != null ? String(body.moodle_course_id) : "";
@@ -981,7 +990,7 @@ async function enrollmentsIngest(req: Request, env: Env): Promise<Response> {
   }
   if (!course_id) return new Response("Bad request", { status: 400 });
   if (!(await getCourse(env.DB, course_id))) return new Response("Unknown course", { status: 404 });
-  const ids = list.filter((x): x is string => typeof x === "string");
+  const ids = studentRows ?? list.filter((x): x is string => typeof x === "string");
   if (ids.length > MAX_INGEST_ROWS) return new Response("Too many rows", { status: 413 });
   const now = new Date(Date.now()).toISOString();
   const n = body?.replace

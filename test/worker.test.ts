@@ -927,6 +927,27 @@ describe("course edit + enrollment", () => {
     await env.DB.prepare("UPDATE courses SET moodle_course_id=NULL WHERE course_id='ds-2026'").run();
   });
 
+  it("token API ingest stores Moodle participant email rows", async () => {
+    const res = await call("/api/enrollments/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer ingest-secret" },
+      body: JSON.stringify({
+        course_id: "ds-2026",
+        students: [
+          { student_id: "m1", email: "m1@nycu.edu.tw" },
+          { student_id: "m2", email: "" },
+        ],
+        replace: true,
+      }),
+    });
+    expect(res.status).toBe(200);
+    const { results } = await env.DB.prepare("SELECT student_id, email FROM enrollments WHERE course_id='ds-2026' ORDER BY student_id").all();
+    expect(results).toEqual([
+      { student_id: "m1", email: "m1@nycu.edu.tw" },
+      { student_id: "m2", email: null },
+    ]);
+  });
+
   it("course roster.csv narrows to enrolled ∩ bound once a roster exists", async () => {
     await env.DB.batch([
       env.DB.prepare("INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, created_at, updated_at) VALUES ('a01','甲',1,'alice','t','t')"),

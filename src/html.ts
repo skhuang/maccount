@@ -223,6 +223,7 @@ ${uiEnhancements(t)}
 
 interface EnrolledLite {
   student_id: string;
+  email?: string | null;
   github_login: string | null;
   google_email?: string | null;
 }
@@ -333,6 +334,8 @@ export function adminPage(
   const enrolledRows = enrolled
     .map(
       (e) => `<tr data-row data-status="${e.github_login && e.google_email ? "complete" : "missing"}"><td>${h(e.student_id)}</td><td>${
+        e.email ? h(e.email) : ""
+      }</td><td>${
         e.github_login ? h(e.github_login) : `<span class="badge badge--danger">${t.enroll_unbound}</span>`
       }</td><td>${
         e.google_email ? h(e.google_email) : `<span class="badge badge--danger">${t.enroll_unbound}</span>`
@@ -358,7 +361,7 @@ export function adminPage(
 <details><summary>${t.enroll_show_list}</summary>
 ${tableTools(t, "enrollment-table", enrolled.length, [{ value: "missing", label: t.table_filter_unbound }])}
 <table id="enrollment-table" class="mobile-compact" border="1" cellpadding="6" cellspacing="0">
-<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh("GitHub", 1)}<th>Google</th></tr></thead>
+<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh("Moodle email", 1)}${sortableTh("GitHub", 2)}<th>Google</th></tr></thead>
 <tbody>${enrolledRows}</tbody></table></details>`
       : ""
   }

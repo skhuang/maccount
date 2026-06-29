@@ -5,14 +5,31 @@
 export interface EnrollmentRow {
   course_id: string;
   student_id: string;
+  email: string | null;
   role: string;
   created_at: string;
+}
+
+export interface EnrollmentInput {
+  student_id: string;
+  email?: string | null;
+}
+
+function normalizeEnrollments(students: (string | EnrollmentInput)[]): EnrollmentInput[] {
+  const byId = new Map<string, EnrollmentInput>();
+  for (const s of students) {
+    const student_id = String(typeof s === "string" ? s : s?.student_id ?? "").trim();
+    if (!student_id || byId.has(student_id)) continue;
+    const email = typeof s === "string" ? "" : String(s?.email ?? "").trim();
+    byId.set(student_id, { student_id, email });
+  }
+  return [...byId.values()];
 }
 
 export async function listEnrollments(db: D1Database, course_id: string): Promise<EnrollmentRow[]> {
   const { results } = await db
     .prepare(
-      "SELECT course_id, student_id, role, created_at FROM enrollments WHERE course_id = ? ORDER BY student_id",
+      "SELECT course_id, student_id, email, role, created_at FROM enrollments WHERE course_id = ? ORDER BY student_id",
     )
     .bind(course_id)
     .all<EnrollmentRow>();
@@ -40,46 +57,47 @@ export async function coursesForStudent(db: D1Database, student_id: string): Pro
 
 // Upsert one enrollment (idempotent) — used by the Moodle sync in Phase 3.
 export async function enroll(
-  db: D1Database, course_id: string, student_id: string, role: string, now: string,
+  db: D1Database, course_id: string, student_id: string, role: string, now: string, email = "",
 ): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO enrollments (course_id, student_id, role, created_at) VALUES (?1, ?2, ?3, ?4)
-       ON CONFLICT(course_id, student_id) DO UPDATE SET role = ?3`,
+      `INSERT INTO enrollments (course_id, student_id, email, role, created_at) VALUES (?1, ?2, ?3, ?4, ?5)
+       ON CONFLICT(course_id, student_id) DO UPDATE SET email = ?3, role = ?4`,
     )
-    .bind(course_id, student_id, role, now)
+    .bind(course_id, student_id, String(email || "").trim() || null, role, now)
     .run();
 }
 
-// Add many student_ids to a course (idempotent — existing rows untouched).
+// Add many student_ids to a course (idempotent; existing rows keep roster
+// membership and get a fresh Moodle email when one is provided).
 // Returns the number of ids submitted (deduped). Empty input is a no-op.
 export async function bulkEnroll(
-  db: D1Database, course_id: string, student_ids: string[], now: string,
+  db: D1Database, course_id: string, student_ids: (string | EnrollmentInput)[], now: string,
 ): Promise<number> {
-  const ids = [...new Set(student_ids.map((s) => s.trim()).filter(Boolean))];
-  if (ids.length === 0) return 0;
+  const students = normalizeEnrollments(student_ids);
+  if (students.length === 0) return 0;
   const stmt = db.prepare(
-    `INSERT INTO enrollments (course_id, student_id, role, created_at) VALUES (?1, ?2, 'student', ?3)
-     ON CONFLICT(course_id, student_id) DO NOTHING`,
+    `INSERT INTO enrollments (course_id, student_id, email, role, created_at) VALUES (?1, ?2, ?3, 'student', ?4)
+     ON CONFLICT(course_id, student_id) DO UPDATE SET email = COALESCE(?3, enrollments.email)`,
   );
-  await db.batch(ids.map((id) => stmt.bind(course_id, id, now)));
-  return ids.length;
+  await db.batch(students.map((s) => stmt.bind(course_id, s.student_id, s.email || null, now)));
+  return students.length;
 }
 
 // Replace a course's entire roster with the given ids (Moodle-authoritative sync).
 export async function replaceEnrollments(
-  db: D1Database, course_id: string, student_ids: string[], now: string,
+  db: D1Database, course_id: string, student_ids: (string | EnrollmentInput)[], now: string,
 ): Promise<number> {
-  const ids = [...new Set(student_ids.map((s) => s.trim()).filter(Boolean))];
+  const students = normalizeEnrollments(student_ids);
   const ops: D1PreparedStatement[] = [
     db.prepare("DELETE FROM enrollments WHERE course_id = ?").bind(course_id),
   ];
   const ins = db.prepare(
-    `INSERT INTO enrollments (course_id, student_id, role, created_at) VALUES (?1, ?2, 'student', ?3)`,
+    `INSERT INTO enrollments (course_id, student_id, email, role, created_at) VALUES (?1, ?2, ?3, 'student', ?4)`,
   );
-  for (const id of ids) ops.push(ins.bind(course_id, id, now));
+  for (const s of students) ops.push(ins.bind(course_id, s.student_id, s.email || null, now));
   await db.batch(ops);
-  return ids.length;
+  return students.length;
 }
 
 export async function removeEnrollment(
@@ -99,6 +117,7 @@ export async function enrollmentCount(db: D1Database, course_id: string): Promis
 
 export interface EnrolledStudent {
   student_id: string;
+  email: string | null;         // Moodle participants-page email
   nycu_name: string | null;
   github_login: string | null; // null = enrolled but hasn't bound GitHub yet
   github_id: number | null;
@@ -111,7 +130,7 @@ export async function listEnrolledWithBinding(
 ): Promise<EnrolledStudent[]> {
   const { results } = await db
     .prepare(
-      `SELECT e.student_id, b.nycu_name, b.github_login, b.github_id, b.google_email
+      `SELECT e.student_id, e.email, b.nycu_name, b.github_login, b.github_id, b.google_email
        FROM enrollments e LEFT JOIN bindings b ON b.nycu_id = e.student_id
        WHERE e.course_id = ? ORDER BY e.student_id`,
     )
