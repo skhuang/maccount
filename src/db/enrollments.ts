@@ -55,6 +55,19 @@ export async function coursesForStudent(db: D1Database, student_id: string): Pro
   return (results ?? []).map((r) => r.course_id);
 }
 
+// Distinct student ids whose Moodle participants-page email matches the given
+// address. Used only as a conservative Google-login fallback after a verified
+// Google OAuth identity is returned.
+export async function studentIdsForMoodleEmail(db: D1Database, email: string): Promise<string[]> {
+  const e = String(email || "").trim().toLowerCase();
+  if (!e) return [];
+  const { results } = await db
+    .prepare("SELECT DISTINCT student_id FROM enrollments WHERE LOWER(email) = ? ORDER BY student_id")
+    .bind(e)
+    .all<{ student_id: string }>();
+  return (results ?? []).map((r) => r.student_id);
+}
+
 // Upsert one enrollment (idempotent) — used by the Moodle sync in Phase 3.
 export async function enroll(
   db: D1Database, course_id: string, student_id: string, role: string, now: string, email = "",

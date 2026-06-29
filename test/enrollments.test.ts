@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { env, applyD1Migrations } from "cloudflare:test";
 import {
   bulkEnroll, replaceEnrollments, enrollmentCount, listEnrolledWithBinding,
-  removeEnrollment, coursesForStudent,
+  removeEnrollment, coursesForStudent, studentIdsForMoodleEmail,
 } from "../src/db/enrollments";
 
 const C = "ds-2026";
@@ -69,5 +69,12 @@ describe("enrollments db", () => {
     expect(await coursesForStudent(env.DB, "a")).toEqual(["ds-2026", "ds-2027"]);
     await removeEnrollment(env.DB, "ds-2026", "a");
     expect(await coursesForStudent(env.DB, "a")).toEqual(["ds-2027"]);
+  });
+
+  it("studentIdsForMoodleEmail matches email case-insensitively and dedupes across courses", async () => {
+    await replaceEnrollments(env.DB, "ds-2026", [{ student_id: "a", email: "A@Gmail.com" }], now);
+    await replaceEnrollments(env.DB, "ds-2027", [{ student_id: "a", email: "a@gmail.com" }], now);
+    await replaceEnrollments(env.DB, "ds-2028", [{ student_id: "b", email: "a@gmail.com" }], now);
+    expect(await studentIdsForMoodleEmail(env.DB, "a@gmail.com")).toEqual(["a", "b"]);
   });
 });

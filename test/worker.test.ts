@@ -522,6 +522,79 @@ describe("sign in with GitHub / Google (login via an existing binding)", () => {
       "https://skhuang.github.io/maccount/done.html?status=err&reason=google_not_bound",
     );
   });
+
+  it("Google login can resolve an unbound Gmail account via Moodle enrollment email", async () => {
+    await env.DB.prepare(
+      "INSERT INTO enrollments (course_id, student_id, email, role, created_at) VALUES ('ds-2026','0856001','m@gmail.com','student','t')",
+    ).run();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("oauth2.googleapis.com/token"))
+        return new Response(JSON.stringify({ access_token: "t", scope: "openid email" }), { headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ sub: "newsub", email: "m@gmail.com" }), { headers: { "Content-Type": "application/json" } });
+    }));
+    const session = await signSession({ exp: Date.now() + 60000, gostate: "GO" }, SECRET);
+    const res = await call("/auth/google/callback?code=abc&state=GO", { headers: cookie(session) });
+    expect(res.headers.get("Location")).toBe("/me");
+    const me = await call("/me", { headers: cookie(sessionToken(res)) });
+    expect(await me.text()).toContain("0856001");
+    const row = await env.DB.prepare("SELECT nycu_id, google_sub, google_email FROM bindings WHERE nycu_id='0856001'").first();
+    expect(row).toMatchObject({ nycu_id: "0856001", google_sub: "newsub", google_email: "m@gmail.com" });
+  });
+
+  it("Google login can resolve an unbound NYCU Workspace account via Moodle enrollment email", async () => {
+    await env.DB.prepare(
+      "INSERT INTO enrollments (course_id, student_id, email, role, created_at) VALUES ('ds-2026','0856002','student@nycu.edu.tw','student','t')",
+    ).run();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("oauth2.googleapis.com/token"))
+        return new Response(JSON.stringify({ access_token: "t", scope: "openid email" }), { headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ sub: "nycusub", email: "student@nycu.edu.tw" }), { headers: { "Content-Type": "application/json" } });
+    }));
+    const session = await signSession({ exp: Date.now() + 60000, gostate: "GO" }, SECRET);
+    const res = await call("/auth/google/callback?code=abc&state=GO", { headers: cookie(session) });
+    expect(res.headers.get("Location")).toBe("/me");
+    const me = await call("/me", { headers: cookie(sessionToken(res)) });
+    expect(await me.text()).toContain("0856002");
+    const row = await env.DB.prepare("SELECT nycu_id, google_sub, google_email FROM bindings WHERE nycu_id='0856002'").first();
+    expect(row).toMatchObject({ nycu_id: "0856002", google_sub: "nycusub", google_email: "student@nycu.edu.tw" });
+  });
+
+  it("Google login does not use other Moodle email domains as an unbound fallback", async () => {
+    await env.DB.prepare(
+      "INSERT INTO enrollments (course_id, student_id, email, role, created_at) VALUES ('ds-2026','0856001','student@example.com','student','t')",
+    ).run();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("oauth2.googleapis.com/token"))
+        return new Response(JSON.stringify({ access_token: "t", scope: "openid email" }), { headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ sub: "newsub", email: "student@example.com" }), { headers: { "Content-Type": "application/json" } });
+    }));
+    const session = await signSession({ exp: Date.now() + 60000, gostate: "GO" }, SECRET);
+    const res = await call("/auth/google/callback?code=abc&state=GO", { headers: cookie(session) });
+    expect(res.headers.get("Location")).toBe(
+      "https://skhuang.github.io/maccount/done.html?status=err&reason=google_not_bound",
+    );
+  });
+
+  it("Google login rejects an ambiguous Moodle Gmail match", async () => {
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO enrollments (course_id, student_id, email, role, created_at) VALUES ('ds-2026','a','same@gmail.com','student','t')"),
+      env.DB.prepare("INSERT INTO enrollments (course_id, student_id, email, role, created_at) VALUES ('ds-2026','b','same@gmail.com','student','t')"),
+    ]);
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("oauth2.googleapis.com/token"))
+        return new Response(JSON.stringify({ access_token: "t", scope: "openid email" }), { headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ sub: "newsub", email: "same@gmail.com" }), { headers: { "Content-Type": "application/json" } });
+    }));
+    const session = await signSession({ exp: Date.now() + 60000, gostate: "GO" }, SECRET);
+    const res = await call("/auth/google/callback?code=abc&state=GO", { headers: cookie(session) });
+    expect(res.headers.get("Location")).toBe(
+      "https://skhuang.github.io/maccount/done.html?status=err&reason=google_email_ambiguous",
+    );
+  });
 });
 
 describe("/admin auth gate", () => {
