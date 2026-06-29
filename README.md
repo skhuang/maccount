@@ -60,15 +60,18 @@ npx wrangler deploy
   - 取得 Client ID / Client secret。
 - **Google**（[console.cloud.google.com](https://console.cloud.google.com) → APIs & Services → Credentials → Create OAuth client ID → Web application）：
   - **Authorized redirect URI：`<worker>/auth/google/callback`**
-  - 取得 Client ID / Client secret。**學生**綁定的預設 scope = `openid email` + `drive.file`（`GOOGLE_SCOPE` 可調；分享給學生其實只需 email）。**staff**「連結 Drive」(`/auth/google/start?drive=1`) 會自動要求完整 `drive` + `forms.body` scope，才能分享既有檔案並直接建立 Google 表單。
+  - 取得 Client ID / Client secret。`GOOGLE_CLIENT_ID` 是主要 Google OAuth client，用於 Google 綁定與 staff Drive/Classroom/Forms 授權；**學生**綁定的預設 scope = `openid email` + `drive.file`（`GOOGLE_SCOPE` 可調；分享給學生其實只需 email）。**staff**「連結 Drive」(`/auth/google/start?drive=1`) 會自動要求完整 `drive` + `forms.body` scope，才能分享既有檔案並直接建立 Google 表單。
+  - 若主要 Google OAuth consent screen 是 **Internal**（只允許機構內帳號），請另外建立一組 **External** Google OAuth client 給學生登入使用，填到 `GOOGLE_LOGIN_CLIENT_ID` / `GOOGLE_LOGIN_CLIENT_SECRET`。這組只用於 `/auth/google/login`，scope 固定為 `openid email`，不要求 Drive/offline，也不會覆寫既有 Drive token。兩組 Google OAuth client 可以共用同一個 redirect URI：`<worker>/auth/google/callback`。
   - 在 **Enabled APIs** 啟用 **Google Drive API**（檔案分享用）與 **Google Forms API**（從後台直接建立問卷用）。兩者都要啟用在**與此 OAuth client 同一個專案**（建立表單失敗、log 顯示 `Forms API has not been used in project <n>` 多半是啟用錯專案）。
   - OAuth consent screen 設 External。完整 `drive` 為**受限 scope**：自用／少量帳號可加「測試使用者」直接用；要對外大量使用才需送 Google 審查。
   - 綁定流程要求 offline 存取（`access_type=offline`+`prompt=consent`），取得並**加密存下** refresh token。
 
 ### 4. 設定 vars 與 secrets
-編輯 `wrangler.toml` 的 `[vars]`：`PUBLIC_BASE_URL = "<worker>"`、`FRONTEND_DONE_URL = "https://skhuang.github.io/maccount/done.html"`、`GITHUB_CLIENT_ID`、`GOOGLE_CLIENT_ID`、`NYCU_CLIENT_ID`、`ADMIN_IDS`（以逗號分隔的 NYCU 帳號）。
+編輯 `wrangler.toml` 的 `[vars]`：`PUBLIC_BASE_URL = "<worker>"`、`FRONTEND_DONE_URL = "https://skhuang.github.io/maccount/done.html"`、`GITHUB_CLIENT_ID`、`GOOGLE_CLIENT_ID`、選填的 `GOOGLE_LOGIN_CLIENT_ID`、`NYCU_CLIENT_ID`、`ADMIN_IDS`（以逗號分隔的 NYCU 帳號）。
 
 > **`GOOGLE_CLIENT_ID`**：填 Google OAuth client 的完整 Client ID（形如 `<數字>-<雜湊>.apps.googleusercontent.com`）。它**非機密**，放 `[vars]`（committed 模板裡是空字串 placeholder，本機填真實值並維持 `skip-worktree` 不提交，與 `GITHUB_CLIENT_ID`/`NYCU_CLIENT_ID`/`ADMIN_IDS` 同）。對應的 `GOOGLE_CLIENT_SECRET` 與加密金鑰 `GOOGLE_TOKEN_KEY` 走 `wrangler secret put`（見下）。`GOOGLE_SCOPE` 已有預設（`openid email` + `drive.file`），一般不需改。
+
+> **`GOOGLE_LOGIN_CLIENT_ID`**：選填。若設定，`/auth/google/login` 會改用這組 External client，讓 `@gmail.com` 與 `@nycu.edu.tw` Google 帳號都能登入；callback 仍會保留「必須唯一對到一筆 `enrollments.email`」的安全檢查。若不設定，Google 登入沿用 `GOOGLE_CLIENT_ID`。設定此值時必須同步設定 secret：`npx wrangler secret put GOOGLE_LOGIN_CLIENT_SECRET`。
 
 NYCU 端點（`NYCU_AUTHORIZE_URL`、`NYCU_TOKEN_URL`、`NYCU_USERINFO_URL = /api/profile/`、`NYCU_SCOPE = profile`）已依官方文件填好，一般不需更動。
 secrets 用指令設定（不進版控）：
@@ -76,6 +79,7 @@ secrets 用指令設定（不進版控）：
 npx wrangler secret put SESSION_SECRET        # 隨機長字串
 npx wrangler secret put GITHUB_CLIENT_SECRET
 npx wrangler secret put GOOGLE_CLIENT_SECRET
+npx wrangler secret put GOOGLE_LOGIN_CLIENT_SECRET  # 選填；有設定 GOOGLE_LOGIN_CLIENT_ID 才需要
 npx wrangler secret put GOOGLE_TOKEN_KEY     # 隨機長字串；用來加密存放 Google refresh token（換金鑰會讓既存 token 失效）
 npx wrangler secret put NYCU_CLIENT_SECRET
 npx wrangler secret put GRADES_INGEST_TOKEN   # 隨機長字串；OJ runner 推成績時帶在 Authorization: Bearer

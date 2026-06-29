@@ -174,6 +174,29 @@ describe("adminPage", () => {
     expect(html).toContain('action="/c/ds-2026/admin/forms/create"'); // create via API
   });
 
+  it("shows suggested Google Form responder emails from Moodle and bound Google", () => {
+    const html = adminPage("zh", { ...course, google_group_email: "maccount-ds-2026@example.edu" }, [], {
+      isOwner: true,
+      staff: [],
+      enrolled: [
+        { student_id: "a01", email: "alice@nycu.edu.tw", github_login: "alice", google_email: "alice@gmail.com" },
+        { student_id: "b02", email: "bob@gmail.com", github_login: null, google_email: "BOB@gmail.com" },
+      ],
+    });
+    expect(html).toContain("問卷建議允許名單（3）");
+    expect(html).toContain("<code>alice@nycu.edu.tw</code>");
+    expect(html).toContain("<code>alice@gmail.com</code>");
+    expect(html).toContain("<code>bob@gmail.com</code>");
+    expect(html).toContain("Moodle + 綁定 Google");
+    expect(html).toContain("Google Forms 的發布/管理權限");
+    expect(html).toContain("課程 Google Group");
+    expect(html).toContain("<code>maccount-ds-2026@example.edu</code>");
+    expect(html).toContain("目前建議同步 3 個填答帳號");
+    expect(html).toContain('action="/c/ds-2026/admin/forms/group/sync"');
+    expect(html).toContain("同步 Google Group 成員");
+    expect(html).toContain("OWNER、MANAGER");
+  });
+
   it("shows an edit link for an API-created form (has form_id)", () => {
     const html = adminPage("zh", course, [], {
       isOwner: true,

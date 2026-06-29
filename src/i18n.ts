@@ -76,6 +76,7 @@ export interface Strings {
   ph_course_org: string;
   ph_course_classroom: string;
   ph_course_meet: string;
+  ph_course_group: string;
   meet_join: string;
   bindings_query_heading: string;
   bindings_all_link: string;
@@ -156,6 +157,10 @@ export interface Strings {
   forms_msg_nodrive: string;
   forms_msg_tokenerror: string;
   forms_msg_createerror: string;
+  forms_msg_groupmissing: string;
+  forms_msg_groupscope: string;
+  forms_msg_grouperror: string;
+  forms_msg_groupdone: string; // {added} {removed} {kept} {protected} {errors}
   forms_create_note: string;
   forms_create_title_ph: string;
   forms_create_btn: string;
@@ -163,6 +168,18 @@ export interface Strings {
   forms_student_heading: string;
   forms_pre_enroll_label: string;
   forms_pre_enroll_badge: string;
+  forms_responder_heading: string; // "{n}" placeholder
+  forms_responder_note: string;
+  forms_responder_empty: string;
+  forms_responder_source_moodle: string;
+  forms_responder_source_google: string;
+  forms_group_heading: string;
+  forms_group_missing: string;
+  forms_group_ready: string; // "{n}" placeholder
+  forms_group_next: string;
+  forms_group_sync: string;
+  forms_group_sync_confirm: string;
+  forms_group_sync_confirm_detail: string;
   prejoin_link_label: string;
   copy_link: string;
   copied: string;
@@ -180,6 +197,8 @@ export interface Strings {
   help_roster_replace: string;
   help_drive: string;
   help_forms: string;
+  help_forms_responders: string;
+  help_forms_group: string;
   help_prejoin_link: string;
   help_classroom: string;
   help_staff: string;
@@ -256,6 +275,7 @@ export const T: Record<Lang, Strings> = {
     ph_course_org: "github_org（選填）",
     ph_course_classroom: "google_classroom_id（選填，可貼課程連結）",
     ph_course_meet: "google_meet_url（選填，課程的 Meet 連結）",
+    ph_course_group: "google_group_email（選填，課程問卷 Google Group）",
     meet_join: "加入 Google Meet",
     bindings_query_heading: "查詢綁定（依 GitHub org）",
     bindings_all_link: "所有綁定",
@@ -338,6 +358,10 @@ export const T: Record<Lang, Strings> = {
     forms_msg_nodrive: "尚未連結你的 Google（完整權限），無法建立表單。請先點上方「連結我的 Google Drive」並授權。",
     forms_msg_tokenerror: "無法取得 Google 存取權杖（請重新連結 Drive）。",
     forms_msg_createerror: "建立 Google 表單失敗（請確認 Google Cloud 專案已啟用 Forms API，並已連結 Drive）。",
+    forms_msg_groupmissing: "尚未設定課程 Google Group，無法同步成員。",
+    forms_msg_groupscope: "你的 Google 授權尚未包含 Google Group 成員管理權限；請重新點「連結我的 Google Drive」授權一次。",
+    forms_msg_grouperror: "同步 Google Group 失敗（請確認帳號有 Workspace 管理群組成員權限，且 Admin SDK 已啟用）。",
+    forms_msg_groupdone: "Google Group 同步完成：新增 {added}、移除 {removed}、保留 {kept}、受保護略過 {protected}、錯誤 {errors}。",
     forms_create_note: "或直接建立新的 Google 表單（用你連結的 Google 帳號建立；建立後點「編輯」到 Google 加題目）：",
     forms_create_title_ph: "新表單標題（如 第一週小考）",
     forms_create_btn: "直接新增 Google 表單",
@@ -345,6 +369,18 @@ export const T: Record<Lang, Strings> = {
     forms_student_heading: "問卷",
     forms_pre_enroll_label: "給尚未選課的學生（報到問卷，顯示於 /me/<課程>）",
     forms_pre_enroll_badge: "（尚未選課）",
+    forms_responder_heading: "問卷建議允許名單（{n}）",
+    forms_responder_note: "第一階段先列出應允許填答的 Google 帳號：Moodle email 與學生綁定的 Google email。建立或貼上問卷後，請在 Google Forms 的發布/管理權限中加入這些帳號，或未來改加入課程 Google Group。",
+    forms_responder_empty: "目前沒有可用 email；請先匯入 Moodle 選課名單，或請學生綁定 Google。",
+    forms_responder_source_moodle: "Moodle",
+    forms_responder_source_google: "綁定 Google",
+    forms_group_heading: "課程 Google Group",
+    forms_group_missing: "尚未設定課程 Google Group。請擁有者先填入 group email。",
+    forms_group_ready: "已設定；目前建議同步 {n} 個填答帳號到此 group。",
+    forms_group_next: "同步後，請在 Google Forms 的填答權限中開放此 group。系統只會移除不在目前名單內的一般 MEMBER，OWNER／MANAGER／巢狀群組會保留。",
+    forms_group_sync: "同步 Google Group 成員",
+    forms_group_sync_confirm: "同步 Google Group 成員？",
+    forms_group_sync_confirm_detail: "會把目前建議允許名單加入課程 Google Group，並移除 group 中不在名單內的一般 MEMBER；OWNER、MANAGER 與巢狀群組會保留。",
     prejoin_link_label: "尚未選課學生入口",
     copy_link: "複製連結",
     copied: "已複製",
@@ -362,6 +398,8 @@ export const T: Record<Lang, Strings> = {
     help_roster_replace: "勾選後，新名單會覆蓋整份本課選課名單；未出現在貼上內容中的學生會從本課移除。",
     help_drive: "以你授權的 Google Drive 分享給已選課且已綁定 Google 的學生；未綁定者會被略過。",
     help_forms: "學生會在 /me 對應課程看到這些表單；請在 Google 表單設定要求登入並收集 email。",
+    help_forms_responders: "這份名單用來避免問卷只開給 Workspace 帳號時擋住 @gmail.com 學生；可同步到課程 Google Group 後，再把 Google Forms 權限開給該 group。",
+    help_forms_group: "將 Moodle email 與綁定 Google email 同步到此 group 後，Google Forms 可把填答權限開給這個 group。同步需要 Workspace 管理群組成員權限。",
     help_prejoin_link: "給尚未正式選課的學生使用；他們可先綁定帳號並填寫報到問卷。",
     help_classroom: "用已綁定的 Google email 邀請學生加入 Classroom；你本人需要是該 Classroom 的老師。",
     help_staff: "助教可檢視與匯出本課資料；擁有者才能新增/移除助教或刪除全域綁定。",
@@ -436,6 +474,7 @@ export const T: Record<Lang, Strings> = {
     ph_course_org: "github_org (optional)",
     ph_course_classroom: "google_classroom_id (optional; a class link works too)",
     ph_course_meet: "google_meet_url (optional, the course's Meet link)",
+    ph_course_group: "google_group_email (optional, course Forms Google Group)",
     meet_join: "Join Google Meet",
     bindings_query_heading: "Query bindings (by GitHub org)",
     bindings_all_link: "All bindings",
@@ -518,6 +557,10 @@ export const T: Record<Lang, Strings> = {
     forms_msg_nodrive: "Your Google (full access) isn't connected, so a form can't be created. Click “Connect my Google Drive” above and authorize first.",
     forms_msg_tokenerror: "Couldn't get a Google access token (please reconnect Drive).",
     forms_msg_createerror: "Failed to create the Google Form (enable the Forms API in the Google Cloud project and connect Drive).",
+    forms_msg_groupmissing: "No course Google Group is configured, so members can't be synced.",
+    forms_msg_groupscope: "Your Google authorization doesn't include Google Group member management yet. Click “Connect my Google Drive” again and authorize once.",
+    forms_msg_grouperror: "Google Group sync failed (check that the account can manage Workspace group members and that the Admin SDK is enabled).",
+    forms_msg_groupdone: "Google Group sync complete: added {added}, removed {removed}, kept {kept}, protected skipped {protected}, errors {errors}.",
     forms_create_note: "Or create a new Google Form directly (created with your connected Google account; click “Edit” afterwards to add questions in Google):",
     forms_create_title_ph: "New form title (e.g. Week 1 quiz)",
     forms_create_btn: "Create Google Form",
@@ -525,6 +568,18 @@ export const T: Record<Lang, Strings> = {
     forms_student_heading: "Forms",
     forms_pre_enroll_label: "For not-yet-enrolled students (shown on /me/<course>)",
     forms_pre_enroll_badge: "(prospective)",
+    forms_responder_heading: "Suggested form responder allowlist ({n})",
+    forms_responder_note: "Phase 1 lists the Google accounts that should be allowed to respond: Moodle emails and students' bound Google emails. After creating or attaching a form, add these accounts in Google Forms publish/access settings, or later add the course Google Group.",
+    forms_responder_empty: "No usable emails yet. Import the Moodle roster or ask students to bind Google first.",
+    forms_responder_source_moodle: "Moodle",
+    forms_responder_source_google: "Bound Google",
+    forms_group_heading: "Course Google Group",
+    forms_group_missing: "No course Google Group is configured yet. Ask an owner to add the group email first.",
+    forms_group_ready: "Configured. Currently {n} responder accounts should be synced to this group.",
+    forms_group_next: "After syncing, grant this group responder access in Google Forms. The app removes only ordinary MEMBER users that are no longer in the current list; OWNER/MANAGER and nested groups are kept.",
+    forms_group_sync: "Sync Google Group members",
+    forms_group_sync_confirm: "Sync Google Group members?",
+    forms_group_sync_confirm_detail: "This adds the current suggested allowlist to the course Google Group and removes ordinary MEMBER users that are no longer listed; OWNER, MANAGER, and nested group members are kept.",
     prejoin_link_label: "Prospective-student entry",
     copy_link: "Copy link",
     copied: "Copied",
@@ -542,6 +597,8 @@ export const T: Record<Lang, Strings> = {
     help_roster_replace: "When checked, the pasted list replaces the entire roster for this course; students not listed are removed from this course.",
     help_drive: "Shares from your authorized Google Drive to enrolled students who bound Google. Students without Google binding are skipped.",
     help_forms: "Students see these forms under the matching course on /me. Configure the Google Form to require sign-in and collect email.",
+    help_forms_responders: "Use this list to avoid blocking @gmail.com students when a form is restricted to Workspace users. It can be synced into a course Google Group, then Google Forms can grant access to that group.",
+    help_forms_group: "After Moodle emails and bound Google emails are synced into this group, Google Forms can grant responder access to the group. Syncing requires Workspace permission to manage group members.",
     help_prejoin_link: "For students not officially enrolled yet. They can bind accounts and fill in the pre-enrollment form first.",
     help_classroom: "Invites students by their bound Google email. You must be a teacher in that Classroom.",
     help_staff: "Staff can view and export this course's data. Only owners can add/remove staff or delete global bindings.",

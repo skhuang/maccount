@@ -11,7 +11,10 @@ export const FORMS_SCOPE = "https://www.googleapis.com/auth/forms.body";
 // Manage a Classroom's roster (invite students). Re-connect picks it up; staff
 // connected earlier re-authorize once to gain it.
 export const CLASSROOM_SCOPE = "https://www.googleapis.com/auth/classroom.rosters";
-export const STAFF_GOOGLE_SCOPE = `openid email ${DRIVE_SCOPE} ${FORMS_SCOPE} ${CLASSROOM_SCOPE}`;
+// Manage course Google Group membership so Google Forms can grant responder
+// access to one group instead of hundreds of individual accounts.
+export const GROUP_MEMBER_SCOPE = "https://www.googleapis.com/auth/admin.directory.group.member";
+export const STAFF_GOOGLE_SCOPE = `openid email ${DRIVE_SCOPE} ${FORMS_SCOPE} ${CLASSROOM_SCOPE} ${GROUP_MEMBER_SCOPE}`;
 
 export type DriveRole = "reader" | "commenter" | "writer";
 
@@ -23,6 +26,10 @@ export function asDriveRole(v: string): DriveRole {
 // drive.file) — i.e. the token can manage permissions on existing files.
 export function scopeHasFullDrive(scope: string | null | undefined): boolean {
   return !!scope && scope.split(/\s+/).includes(DRIVE_SCOPE);
+}
+
+export function scopeHasGroupMember(scope: string | null | undefined): boolean {
+  return !!scope && scope.split(/\s+/).includes(GROUP_MEMBER_SCOPE);
 }
 
 // Accept a raw Drive id or a pasted share URL and return the id. Handles the
