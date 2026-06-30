@@ -536,7 +536,16 @@ function bearerOk(req: Request, env: Env): boolean {
 // roster-sync timer — token-auth (no NYCU session), unlike /admin/roster.csv.
 async function apiRoster(req: Request, env: Env): Promise<Response> {
   if (!bearerOk(req, env)) return new Response("Unauthorized", { status: 401 });
-  const rows = await listBindings(env.DB);
+  const courseId = new URL(req.url).searchParams.get("course_id");
+  let rows = await listBindings(env.DB);
+  if (courseId) {
+    // Per-course roster (github_login,student_id): enrolled ∩ bound — the same
+    // set as /c/<id>/admin/roster.csv, but token-pullable so dsjudge can sync a
+    // specific offering (e.g. a TA test course). Empty if the course has no
+    // enrolled roster yet — never fall back to all bindings for a named course.
+    const set = await enrolledSet(env, courseId);
+    rows = set ? rows.filter((r) => set.has(r.nycu_id)) : [];
+  }
   return new Response(toRosterCsv(rows), {
     headers: { "Content-Type": "text/csv; charset=utf-8" },
   });
