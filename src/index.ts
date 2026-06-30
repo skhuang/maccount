@@ -1085,29 +1085,51 @@ function parseStudentIds(blob: string): string[] {
   return blob.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
 }
 
+function normalizedFieldKey(key: string): string {
+  return key.toLocaleLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, "");
+}
+
 function fieldString(row: unknown, keys: string[]): string {
   if (typeof row !== "object" || row == null) return "";
-  const record = row as Record<string, unknown>;
-  for (const key of keys) {
-    if (key in record) {
-      const value = String(record[key] ?? "").trim();
-      if (value) return value;
+  const wanted = new Set(keys.map(normalizedFieldKey));
+  const seen = new Set<unknown>();
+  const stack: unknown[] = [row];
+  while (stack.length) {
+    const cur = stack.shift();
+    if (typeof cur !== "object" || cur == null || seen.has(cur)) continue;
+    seen.add(cur);
+    if (Array.isArray(cur)) {
+      stack.push(...cur);
+      continue;
+    }
+    const record = cur as Record<string, unknown>;
+    for (const [key, raw] of Object.entries(record)) {
+      if (wanted.has(normalizedFieldKey(key))) {
+        const value = String(raw ?? "").trim();
+        if (value && value !== "[object Object]") return value;
+      }
+    }
+    for (const raw of Object.values(record)) {
+      if (typeof raw === "object" && raw != null) stack.push(raw);
     }
   }
   return "";
 }
 
 function moodleStudentName(row: unknown): string {
-  const direct = fieldString(row, ["name", "fullname", "full_name", "displayname", "display_name"]);
+  const direct = fieldString(row, [
+    "name", "fullname", "full_name", "displayname", "display_name", "realname", "real_name",
+    "姓名", "全名", "名字",
+  ]);
   if (direct) return direct;
-  const first = fieldString(row, ["firstname", "first_name"]);
-  const last = fieldString(row, ["lastname", "last_name"]);
+  const first = fieldString(row, ["firstname", "first_name", "firstName", "givenname", "given_name"]);
+  const last = fieldString(row, ["lastname", "last_name", "lastName", "surname", "familyname", "family_name"]);
   return [first, last].filter(Boolean).join(" ").trim();
 }
 
 // POST /api/enrollments/ingest — token-auth roster import for automation
 // (e.g. seminar-moodle pushing Moodle participants). Body supports either:
-// { course_id | moodle_course_id, students: [{ student_id, name?/fullname?/firstname+lastname?, email? }], replace?: bool }
+// { course_id | moodle_course_id, students: [{ student_id, name?/fullname?/user.fullname?/firstname+lastname?, email? }], replace?: bool }
 // or the legacy { course_id | moodle_course_id, student_ids: [...], replace?: bool }.
 // moodle_course_id is resolved to a course_id via courses.moodle_course_id, so
 // the caller can send the Moodle numeric id it already has.
@@ -1119,9 +1141,9 @@ async function enrollmentsIngest(req: Request, env: Env): Promise<Response> {
   const studentRows = Array.isArray(body?.students)
     ? body!.students
         .map((x) => ({
-          student_id: fieldString(x, ["student_id", "studentid", "username", "idnumber"]),
+          student_id: fieldString(x, ["student_id", "studentid", "username", "idnumber", "userid", "user_id", "學號"]),
           name: moodleStudentName(x),
-          email: fieldString(x, ["email", "mail"]),
+          email: fieldString(x, ["email", "mail", "emailaddress", "email_address", "電子郵件", "信箱"]),
         }))
         .filter((x) => x.student_id)
     : null;
@@ -1142,7 +1164,9 @@ async function enrollmentsIngest(req: Request, env: Env): Promise<Response> {
   const n = body?.replace
     ? await replaceEnrollments(env.DB, course_id, ids, now)
     : await bulkEnroll(env.DB, course_id, ids, now);
-  return new Response(JSON.stringify({ ok: true, course_id, enrolled: n }), {
+  const withName = studentRows?.filter((x) => x.name).length ?? 0;
+  const withEmail = studentRows?.filter((x) => x.email).length ?? 0;
+  return new Response(JSON.stringify({ ok: true, course_id, enrolled: n, with_name: withName, with_email: withEmail }), {
     headers: { "Content-Type": "application/json" },
   });
 }
