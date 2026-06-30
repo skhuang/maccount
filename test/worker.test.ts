@@ -1059,16 +1059,19 @@ describe("course edit + enrollment", () => {
           { student_id: "m1", name: "王小明", email: "m1@nycu.edu.tw" },
           { student_id: "m2", fullname: "李小華", email: "" },
           { username: "m3", firstname: "Ada", lastname: "Lovelace", mail: "ada@example.edu" },
+          { user: { idnumber: "m4", fullname: "巢狀同學", emailAddress: "nested@example.edu" } },
         ],
         replace: true,
       }),
     });
     expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, enrolled: 4, with_name: 4, with_email: 3 });
     const { results } = await env.DB.prepare("SELECT student_id, name, email FROM enrollments WHERE course_id='ds-2026' ORDER BY student_id").all();
     expect(results).toEqual([
       { student_id: "m1", name: "王小明", email: "m1@nycu.edu.tw" },
       { student_id: "m2", name: "李小華", email: null },
       { student_id: "m3", name: "Ada Lovelace", email: "ada@example.edu" },
+      { student_id: "m4", name: "巢狀同學", email: "nested@example.edu" },
     ]);
   });
 
