@@ -46,15 +46,15 @@ import {
 import {
   listStaff, addStaff, removeStaff, isStaffAnywhere, isStaffMember, coursesForStaff,
 } from "./db/staff";
-import { listCourses, getCourse, getCourseByMoodleId, upsertCourse } from "./db/courses";
+import { listCourses, getCourse, getCourseByMoodleId, upsertCourse, type CourseRow } from "./db/courses";
 import {
   listCourseForms, listFormsForCourses, addCourseForm, removeCourseForm,
 } from "./db/forms";
 import {
   bulkEnroll, replaceEnrollments, enrollmentCount, listEnrolledWithBinding, listEnrollments,
-  coursesForStudent, studentIdsForMoodleEmail,
+  coursesForStudent, studentIdsForMoodleEmail, type EnrolledStudent,
 } from "./db/enrollments";
-import { toCsv, toRosterCsv } from "./csv";
+import { toCsv, toRosterCsv, toGithubAccessCsv, type GithubAccessRow } from "./csv";
 import {
   adminPage, adminHomePage, bindingsPage, orgMembersPage, dashboardPage, examPage, coursePrejoinPage,
   privacyPage, termsPage,
@@ -93,6 +93,7 @@ export default {
       if (p === "/api/enrollments/ingest" && req.method === "POST")
         return await enrollmentsIngest(req, env);
       if (p === "/admin" && req.method === "GET") return await adminHome(req, env, url);
+      if (p === "/admin/github.csv" && req.method === "GET") return await adminGithubCsv(req, env);
       if (p === "/admin/bindings" && req.method === "GET") return await adminBindings(req, env, url);
       if (p === "/admin/courses" && req.method === "POST") return await courseUpsert(req, env);
       const om = p.match(/^\/admin\/org\/([A-Za-z0-9_.-]+)$/);
@@ -757,6 +758,8 @@ async function courseUpsert(req: Request, env: Env): Promise<Response> {
       term: String(form.get("term") ?? "").trim() || null,
       moodle_course_id: String(form.get("moodle_course_id") ?? "").trim() || null,
       github_org: String(form.get("github_org") ?? "").trim() || null,
+      github_team_slug: String(form.get("github_team_slug") ?? "").trim() || null,
+      github_repos: String(form.get("github_repos") ?? "").trim() || null,
       google_classroom_id: String(form.get("google_classroom_id") ?? "").trim() || null,
       google_meet_url: String(form.get("google_meet_url") ?? "").trim() || null,
       google_group_email: String(form.get("google_group_email") ?? "").trim() || null,
@@ -777,6 +780,7 @@ async function courseAdminRouter(
   if (sub === "" && m === "GET") return await courseAdmin(req, env, url, courseId);
   if (sub === "/export.csv" && m === "GET") return await courseExport(req, env, courseId);
   if (sub === "/roster.csv" && m === "GET") return await courseRoster(req, env, courseId);
+  if (sub === "/github.csv" && m === "GET") return await courseGithubCsv(req, env, courseId);
   if (sub === "/delete" && m === "POST") return await courseDelete(req, env, courseId);
   if (sub === "/staff/add" && m === "POST") return await staffAdd(req, env, courseId);
   if (sub === "/staff/remove" && m === "POST") return await staffRemove(req, env, courseId);
@@ -823,6 +827,58 @@ async function enrolledSet(env: Env, courseId: string): Promise<Set<string> | nu
   return rows.length ? new Set(rows.map((r) => r.student_id)) : null;
 }
 
+function githubAccessRows(
+  env: Env,
+  course: CourseRow,
+  enrolled: EnrolledStudent[],
+): GithubAccessRow[] {
+  const githubOrg = effectiveOrg(env, course);
+  const repos = parseGithubRepos(course.github_repos);
+  const targets = repos.length ? repos : [null];
+  return enrolled.flatMap((r) => {
+    if (!r.github_login) return [];
+    return targets.map((repo) => ({
+      course_id: course.course_id,
+      course_name: course.name,
+      student_id: r.student_id,
+      name: r.name || r.nycu_name,
+      github_login: r.github_login!,
+      github_org: githubOrg,
+      github_team_slug: course.github_team_slug,
+      github_repo: repo,
+      permission: "write",
+    }));
+  });
+}
+
+function parseGithubRepos(value: string | null | undefined): string[] {
+  const seen = new Set<string>();
+  for (const raw of String(value ?? "").split(/[\s,;]+/)) {
+    const repo = raw.trim();
+    if (repo && !seen.has(repo)) seen.add(repo);
+  }
+  return [...seen];
+}
+
+// Owner-only export for provisioning private GitHub course repositories across
+// all active courses. This is a planning/export step only; it does not mutate
+// GitHub org, team, or repository permissions.
+async function adminGithubCsv(req: Request, env: Env): Promise<Response> {
+  const s = await requireAdmin(req, env);
+  if (s instanceof Response) return s;
+  const courses = (await listCourses(env.DB)).filter((c) => c.status !== "archived");
+  const rows: GithubAccessRow[] = [];
+  for (const course of courses) {
+    rows.push(...githubAccessRows(env, course, await listEnrolledWithBinding(env.DB, course.course_id)));
+  }
+  return new Response(toGithubAccessCsv(rows), {
+    headers: {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename="github-access-all-courses.csv"`,
+    },
+  });
+}
+
 // Per-course bindings CSV. Scoped to the enrolled roster once one exists.
 async function courseExport(req: Request, env: Env, courseId: string): Promise<Response> {
   const s = await requireCourseStaff(req, env, courseId);
@@ -849,6 +905,22 @@ async function courseRoster(req: Request, env: Env, courseId: string): Promise<R
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="roster-${courseId}.csv"`,
+    },
+  });
+}
+
+// Per-course GitHub private-repo access CSV. Emits enrolled ∩ GitHub-bound
+// students with the course's effective org and the intended write permission.
+async function courseGithubCsv(req: Request, env: Env, courseId: string): Promise<Response> {
+  const s = await requireCourseStaff(req, env, courseId);
+  if (s instanceof Response) return s;
+  const course = await getCourse(env.DB, courseId);
+  if (!course) return new Response("Course not found", { status: 404 });
+  const rows = githubAccessRows(env, course, await listEnrolledWithBinding(env.DB, courseId));
+  return new Response(toGithubAccessCsv(rows), {
+    headers: {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename="github-access-${courseId}.csv"`,
     },
   });
 }

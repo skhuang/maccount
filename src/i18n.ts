@@ -84,6 +84,8 @@ export interface Strings {
   admin_bindings: string; // "{n}" placeholder
   export_full: string;
   export_roster: string;
+  export_github: string;
+  export_all_github: string;
   admin_courses_heading: string;
   no_courses: string;
   no_bindings: string;
@@ -106,6 +108,8 @@ export interface Strings {
   ph_course_term: string;
   ph_course_moodle: string;
   ph_course_org: string;
+  ph_course_team: string;
+  ph_course_repos: string;
   ph_course_classroom: string;
   ph_course_meet: string;
   ph_course_group: string;
@@ -383,6 +387,8 @@ export const T: Record<Lang, Strings> = {
     ph_course_term: "學期（如 2026 / 2026-fall）",
     ph_course_moodle: "moodle_course_id（選填）",
     ph_course_org: "github_org（選填）",
+    ph_course_team: "github_team_slug（選填，如 ds2026-students）",
+    ph_course_repos: "github_repos（選填，如 ds2026；多個可用空白或逗號分隔）",
     ph_course_classroom: "google_classroom_id（選填，可貼課程連結）",
     ph_course_meet: "google_meet_url（選填，課程的 Meet 連結）",
     ph_course_group: "google_group_email（選填，課程問卷 Google Group）",
@@ -414,6 +420,8 @@ export const T: Record<Lang, Strings> = {
     enroll_import: "匯入選課名單",
     export_full: "⬇ 匯出 CSV（完整綁定）",
     export_roster: "⬇ 匯出 roster.csv（github_login,student_id）",
+    export_github: "⬇ 匯出 GitHub repo 權限名單",
+    export_all_github: "⬇ 匯出所有課程 GitHub repo 權限名單",
     th_name: "姓名",
     th_github_id: "GitHub id",
     th_updated: "更新時間",
@@ -506,7 +514,7 @@ export const T: Record<Lang, Strings> = {
     help_exam_repo: "開啟你的個人 repo 後 clone、提交並 push；OJ 會依課程設定評分。",
     help_course_create: "相同 course_id 再送出會更新既有課程，不會建立第二門；course_id 建議固定且不要隨意更名。",
     help_bindings: "綁定名單是學生全域帳號對應；刪除綁定會影響所有課程，但不會刪除成績或選課資料。",
-    help_exports: "完整 CSV 含所有綁定欄位；roster.csv 只輸出 github_login 與 student_id，適合匯入評分或課程工具。",
+    help_exports: "完整 CSV 含所有綁定欄位；roster.csv 只輸出 github_login 與 student_id，適合匯入評分或課程工具；GitHub repo 權限名單列出選課且已綁 GitHub 的學生、目標 org/team/repo 與 write 權限，可交給後續腳本加入 private repo/team。",
     help_table_search: "可搜尋目前表格中的學號、姓名、GitHub、Google 等文字；搭配篩選可快速找未綁定學生。",
     help_enrollment: "選課名單控制本課 roster；已綁定且在選課名單中的學生會出現在課程匯出。",
     help_roster_replace: "勾選後，新名單會覆蓋整份本課選課名單；未出現在貼上內容中的學生會從本課移除。",
@@ -660,6 +668,8 @@ export const T: Record<Lang, Strings> = {
     ph_course_term: "Term (e.g. 2026 / 2026-fall)",
     ph_course_moodle: "moodle_course_id (optional)",
     ph_course_org: "github_org (optional)",
+    ph_course_team: "github_team_slug (optional, e.g. ds2026-students)",
+    ph_course_repos: "github_repos (optional, e.g. ds2026; separate multiple with spaces or commas)",
     ph_course_classroom: "google_classroom_id (optional; a class link works too)",
     ph_course_meet: "google_meet_url (optional, the course's Meet link)",
     ph_course_group: "google_group_email (optional, course Forms Google Group)",
@@ -691,6 +701,8 @@ export const T: Record<Lang, Strings> = {
     enroll_import: "Import roster",
     export_full: "⬇ Export CSV (full bindings)",
     export_roster: "⬇ Export roster.csv (github_login,student_id)",
+    export_github: "⬇ Export GitHub repo access list",
+    export_all_github: "⬇ Export all-course GitHub repo access list",
     th_name: "Name",
     th_github_id: "GitHub id",
     th_updated: "Updated",
@@ -783,7 +795,7 @@ export const T: Record<Lang, Strings> = {
     help_exam_repo: "Open your personal repo, clone it, commit, and push. The OJ grades according to the course setup.",
     help_course_create: "Submitting the same course_id updates the existing course instead of creating another one. Keep course_id stable.",
     help_bindings: "Bindings are global student-account mappings. Deleting one affects every course, but keeps grades and enrollment data.",
-    help_exports: "The full CSV includes all binding fields; roster.csv contains only github_login and student_id for grading/course tools.",
+    help_exports: "The full CSV includes all binding fields; roster.csv contains only github_login and student_id for grading/course tools; the GitHub repo access list contains enrolled students who bound GitHub plus target org/team/repo and write permission for a later provisioning script.",
     help_table_search: "Search within the current table by student ID, name, GitHub, Google, and other visible text. Combine with filters to find missing bindings.",
     help_enrollment: "The roster controls this course's enrollment. Bound students on the roster are included in course exports.",
     help_roster_replace: "When checked, the pasted list replaces the entire roster for this course; students not listed are removed from this course.",

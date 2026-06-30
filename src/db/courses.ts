@@ -8,6 +8,8 @@ export interface CourseRow {
   term: string | null;
   moodle_course_id: string | null;
   github_org: string | null;
+  github_team_slug: string | null;
+  github_repos: string | null;
   google_classroom_id: string | null;
   google_meet_url: string | null;
   google_group_email: string | null;
@@ -16,7 +18,7 @@ export interface CourseRow {
 }
 
 const COLS =
-  "course_id, name, term, moodle_course_id, github_org, google_classroom_id, " +
+  "course_id, name, term, moodle_course_id, github_org, github_team_slug, github_repos, google_classroom_id, " +
   "google_meet_url, google_group_email, status, created_at";
 
 export async function listCourses(db: D1Database): Promise<CourseRow[]> {
@@ -51,6 +53,8 @@ export interface CourseInput {
   term?: string | null;
   moodle_course_id?: string | null;
   github_org?: string | null;
+  github_team_slug?: string | null;
+  github_repos?: string | null;
   google_classroom_id?: string | null;
   google_meet_url?: string | null;
   google_group_email?: string | null;
@@ -62,17 +66,19 @@ export async function upsertCourse(db: D1Database, c: CourseInput, now: string):
   await db
     .prepare(
       `INSERT INTO courses
-         (course_id, name, term, moodle_course_id, github_org, google_classroom_id,
-          google_meet_url, google_group_email, status, created_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+         (course_id, name, term, moodle_course_id, github_org, github_team_slug, github_repos,
+          google_classroom_id, google_meet_url, google_group_email, status, created_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
        ON CONFLICT(course_id) DO UPDATE SET
          name = ?2, term = ?3, moodle_course_id = ?4, github_org = ?5,
-         google_classroom_id = ?6, google_meet_url = ?7, google_group_email = ?8,
-         status = ?9`,
+         github_team_slug = ?6, github_repos = ?7,
+         google_classroom_id = ?8, google_meet_url = ?9, google_group_email = ?10,
+         status = ?11`,
     )
     .bind(
       c.course_id, c.name, c.term ?? null, c.moodle_course_id ?? null,
-      c.github_org ?? null, c.google_classroom_id ?? null, c.google_meet_url ?? null,
+      c.github_org ?? null, c.github_team_slug ?? null, c.github_repos ?? null,
+      c.google_classroom_id ?? null, c.google_meet_url ?? null,
       c.google_group_email ?? null, c.status || "active", now,
     )
     .run();

@@ -37,6 +37,7 @@ describe("adminPage", () => {
     const html = adminPage("zh", course, rows);
     expect(html).toContain("(1)");
     expect(html).toContain('href="/c/ds-2026/admin/export.csv"');
+    expect(html).toContain('href="/c/ds-2026/admin/github.csv"');
     expect(html).toContain("資料結構 2026");
   });
 
@@ -128,7 +129,15 @@ describe("adminPage", () => {
   it("renders the enrollment section (bound/unbound) and a prefilled settings form for owners", () => {
     const html = adminPage(
       "zh",
-      { ...course, term: "2026", moodle_course_id: "12345", google_classroom_id: "CR-789", status: "archived" },
+      {
+        ...course,
+        term: "2026",
+        moodle_course_id: "12345",
+        github_team_slug: "ds2026-students",
+        github_repos: "ds2026",
+        google_classroom_id: "CR-789",
+        status: "archived",
+      },
       [],
       {
         isOwner: true,
@@ -148,6 +157,8 @@ describe("adminPage", () => {
     expect(html).toContain(`action="/c/ds-2026/admin/enroll"`);
     // settings form prefilled
     expect(html).toContain('name="moodle_course_id" value="12345"');
+    expect(html).toContain('name="github_team_slug" value="ds2026-students"');
+    expect(html).toContain('name="github_repos" value="ds2026"');
     expect(html).toContain('name="google_classroom_id" value="CR-789"');
     expect(html).toContain('<option value="archived" selected>');
   });
@@ -433,10 +444,13 @@ describe("adminHomePage (course picker)", () => {
   it("shows the create-course form to owners only", () => {
     const html = adminHomePage("zh", courses, { isOwner: true });
     expect(html).toContain('action="/admin/courses"');
+    expect(html).toContain('href="/admin/github.csv"');
     expect(html).toContain('class="admin-disclosure"');
     expect(html).toContain("新增或更新課程");
     expect(html).toContain(`<label>課程名稱（如 資料結構 2026）<input name="name"`);
-    expect(adminHomePage("zh", courses, { isOwner: false })).not.toContain('action="/admin/courses"');
+    const staffHtml = adminHomePage("zh", courses, { isOwner: false });
+    expect(staffHtml).not.toContain('action="/admin/courses"');
+    expect(staffHtml).not.toContain('href="/admin/github.csv"');
   });
 
   it("escapes course names", () => {

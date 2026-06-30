@@ -153,6 +153,9 @@ export function adminHomePage(
   const orgLinks = orgs
     .map((o) => `<article class="utility-card"><a href="/admin/org/${encodeURIComponent(o)}"><b>${h(o)}</b></a><p>GitHub org</p></article>`)
     .join("\n");
+  const ownerExports = opts.isOwner
+    ? `<p><a href="/admin/github.csv">${t.export_all_github}</a>${helpHint(t.help_exports, t.help_label)}</p>`
+    : "";
   const bindingsSection = `<h2>${t.bindings_query_heading}</h2>
 <div class="utility-grid">
   <article class="utility-card"><a href="/admin/bindings"><b>${t.bindings_all_link}</b></a><p>${t.bindings_query_heading}</p></article>
@@ -182,6 +185,8 @@ export function adminHomePage(
   <label>${t.ph_course_term}<input name="term" placeholder="${t.ph_course_term}"></label>
   <label>${t.ph_course_moodle}<input name="moodle_course_id" placeholder="${t.ph_course_moodle}" inputmode="numeric"></label>
   <label>${t.ph_course_org}<input name="github_org" placeholder="${t.ph_course_org}" autocomplete="off"></label>
+  <label>${t.ph_course_team}<input name="github_team_slug" placeholder="ds2026-students" autocomplete="off"></label>
+  <label>${t.ph_course_repos}<input name="github_repos" placeholder="ds2026, dsvisual" autocomplete="off"></label>
   <label>${t.ph_course_classroom}<input name="google_classroom_id" placeholder="${t.ph_course_classroom}" autocomplete="off"></label>
   <label>${t.ph_course_meet}<input name="google_meet_url" type="url" placeholder="https://meet.google.com/…"></label>
   <label>${t.ph_course_group}<input name="google_group_email" type="email" placeholder="maccount-ds-2026@example.edu" autocomplete="off"></label>
@@ -196,6 +201,7 @@ export function adminHomePage(
 <p class="identity__meta">${t.course_count.replace("{n}", String(courses.length))}</p>
 ${items}
 ${createForm}
+${ownerExports}
 ${bindingsSection}
 ${legalFooter(t)}
 ${uiEnhancements(t)}
@@ -315,6 +321,8 @@ export function adminPage(
     term?: string | null;
     moodle_course_id?: string | null;
     github_org?: string | null;
+    github_team_slug?: string | null;
+    github_repos?: string | null;
     google_classroom_id?: string | null;
     google_meet_url?: string | null;
     google_group_email?: string | null;
@@ -620,6 +628,8 @@ ${
   <label>${t.ph_course_term}<input name="term" value="${h(course.term ?? "")}"></label>
   <label>${t.ph_course_moodle}<input name="moodle_course_id" value="${h(course.moodle_course_id ?? "")}"></label>
   <label>${t.ph_course_org}<input name="github_org" value="${h(course.github_org ?? "")}"></label>
+  <label>${t.ph_course_team}<input name="github_team_slug" value="${h(course.github_team_slug ?? "")}"></label>
+  <label>${t.ph_course_repos}<input name="github_repos" value="${h(course.github_repos ?? "")}"></label>
   <label>${t.ph_course_classroom}<input name="google_classroom_id" value="${h(course.google_classroom_id ?? "")}"></label>
   <label>${t.ph_course_meet}<input name="google_meet_url" value="${h(course.google_meet_url ?? "")}"></label>
   <label>${t.ph_course_group}<input name="google_group_email" type="email" value="${h(course.google_group_email ?? "")}"></label>
@@ -656,7 +666,7 @@ ${adminNav}
 <div class="admin-sections">
 <section class="admin-section" id="bindings"><h2 class="with-help">${t.admin_bindings.replace("{n}", String(rows.length))}${helpHint(t.help_bindings, t.help_label)}</h2>
 ${banner}
-<p><a href="${base}/export.csv">${t.export_full}</a>　|　<a href="${base}/roster.csv">${t.export_roster}</a>${helpHint(t.help_exports, t.help_label)}</p>
+<p><a href="${base}/export.csv">${t.export_full}</a>　|　<a href="${base}/roster.csv">${t.export_roster}</a>　|　<a href="${base}/github.csv">${t.export_github}</a>${helpHint(t.help_exports, t.help_label)}</p>
 ${rows.length ? tableTools(t, "course-bindings-table", rows.length) : ""}
 <table id="course-bindings-table" class="mobile-compact" border="1" cellpadding="6" cellspacing="0">
 <thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("GitHub", 2)}${sortableTh(t.th_github_id, 3, "number", "mobile-secondary")}<th>Google</th>${sortableTh(t.th_updated, 5, "text", "mobile-secondary")}${isOwner ? `<th>${t.th_actions}</th>` : ""}</tr></thead>
