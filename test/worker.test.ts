@@ -2,7 +2,8 @@ import { describe, it, expect, beforeAll, beforeEach, vi, afterEach } from "vite
 import { env, applyD1Migrations } from "cloudflare:test";
 import worker from "../src/index";
 import { signSession, SESSION_COOKIE } from "../src/session";
-import { listBindings } from "../src/db/bindings";
+import { listBindings, upsertBinding } from "../src/db/bindings";
+import { bulkEnroll } from "../src/db/enrollments";
 import { encryptSecret } from "../src/crypto";
 import { GROUP_MEMBER_SCOPE, STAFF_GOOGLE_SCOPE } from "../src/oauth/drive";
 import type { Env } from "../src/env";
@@ -1895,5 +1896,44 @@ describe("/api/roster (token-auth pull for the OJ roster-sync timer)", () => {
     expect(
       (await call("/api/roster", { headers: { Authorization: "Bearer nope" } })).status,
     ).toBe(401);
+  });
+});
+
+describe("GET /api/roster?course_id= (per-course, token)", () => {
+  const NOW = "2026-06-30T00:00:00.000Z";
+  const get = (q = "") =>
+    worker.fetch(new Request(`https://api.example/api/roster${q}`, {
+      headers: { Authorization: "Bearer ingest-secret" },
+    }), testEnv);
+
+  beforeEach(async () => {
+    await upsertBinding(env.DB, { nycu_id: "TA001", nycu_name: "TA One",
+      github_id: 901, github_login: "ta-one", now: NOW });
+    await upsertBinding(env.DB, { nycu_id: "S001", nycu_name: "Stu",
+      github_id: 902, github_login: "stu-b", now: NOW });
+    await bulkEnroll(env.DB, "ds-2026-ta", ["TA001"], NOW);   // only the TA enrolled
+  });
+
+  it("scopes to enrolled ∩ bound for the course", async () => {
+    const csv = await (await get("?course_id=ds-2026-ta")).text();
+    expect(csv).toContain("ta-one,TA001");
+    expect(csv).not.toContain("stu-b");          // not enrolled in ds-2026-ta
+  });
+
+  it("no course_id returns all bindings (back-compat)", async () => {
+    const csv = await (await get()).text();
+    expect(csv).toContain("ta-one,TA001");
+    expect(csv).toContain("stu-b,S001");
+  });
+
+  it("a course with no enrolled roster yields just the header (not all)", async () => {
+    const csv = await (await get("?course_id=ds-2099-none")).text();
+    expect(csv.trim()).toBe("github_login,student_id");
+  });
+
+  it("requires the bearer token", async () => {
+    const res = await worker.fetch(
+      new Request("https://api.example/api/roster?course_id=ds-2026-ta"), testEnv);
+    expect(res.status).toBe(401);
   });
 });
