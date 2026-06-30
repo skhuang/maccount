@@ -41,3 +41,35 @@ export function toRosterCsv(rows: BindingRow[]): string {
   }
   return lines.join("\n") + "\n";
 }
+
+export interface GithubAccessRow {
+  course_id: string;
+  course_name: string;
+  student_id: string;
+  name: string | null;
+  github_login: string;
+  github_org: string;
+  github_team_slug: string | null;
+  github_repo: string | null;
+  permission: "write";
+}
+
+// GitHub private-repo access planning CSV. Each row is one enrolled student who
+// has bound GitHub. A downstream provisioning script can invite github_login to
+// github_org and grant the course repo/team write access.
+export function toGithubAccessCsv(rows: GithubAccessRow[]): string {
+  const lines = [
+    "course_id,course_name,student_id,name,github_login,github_org,github_team_slug,github_repo,permission",
+  ];
+  for (const r of rows) {
+    lines.push(
+      [
+        r.course_id, r.course_name, r.student_id, r.name, r.github_login,
+        r.github_org, r.github_team_slug, r.github_repo, r.permission,
+      ]
+        .map(esc)
+        .join(","),
+    );
+  }
+  return lines.join("\n") + "\n";
+}

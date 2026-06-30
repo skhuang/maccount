@@ -1763,6 +1763,76 @@ describe("/c/<id>/admin/roster.csv", () => {
   });
 });
 
+describe("GitHub private repo access CSV exports", () => {
+  const owner = () => signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "A" } }, SECRET);
+  const staff = () => signSession({ exp: Date.now() + 60000, nycu: { id: "ta01", name: "TA" } }, SECRET);
+
+  beforeEach(async () => {
+    await env.DB.batch([
+      env.DB.prepare(
+        "UPDATE courses SET github_org='course-org', github_team_slug='ds2026-students', github_repos='ds2026 ds2026-labs', status='active' WHERE course_id='ds-2026'",
+      ),
+      env.DB.prepare(
+        "INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, created_at, updated_at) VALUES ('s1','綁定名',1,'alice','t','t')",
+      ),
+      env.DB.prepare(
+        "INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, created_at, updated_at) VALUES ('s2','無選課',2,'bob','t','t')",
+      ),
+      env.DB.prepare(
+        "INSERT INTO enrollments (course_id, student_id, name, email, role, created_at) VALUES ('ds-2026','s1','Moodle 名','s1@example.edu','student','t')",
+      ),
+      env.DB.prepare(
+        "INSERT INTO enrollments (course_id, student_id, name, email, role, created_at) VALUES ('ds-2026','s3','未綁名','s3@example.edu','student','t')",
+      ),
+    ]);
+  });
+
+  it("exports one course's enrolled GitHub-bound students for course staff", async () => {
+    await env.DB.prepare("INSERT INTO staff (course_id, nycu_id, added_by, added_at) VALUES ('ds-2026','ta01','admin1','t')").run();
+    const res = await call("/c/ds-2026/admin/github.csv", { headers: cookie(await staff()) });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toContain("text/csv");
+    expect(res.headers.get("Content-Disposition")).toContain("github-access-ds-2026.csv");
+    const body = await res.text();
+    expect(body).toContain("course_id,course_name,student_id,name,github_login,github_org,github_team_slug,github_repo,permission");
+    expect(body).toContain("ds-2026");
+    expect(body).toContain("s1,Moodle 名,alice,course-org,ds2026-students,ds2026,write");
+    expect(body).toContain("s1,Moodle 名,alice,course-org,ds2026-students,ds2026-labs,write");
+    expect(body).not.toContain("bob");
+    expect(body).not.toContain("s3@example");
+  });
+
+  it("exports all active courses for owners only", async () => {
+    await env.DB.batch([
+      env.DB.prepare(
+        "INSERT INTO courses (course_id, name, term, moodle_course_id, github_org, github_team_slug, github_repos, status, created_at) VALUES ('dsvisual','DS Visual',NULL,NULL,NULL,'dsvisual-students','dsvisual','active','t')",
+      ),
+      env.DB.prepare(
+        "INSERT INTO enrollments (course_id, student_id, name, email, role, created_at) VALUES ('dsvisual','s1','Moodle 名','s1@example.edu','student','t')",
+      ),
+      env.DB.prepare(
+        "INSERT INTO courses (course_id, name, term, moodle_course_id, github_org, status, created_at) VALUES ('old','Old',NULL,NULL,'old-org','archived','t')",
+      ),
+      env.DB.prepare(
+        "INSERT INTO enrollments (course_id, student_id, name, email, role, created_at) VALUES ('old','s1','Moodle 名','s1@example.edu','student','t')",
+      ),
+    ]);
+    const res = await call("/admin/github.csv", { headers: cookie(await owner()) });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Disposition")).toContain("github-access-all-courses.csv");
+    const body = await res.text();
+    expect(body).toContain("s1,Moodle 名,alice,course-org,ds2026-students,ds2026,write");
+    expect(body).toContain("dsvisual,DS Visual,s1,Moodle 名,alice,nycu-cs-course-ds,dsvisual-students,dsvisual,write");
+    expect(body).not.toContain("old-org");
+  });
+
+  it("forbids the all-course export to non-owners", async () => {
+    await env.DB.prepare("INSERT INTO staff (course_id, nycu_id, added_by, added_at) VALUES ('ds-2026','ta01','admin1','t')").run();
+    const res = await call("/admin/github.csv", { headers: cookie(await staff()) });
+    expect(res.status).toBe(403);
+  });
+});
+
 describe("/api/grades (token-auth pull for 程式作業自動批改)", () => {
   beforeEach(async () => {
     await env.DB.batch([

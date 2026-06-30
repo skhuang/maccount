@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { toCsv, type BindingRow } from "../src/csv";
+import { toCsv, toGithubAccessCsv, type BindingRow } from "../src/csv";
 
 const row: BindingRow = {
   nycu_id: "0856001",
@@ -32,5 +32,26 @@ describe("toCsv", () => {
     const csv = toCsv([{ ...row, nycu_name: null, github_login: null }]);
     const cells = csv.trimEnd().split("\n")[1].split(",");
     expect(cells[1]).toBe("");
+  });
+});
+
+describe("toGithubAccessCsv", () => {
+  it("emits course-scoped GitHub access rows for private repo provisioning", () => {
+    const csv = toGithubAccessCsv([
+      {
+        course_id: "ds-2026",
+        course_name: "Data Structures, 2026",
+        student_id: "0856001",
+        name: "王小明",
+        github_login: "xiaoming",
+        github_org: "nycu-cs-course-ds",
+        github_team_slug: "ds2026-students",
+        github_repo: "ds2026",
+        permission: "write",
+      },
+    ]);
+    const lines = csv.trimEnd().split("\n");
+    expect(lines[0]).toBe("course_id,course_name,student_id,name,github_login,github_org,github_team_slug,github_repo,permission");
+    expect(lines[1]).toBe('ds-2026,"Data Structures, 2026",0856001,王小明,xiaoming,nycu-cs-course-ds,ds2026-students,ds2026,write');
   });
 });
