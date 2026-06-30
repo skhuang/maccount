@@ -1057,7 +1057,8 @@ describe("course edit + enrollment", () => {
         course_id: "ds-2026",
         students: [
           { student_id: "m1", name: "王小明", email: "m1@nycu.edu.tw" },
-          { student_id: "m2", name: "", email: "" },
+          { student_id: "m2", fullname: "李小華", email: "" },
+          { username: "m3", firstname: "Ada", lastname: "Lovelace", mail: "ada@example.edu" },
         ],
         replace: true,
       }),
@@ -1066,7 +1067,8 @@ describe("course edit + enrollment", () => {
     const { results } = await env.DB.prepare("SELECT student_id, name, email FROM enrollments WHERE course_id='ds-2026' ORDER BY student_id").all();
     expect(results).toEqual([
       { student_id: "m1", name: "王小明", email: "m1@nycu.edu.tw" },
-      { student_id: "m2", name: null, email: null },
+      { student_id: "m2", name: "李小華", email: null },
+      { student_id: "m3", name: "Ada Lovelace", email: "ada@example.edu" },
     ]);
   });
 
