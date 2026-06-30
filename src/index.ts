@@ -1087,7 +1087,7 @@ function parseStudentIds(blob: string): string[] {
 
 // POST /api/enrollments/ingest — token-auth roster import for automation
 // (e.g. seminar-moodle pushing Moodle participants). Body supports either:
-// { course_id | moodle_course_id, students: [{ student_id, email? }], replace?: bool }
+// { course_id | moodle_course_id, students: [{ student_id, name?, email? }], replace?: bool }
 // or the legacy { course_id | moodle_course_id, student_ids: [...], replace?: bool }.
 // moodle_course_id is resolved to a course_id via courses.moodle_course_id, so
 // the caller can send the Moodle numeric id it already has.
@@ -1100,6 +1100,7 @@ async function enrollmentsIngest(req: Request, env: Env): Promise<Response> {
     ? body!.students
         .map((x) => ({
           student_id: typeof x === "object" && x != null && "student_id" in x ? String(x.student_id ?? "").trim() : "",
+          name: typeof x === "object" && x != null && "name" in x ? String(x.name ?? "").trim() : "",
           email: typeof x === "object" && x != null && "email" in x ? String(x.email ?? "").trim() : "",
         }))
         .filter((x) => x.student_id)
