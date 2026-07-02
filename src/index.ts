@@ -1332,6 +1332,9 @@ export async function syncStudentsToTeam(
   const team = (course?.github_team_slug ?? "").trim();
   if (!org || !team || !env.ORG_INVITE_TOKEN)
     return { total: 0, processed: 0, added: 0, failed: 0, done: true, nextOffset: 0, skipped: "not-configured" };
+  // Each chunk re-queries the enrolled∩bound list (per-chunk snapshot): a roster
+  // change mid-run could shift the window, but re-running is safe because
+  // addTeamMembership is add-only/idempotent.
   const all = (await listEnrolledWithBinding(env.DB, courseId)).filter((s) => s.github_login);
   const total = all.length;
   const offset = Math.max(0, opts.offset ?? 0);
