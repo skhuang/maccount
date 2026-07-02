@@ -281,6 +281,8 @@ async function githubCallback(req: Request, env: Env, url: URL): Promise<Respons
       }
     }
   }
+  // Also add them to each enrolled course's student team (best-effort).
+  await syncStudentTeamsOnBind(env, session.nycu.id, gh.login);
   // Stay logged in; back to the dashboard with a success flash.
   return redirect("/me?bound=1");
 }
@@ -466,6 +468,22 @@ export async function studentTeams(env: Env, studentId: string): Promise<{ org: 
     }
   }
   return out;
+}
+
+// Best-effort: add a just-bound student to every enrolled course's GitHub team.
+// A failure is logged but never propagated (must not break the binding).
+export async function syncStudentTeamsOnBind(
+  env: Env, studentId: string, login: string, fetcher: typeof fetch = fetch,
+): Promise<void> {
+  if (!env.ORG_INVITE_TOKEN) return;
+  for (const { org, team } of await studentTeams(env, studentId)) {
+    try {
+      await addTeamMembership(org, team, login, env.ORG_INVITE_TOKEN, fetcher);
+      console.log(`team add: ${login} -> ${org}/${team}`);
+    } catch (e) {
+      console.error(`team add failed (${org}/${team}):`, (e as Error).message);
+    }
+  }
 }
 
 // ── dashboard (/me) ───────────────────────────────────────────────────────
