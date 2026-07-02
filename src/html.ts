@@ -466,9 +466,10 @@ ${enrollImport}</section>`;
         if (!res.ok) throw new Error('HTTP ' + res.status);
         var d = await res.json();
         if (d.skipped) { out.textContent = d.skipped; break; }
-        added += d.added; failed += d.failed; total = d.total; offset = d.nextOffset;
-        out.textContent = SYNCING + ' ' + offset + '/' + total;
+        added += d.added; failed += d.failed; total = d.total;
         if (d.done) { out.textContent = DONE + ': added ' + added + ', failed ' + failed + ' (of ' + total + ')'; break; }
+        offset = d.nextOffset;
+        out.textContent = SYNCING + ' ' + offset + '/' + total;
       }
     } catch (e) {
       out.textContent = ERR + ': ' + e.message;
