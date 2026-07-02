@@ -333,7 +333,6 @@ export function adminPage(
     isOwner: boolean;
     staff: StaffLite[];
     staffMsg?: string;
-    studentsTeamMsg?: string;
     boundCount?: number;
     driveMsg?: string;
     formsMsg?: string;
@@ -447,15 +446,37 @@ ${tableTools(t, "enrollment-table", enrolled.length, [{ value: "missing", label:
 ${enrollImport}</section>`;
 
   // Sync enrolled+bound students into the course GitHub team (owner/staff only).
-  const studentsTeamMsg = opts.studentsTeamMsg ?? "";
   const boundCount = opts.boundCount ?? 0;
   const studentsTeamSection = course.github_team_slug
     ? `<section class="admin-section" id="students-team">
-<form method="POST" action="${base}/students/team/sync" class="inline">
-  <button type="submit">${t.syncStudentsTeam}</button>
-  <span class="muted">${boundCount} ${t.enrolledBound}</span>
-</form>
-${studentsTeamMsg ? `<p class="flash">${h(studentsTeamMsg)}</p>` : ""}
+<button id="sync-students-team" type="button">${t.syncStudentsTeam}</button>
+<span class="muted" id="sync-students-status">${boundCount} ${t.enrolledBound}</span>
+<script>
+(function () {
+  var URL_ = ${JSON.stringify(`${base}/students/team/sync`)};
+  var SYNCING = ${JSON.stringify(t.syncing)}, DONE = ${JSON.stringify(t.syncDone)}, ERR = ${JSON.stringify(t.syncError)};
+  var btn = document.getElementById('sync-students-team');
+  var out = document.getElementById('sync-students-status');
+  btn.addEventListener('click', async function () {
+    btn.disabled = true;
+    var offset = 0, added = 0, failed = 0, total = 0;
+    try {
+      while (true) {
+        var res = await fetch(URL_, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ offset: offset }) });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var d = await res.json();
+        if (d.skipped) { out.textContent = d.skipped; break; }
+        added += d.added; failed += d.failed; total = d.total; offset = d.nextOffset;
+        out.textContent = SYNCING + ' ' + offset + '/' + total;
+        if (d.done) { out.textContent = DONE + ': added ' + added + ', failed ' + failed + ' (of ' + total + ')'; break; }
+      }
+    } catch (e) {
+      out.textContent = ERR + ': ' + e.message;
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
 </section>`
     : "";
 
