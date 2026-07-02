@@ -455,6 +455,7 @@ ${enrollImport}</section>`;
 (function () {
   var URL_ = ${JSON.stringify(`${base}/students/team/sync`)};
   var SYNCING = ${JSON.stringify(t.syncing)}, DONE = ${JSON.stringify(t.syncDone)}, ERR = ${JSON.stringify(t.syncError)};
+  var NOTCONF = ${JSON.stringify(t.syncNotConfigured)};
   var btn = document.getElementById('sync-students-team');
   var out = document.getElementById('sync-students-status');
   btn.addEventListener('click', async function () {
@@ -465,7 +466,7 @@ ${enrollImport}</section>`;
         var res = await fetch(URL_, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ offset: offset }) });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         var d = await res.json();
-        if (d.skipped) { out.textContent = d.skipped; break; }
+        if (d.skipped) { out.textContent = d.skipped === 'not-configured' ? NOTCONF : d.skipped; break; }
         added += d.added; failed += d.failed; total = d.total;
         if (d.done) { out.textContent = DONE + ': added ' + added + ', failed ' + failed + ' (of ' + total + ')'; break; }
         offset = d.nextOffset;
