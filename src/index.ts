@@ -1309,26 +1309,38 @@ function defaultCourse(env: Env): string {
   return env.DEFAULT_COURSE_ID || "ds-2026";
 }
 
-export interface StudentTeamSyncResult { total: number; added: number; failed: number; skipped?: string }
+export interface StudentTeamSyncResult {
+  total: number;      // full enrolled∩bound count
+  processed: number;  // handled in this chunk
+  added: number;
+  failed: number;
+  done: boolean;      // nextOffset >= total
+  nextOffset: number;
+  skipped?: string;   // "not-configured" when org/team/token missing
+}
 
-// Batch: add every enrolled∩bound student of a course to its GitHub team.
-// Idempotent, per-student isolated (one failure doesn't abort the rest).
+// Add a bounded window of enrolled∩bound students to the course GitHub team.
+// One subrequest/student (addTeamMembership also invites non-members to the org),
+// and a `limit` (default 40) keeps each invocation under the Workers ~50
+// subrequest cap — the caller loops with `offset` until `done`.
 export async function syncStudentsToTeam(
-  env: Env, courseId: string, fetcher: typeof fetch = fetch,
+  env: Env, courseId: string,
+  opts: { offset?: number; limit?: number; fetcher?: typeof fetch } = {},
 ): Promise<StudentTeamSyncResult> {
+  const fetcher = opts.fetcher ?? fetch;
   const course = await getCourse(env.DB, courseId);
   const org = course ? effectiveOrg(env, course) : "";
   const team = (course?.github_team_slug ?? "").trim();
-  if (!org || !team || !env.ORG_INVITE_TOKEN) return { total: 0, added: 0, failed: 0, skipped: "not-configured" };
-  const students = (await listEnrolledWithBinding(env.DB, courseId)).filter((s) => s.github_login);
+  if (!org || !team || !env.ORG_INVITE_TOKEN)
+    return { total: 0, processed: 0, added: 0, failed: 0, done: true, nextOffset: 0, skipped: "not-configured" };
+  const all = (await listEnrolledWithBinding(env.DB, courseId)).filter((s) => s.github_login);
+  const total = all.length;
+  const offset = Math.max(0, opts.offset ?? 0);
+  const limit = opts.limit ?? 40;
+  const slice = all.slice(offset, offset + limit);
   let added = 0, failed = 0;
-  for (const s of students) {
+  for (const s of slice) {
     try {
-      // One subrequest per student: PUT team membership already adds a
-      // non-member to the org (pending invite), so a separate inviteOrgMember
-      // is redundant — and Workers caps subrequests per invocation (~50), so
-      // 2 calls/student overflowed for a full class (30×2 = 60 → the tail
-      // failed the last ~5 with "Too many subrequests").
       await addTeamMembership(org, team, s.github_login!, env.ORG_INVITE_TOKEN, fetcher);
       added++;
     } catch (e) {
@@ -1336,7 +1348,8 @@ export async function syncStudentsToTeam(
       console.error(`student team sync failed (${s.github_login}):`, (e as Error).message);
     }
   }
-  return { total: students.length, added, failed };
+  const nextOffset = offset + slice.length;
+  return { total, processed: slice.length, added, failed, done: nextOffset >= total, nextOffset };
 }
 
 // Sync a staff member to the GitHub org + staff team (scope: team+org).
