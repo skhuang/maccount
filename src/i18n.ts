@@ -163,6 +163,8 @@ export interface Strings {
   staff_sync_ok: string;
   staff_sync_nobinding: string;
   staff_sync_error: string;
+  syncStudentsTeam: string;
+  enrolledBound: string;
   drive_heading: string;
   drive_note: string;
   drive_connect: string;
@@ -446,6 +448,8 @@ export const T: Record<Lang, Strings> = {
     staff_sync_ok: "已同步到 GitHub org 與 staff team。",
     staff_sync_nobinding: "此助教尚未綁定 GitHub；請他先到 /me 綁定，再加入一次以同步。",
     staff_sync_error: "GitHub org/team 同步失敗（請檢查 ORG_INVITE_TOKEN 權限與 STAFF_TEAM）。",
+    syncStudentsTeam: "同步學生到課程 team",
+    enrolledBound: "位已選課且已綁定",
     drive_heading: "用 Google Drive 分享檔案給全班",
     drive_note: "以你自己的 Google Drive 將檔案／資料夾分享給「選課∩已綁 Google」的學生（用其綁定的 Google email）。需先連結你的 Drive（完整權限）：",
     drive_connect: "連結我的 Google Drive（完整權限）→",
@@ -727,6 +731,8 @@ export const T: Record<Lang, Strings> = {
     staff_sync_ok: "Synced to the GitHub org and staff team.",
     staff_sync_nobinding: "This TA hasn't bound GitHub yet; have them bind at /me, then add again to sync.",
     staff_sync_error: "GitHub org/team sync failed (check ORG_INVITE_TOKEN permissions and STAFF_TEAM).",
+    syncStudentsTeam: "Sync students to team",
+    enrolledBound: "enrolled & bound",
     drive_heading: "Share a Drive file with the class",
     drive_note: "Share a file/folder from your own Google Drive with enrolled students who bound Google (by their bound Google email). Connect your Drive (full access) first:",
     drive_connect: "Connect my Google Drive (full access) →",

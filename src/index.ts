@@ -281,6 +281,8 @@ async function githubCallback(req: Request, env: Env, url: URL): Promise<Respons
       }
     }
   }
+  // Also add them to each enrolled course's student team (best-effort).
+  await syncStudentTeamsOnBind(env, session.nycu.id, gh.login);
   // Stay logged in; back to the dashboard with a success flash.
   return redirect("/me?bound=1");
 }
@@ -446,6 +448,42 @@ async function studentOrgs(env: Env, studentId: string): Promise<string[]> {
   }
   if (orgs.size === 0 && env.COURSE_ORG) orgs.add(env.COURSE_ORG);
   return [...orgs];
+}
+
+// The deduped {org, team} pairs a student should be a team member of: for each
+// enrolled course that defines a github_team_slug, its effective org + team.
+export async function studentTeams(env: Env, studentId: string): Promise<{ org: string; team: string }[]> {
+  const ids = new Set(await coursesForStudent(env.DB, studentId));
+  const out: { org: string; team: string }[] = [];
+  const seen = new Set<string>();
+  if (ids.size) {
+    for (const c of await listCourses(env.DB)) {
+      if (!ids.has(c.course_id)) continue;
+      const org = effectiveOrg(env, c);
+      const team = (c.github_team_slug ?? "").trim();
+      if (org && team && !seen.has(`${org}/${team}`)) {
+        seen.add(`${org}/${team}`);
+        out.push({ org, team });
+      }
+    }
+  }
+  return out;
+}
+
+// Best-effort: add a just-bound student to every enrolled course's GitHub team.
+// A failure is logged but never propagated (must not break the binding).
+export async function syncStudentTeamsOnBind(
+  env: Env, studentId: string, login: string, fetcher: typeof fetch = fetch,
+): Promise<void> {
+  if (!env.ORG_INVITE_TOKEN) return;
+  for (const { org, team } of await studentTeams(env, studentId)) {
+    try {
+      await addTeamMembership(org, team, login, env.ORG_INVITE_TOKEN, fetcher);
+      console.log(`team add: ${login} -> ${org}/${team}`);
+    } catch (e) {
+      console.error(`team add failed (${org}/${team}):`, (e as Error).message);
+    }
+  }
 }
 
 // ── dashboard (/me) ───────────────────────────────────────────────────────
@@ -793,6 +831,7 @@ async function courseAdminRouter(
   if (sub === "/delete" && m === "POST") return await courseDelete(req, env, courseId);
   if (sub === "/staff/add" && m === "POST") return await staffAdd(req, env, courseId);
   if (sub === "/staff/remove" && m === "POST") return await staffRemove(req, env, courseId);
+  if (sub === "/students/team/sync" && m === "POST") return await studentsTeamSync(req, env, courseId);
   if (sub === "/enroll" && m === "POST") return await courseEnroll(req, env, courseId);
   if (sub === "/drive/share" && m === "POST") return await driveShare(req, env, courseId);
   if (sub === "/forms/add" && m === "POST") return await formAdd(req, env, courseId);
@@ -823,8 +862,10 @@ async function courseAdmin(req: Request, env: Env, url: URL, courseId: string): 
   const driveMsg = url.searchParams.get("drive_msg") ?? "";
   const formsMsg = url.searchParams.get("forms_msg") ?? "";
   const classroomMsg = url.searchParams.get("classroom_msg") ?? "";
+  const studentsTeamMsg = url.searchParams.get("students_team_msg") ?? "";
+  const boundCount = enrolled.filter((e) => e.github_login).length;
   return new Response(
-    adminPage(lang, course, scoped, { isOwner, staff, staffMsg, driveMsg, formsMsg, classroomMsg, enrolled, forms }),
+    adminPage(lang, course, scoped, { isOwner, staff, staffMsg, studentsTeamMsg, boundCount, driveMsg, formsMsg, classroomMsg, enrolled, forms }),
     { headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) } },
   );
 }
@@ -1268,6 +1309,32 @@ function defaultCourse(env: Env): string {
   return env.DEFAULT_COURSE_ID || "ds-2026";
 }
 
+export interface StudentTeamSyncResult { total: number; added: number; failed: number; skipped?: string }
+
+// Batch: add every enrolled∩bound student of a course to its GitHub team.
+// Idempotent, per-student isolated (one failure doesn't abort the rest).
+export async function syncStudentsToTeam(
+  env: Env, courseId: string, fetcher: typeof fetch = fetch,
+): Promise<StudentTeamSyncResult> {
+  const course = await getCourse(env.DB, courseId);
+  const org = course ? effectiveOrg(env, course) : "";
+  const team = (course?.github_team_slug ?? "").trim();
+  if (!org || !team || !env.ORG_INVITE_TOKEN) return { total: 0, added: 0, failed: 0, skipped: "not-configured" };
+  const students = (await listEnrolledWithBinding(env.DB, courseId)).filter((s) => s.github_login);
+  let added = 0, failed = 0;
+  for (const s of students) {
+    try {
+      await inviteOrgMember(org, s.github_login!, env.ORG_INVITE_TOKEN, fetcher);      // ensure org (idempotent)
+      await addTeamMembership(org, team, s.github_login!, env.ORG_INVITE_TOKEN, fetcher);
+      added++;
+    } catch (e) {
+      failed++;
+      console.error(`student team sync failed (${s.github_login}):`, (e as Error).message);
+    }
+  }
+  return { total: students.length, added, failed };
+}
+
 // Sync a staff member to the GitHub org + staff team (scope: team+org).
 // Best-effort, never throws. Returns a short status code for the /admin flash:
 // "" (no GitHub sync configured), "ok", "no-binding" (TA hasn't bound GitHub),
@@ -1317,4 +1384,12 @@ async function staffRemove(req: Request, env: Env, courseId: string): Promise<Re
   if (!id) return redirect(`/c/${encodeURIComponent(courseId)}/admin`);
   await removeStaff(env.DB, courseId, id);
   return adminRedirect(courseId, await syncStaffToGitHub(env, id, false));
+}
+
+async function studentsTeamSync(req: Request, env: Env, courseId: string): Promise<Response> {
+  const s = await requireCourseStaff(req, env, courseId);
+  if (s instanceof Response) return s;
+  const r = await syncStudentsToTeam(env, courseId);
+  const msg = r.skipped ? r.skipped : `added ${r.added}, failed ${r.failed} (of ${r.total})`;
+  return redirect(`/c/${encodeURIComponent(courseId)}/admin?students_team_msg=${encodeURIComponent(msg)}`);
 }

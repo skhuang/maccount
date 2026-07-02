@@ -333,6 +333,8 @@ export function adminPage(
     isOwner: boolean;
     staff: StaffLite[];
     staffMsg?: string;
+    studentsTeamMsg?: string;
+    boundCount?: number;
     driveMsg?: string;
     formsMsg?: string;
     classroomMsg?: string;
@@ -443,6 +445,19 @@ ${tableTools(t, "enrollment-table", enrolled.length, [{ value: "missing", label:
       : ""
   }
 ${enrollImport}</section>`;
+
+  // Sync enrolled+bound students into the course GitHub team (owner/staff only).
+  const studentsTeamMsg = opts.studentsTeamMsg ?? "";
+  const boundCount = opts.boundCount ?? 0;
+  const studentsTeamSection = course.github_team_slug
+    ? `<section class="admin-section" id="students-team">
+<form method="POST" action="${base}/students/team/sync" class="inline">
+  <button type="submit">${t.syncStudentsTeam}</button>
+  <span class="muted">${boundCount} ${t.enrolledBound}</span>
+</form>
+${studentsTeamMsg ? `<p class="flash">${h(studentsTeamMsg)}</p>` : ""}
+</section>`
+    : "";
 
   // Share a staff-owned Drive file with the class (any course staff). Acts as
   // the logged-in staff's own connected Google Drive; recipients are the
@@ -674,6 +689,7 @@ ${rows.length ? tableTools(t, "course-bindings-table", rows.length) : ""}
 ${trs || `<tr><td colspan="${isOwner ? "7" : "6"}" class="empty-cell">${t.no_bindings}</td></tr>`}
 </tbody></table></section>
 ${enrollSection}
+${studentsTeamSection}
 ${driveSection}
 ${formsSection}
 ${classroomSection}
