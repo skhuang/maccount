@@ -448,6 +448,26 @@ async function studentOrgs(env: Env, studentId: string): Promise<string[]> {
   return [...orgs];
 }
 
+// The deduped {org, team} pairs a student should be a team member of: for each
+// enrolled course that defines a github_team_slug, its effective org + team.
+export async function studentTeams(env: Env, studentId: string): Promise<{ org: string; team: string }[]> {
+  const ids = new Set(await coursesForStudent(env.DB, studentId));
+  const out: { org: string; team: string }[] = [];
+  const seen = new Set<string>();
+  if (ids.size) {
+    for (const c of await listCourses(env.DB)) {
+      if (!ids.has(c.course_id)) continue;
+      const org = effectiveOrg(env, c);
+      const team = (c.github_team_slug ?? "").trim();
+      if (org && team && !seen.has(`${org}/${team}`)) {
+        seen.add(`${org}/${team}`);
+        out.push({ org, team });
+      }
+    }
+  }
+  return out;
+}
+
 // ── dashboard (/me) ───────────────────────────────────────────────────────
 async function requireLogin(req: Request, env: Env): Promise<SessionData | Response> {
   const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
