@@ -831,6 +831,7 @@ async function courseAdminRouter(
   if (sub === "/delete" && m === "POST") return await courseDelete(req, env, courseId);
   if (sub === "/staff/add" && m === "POST") return await staffAdd(req, env, courseId);
   if (sub === "/staff/remove" && m === "POST") return await staffRemove(req, env, courseId);
+  if (sub === "/students/team/sync" && m === "POST") return await studentsTeamSync(req, env, courseId);
   if (sub === "/enroll" && m === "POST") return await courseEnroll(req, env, courseId);
   if (sub === "/drive/share" && m === "POST") return await driveShare(req, env, courseId);
   if (sub === "/forms/add" && m === "POST") return await formAdd(req, env, courseId);
@@ -1306,6 +1307,32 @@ function defaultCourse(env: Env): string {
   return env.DEFAULT_COURSE_ID || "ds-2026";
 }
 
+export interface StudentTeamSyncResult { total: number; added: number; failed: number; skipped?: string }
+
+// Batch: add every enrolled∩bound student of a course to its GitHub team.
+// Idempotent, per-student isolated (one failure doesn't abort the rest).
+export async function syncStudentsToTeam(
+  env: Env, courseId: string, fetcher: typeof fetch = fetch,
+): Promise<StudentTeamSyncResult> {
+  const course = await getCourse(env.DB, courseId);
+  const org = course ? effectiveOrg(env, course) : "";
+  const team = (course?.github_team_slug ?? "").trim();
+  if (!org || !team || !env.ORG_INVITE_TOKEN) return { total: 0, added: 0, failed: 0, skipped: "not-configured" };
+  const students = (await listEnrolledWithBinding(env.DB, courseId)).filter((s) => s.github_login);
+  let added = 0, failed = 0;
+  for (const s of students) {
+    try {
+      await inviteOrgMember(org, s.github_login!, env.ORG_INVITE_TOKEN, fetcher);      // ensure org (idempotent)
+      await addTeamMembership(org, team, s.github_login!, env.ORG_INVITE_TOKEN, fetcher);
+      added++;
+    } catch (e) {
+      failed++;
+      console.error(`student team sync failed (${s.github_login}):`, (e as Error).message);
+    }
+  }
+  return { total: students.length, added, failed };
+}
+
 // Sync a staff member to the GitHub org + staff team (scope: team+org).
 // Best-effort, never throws. Returns a short status code for the /admin flash:
 // "" (no GitHub sync configured), "ok", "no-binding" (TA hasn't bound GitHub),
@@ -1355,4 +1382,12 @@ async function staffRemove(req: Request, env: Env, courseId: string): Promise<Re
   if (!id) return redirect(`/c/${encodeURIComponent(courseId)}/admin`);
   await removeStaff(env.DB, courseId, id);
   return adminRedirect(courseId, await syncStaffToGitHub(env, id, false));
+}
+
+async function studentsTeamSync(req: Request, env: Env, courseId: string): Promise<Response> {
+  const s = await requireCourseStaff(req, env, courseId);
+  if (s instanceof Response) return s;
+  const r = await syncStudentsToTeam(env, courseId);
+  const msg = r.skipped ? r.skipped : `added ${r.added}, failed ${r.failed} (of ${r.total})`;
+  return redirect(`/c/${encodeURIComponent(courseId)}/admin?students_team_msg=${encodeURIComponent(msg)}`);
 }
