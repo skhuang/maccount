@@ -862,8 +862,10 @@ async function courseAdmin(req: Request, env: Env, url: URL, courseId: string): 
   const driveMsg = url.searchParams.get("drive_msg") ?? "";
   const formsMsg = url.searchParams.get("forms_msg") ?? "";
   const classroomMsg = url.searchParams.get("classroom_msg") ?? "";
+  const studentsTeamMsg = url.searchParams.get("students_team_msg") ?? "";
+  const boundCount = enrolled.filter((e) => e.github_login).length;
   return new Response(
-    adminPage(lang, course, scoped, { isOwner, staff, staffMsg, driveMsg, formsMsg, classroomMsg, enrolled, forms }),
+    adminPage(lang, course, scoped, { isOwner, staff, staffMsg, studentsTeamMsg, boundCount, driveMsg, formsMsg, classroomMsg, enrolled, forms }),
     { headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) } },
   );
 }
