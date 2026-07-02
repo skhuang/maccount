@@ -3,6 +3,7 @@ import { env, applyD1Migrations } from "cloudflare:test";
 import { upsertCourse } from "../src/db/courses";
 import { bulkEnroll } from "../src/db/enrollments";
 import { studentTeams } from "../src/index";
+import type { Env } from "../src/env";
 
 const now = "2026-06-30T00:00:00.000Z";
 
@@ -18,10 +19,10 @@ describe("studentTeams", () => {
     await upsertCourse(env.DB, { course_id: "no-team", name: "NT", github_org: "nycu-cs-course-ds", github_team_slug: null }, now);
     await bulkEnroll(env.DB, "ds-2026", ["s1"], now);
     await bulkEnroll(env.DB, "no-team", ["s1"], now);
-    expect(await studentTeams(env, "s1")).toEqual([{ org: "nycu-cs-course-ds", team: "ds2026-students" }]);
+    expect(await studentTeams(env as unknown as Env, "s1")).toEqual([{ org: "nycu-cs-course-ds", team: "ds2026-students" }]);
   });
 
   it("returns [] when not enrolled in any course with a team", async () => {
-    expect(await studentTeams(env, "nobody")).toEqual([]);
+    expect(await studentTeams(env as unknown as Env, "nobody")).toEqual([]);
   });
 });
