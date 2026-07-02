@@ -862,10 +862,9 @@ async function courseAdmin(req: Request, env: Env, url: URL, courseId: string): 
   const driveMsg = url.searchParams.get("drive_msg") ?? "";
   const formsMsg = url.searchParams.get("forms_msg") ?? "";
   const classroomMsg = url.searchParams.get("classroom_msg") ?? "";
-  const studentsTeamMsg = url.searchParams.get("students_team_msg") ?? "";
   const boundCount = enrolled.filter((e) => e.github_login).length;
   return new Response(
-    adminPage(lang, course, scoped, { isOwner, staff, staffMsg, studentsTeamMsg, boundCount, driveMsg, formsMsg, classroomMsg, enrolled, forms }),
+    adminPage(lang, course, scoped, { isOwner, staff, staffMsg, boundCount, driveMsg, formsMsg, classroomMsg, enrolled, forms }),
     { headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) } },
   );
 }
@@ -1406,7 +1405,8 @@ async function staffRemove(req: Request, env: Env, courseId: string): Promise<Re
 async function studentsTeamSync(req: Request, env: Env, courseId: string): Promise<Response> {
   const s = await requireCourseStaff(req, env, courseId);
   if (s instanceof Response) return s;
-  const r = await syncStudentsToTeam(env, courseId);
-  const msg = r.skipped ? r.skipped : `added ${r.added}, failed ${r.failed} (of ${r.total})`;
-  return redirect(`/c/${encodeURIComponent(courseId)}/admin?students_team_msg=${encodeURIComponent(msg)}`);
+  let offset = 0;
+  try { offset = Number((await req.json() as { offset?: number } | null)?.offset) || 0; } catch { offset = 0; }
+  const r = await syncStudentsToTeam(env, courseId, { offset, limit: 40 });
+  return new Response(JSON.stringify(r), { headers: { "content-type": "application/json" } });
 }
