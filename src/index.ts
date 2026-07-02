@@ -1324,7 +1324,11 @@ export async function syncStudentsToTeam(
   let added = 0, failed = 0;
   for (const s of students) {
     try {
-      await inviteOrgMember(org, s.github_login!, env.ORG_INVITE_TOKEN, fetcher);      // ensure org (idempotent)
+      // One subrequest per student: PUT team membership already adds a
+      // non-member to the org (pending invite), so a separate inviteOrgMember
+      // is redundant — and Workers caps subrequests per invocation (~50), so
+      // 2 calls/student overflowed for a full class (30×2 = 60 → the tail
+      // failed the last ~5 with "Too many subrequests").
       await addTeamMembership(org, team, s.github_login!, env.ORG_INVITE_TOKEN, fetcher);
       added++;
     } catch (e) {
