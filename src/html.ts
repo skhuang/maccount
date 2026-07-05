@@ -1,6 +1,7 @@
 import type { BindingRow } from "./csv";
 import type { GradeRow } from "./db/grades";
 import type { Scoreboard } from "./scoreboard";
+import type { ProvisionRequest } from "./db/provision";
 import { T, langToggle, type Lang } from "./i18n";
 import { accountStatusCard, confirmAttrs, fmtTime, h, helpHint, repoHref, verdictBadge } from "./ui/components";
 import { documentStart } from "./ui/layout";
@@ -706,7 +707,7 @@ ${adminNav}
 <section class="admin-section" id="bindings"><h2 class="with-help">${t.admin_bindings.replace("{n}", String(rows.length))}${helpHint(t.help_bindings, t.help_label)}</h2>
 ${banner}
 <p><a href="${base}/export.csv">${t.export_full}</a>　|　<a href="${base}/roster.csv">${t.export_roster}</a>　|　<a href="${base}/github.csv">${t.export_github}</a>${helpHint(t.help_exports, t.help_label)}</p>
-<p><a href="${base}/scoreboard">📊 記分板 / Scoreboard</a></p>
+<p><a href="${base}/scoreboard">📊 記分板 / Scoreboard</a>　|　<a href="${base}/provision">🚀 Provisioning 遙控</a></p>
 ${rows.length ? tableTools(t, "course-bindings-table", rows.length) : ""}
 <table id="course-bindings-table" class="mobile-compact" border="1" cellpadding="6" cellspacing="0">
 <thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("GitHub", 2)}${sortableTh(t.th_github_id, 3, "number", "mobile-secondary")}<th>Google</th>${sortableTh(t.th_updated, 5, "text", "mobile-secondary")}${isOwner ? `<th>${t.th_actions}</th>` : ""}</tr></thead>
@@ -989,6 +990,52 @@ export function scoreboardPage(
 ${picker}
 ${table}
 <p class="muted text-small">只顯示分數、判定與學生自己的 repo(不含測資)。 / Score, verdict, and the student's own repo only.</p>
+</body></html>`;
+}
+
+// Provisioning remote control (staff/TA). Buttons enqueue a request; the dsjudge
+// runner polls, executes locally, and writes the result back. MVP: read-only
+// actions (plan/status). Refresh to see results.
+export function provisionPage(
+  lang: Lang,
+  courseId: string,
+  assignments: { assignment_id: string; title: string | null }[],
+  requests: ProvisionRequest[],
+): string {
+  const base = `/c/${encodeURIComponent(courseId)}/admin`;
+  const actForm = (aid: string, action: string, label: string) =>
+    `<form method="POST" action="${base}/provision/request" style="display:inline;max-width:none">
+    <input type="hidden" name="assignment_id" value="${h(aid)}">
+    <input type="hidden" name="action" value="${action}">
+    <button type="submit">${label}</button></form>`;
+  const aRows =
+    assignments
+      .map(
+        (a) =>
+          `<tr><td>${h(a.title || a.assignment_id)}<br><span class="muted text-small">${h(a.assignment_id)}</span></td>
+      <td>${actForm(a.assignment_id, "plan", "Plan (dry-run)")} ${actForm(a.assignment_id, "status", "Status")}</td></tr>`,
+      )
+      .join("") ||
+    `<tr><td colspan="2" class="muted">此課程尚無作業(先在 runner 建 manifest)。</td></tr>`;
+  const reqRows =
+    requests
+      .map((r) => {
+        const res = r.result
+          ? `<tr><td colspan="5"><pre style="max-height:12em;overflow:auto">${h(r.result)}</pre></td></tr>`
+          : "";
+        return `<tr><td>${r.id}</td><td>${h(r.assignment_id)}</td><td>${h(r.action)}</td><td>${h(r.status)}</td><td>${h(r.requested_by)}</td></tr>${res}`;
+      })
+      .join("") || `<tr><td colspan="5" class="muted">尚無請求。</td></tr>`;
+  return `${documentStart(lang, "Provisioning", UI_CSS)}
+<body>
+<p style="font-size:.9em"><a href="${base}">← ${h(courseId)} admin</a></p>
+<h1>Provisioning 遙控 / Remote</h1>
+<p class="muted text-small">按動作 → runner 輪詢並在本地執行(dry-run / status 為唯讀,不建 repo、不寫 course.yaml)。重新整理看結果。</p>
+<table border="1" cellpadding="6" cellspacing="0"><thead><tr><th>作業 / Assignment</th><th>動作 / Action</th></tr></thead>
+<tbody>${aRows}</tbody></table>
+<h2>最近請求 / Recent requests</h2>
+<table border="1" cellpadding="6" cellspacing="0"><thead><tr><th>#</th><th>作業</th><th>動作</th><th>狀態</th><th>由</th></tr></thead>
+<tbody>${reqRows}</tbody></table>
 </body></html>`;
 }
 
