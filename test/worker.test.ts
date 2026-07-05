@@ -2016,3 +2016,64 @@ describe("staff scoreboard", () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe("provisioning control plane", () => {
+  const staffSession = () =>
+    signSession({ exp: Date.now() + 60000, nycu: { id: "ta01", name: "TA" } }, SECRET);
+  const seedStaff = () =>
+    env.DB.prepare(
+      "INSERT INTO staff (course_id, nycu_id, added_by, added_at) VALUES ('ds-2026','ta01','admin1','t')",
+    ).run();
+  const form = (o: Record<string, string>) => ({
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(o).toString(),
+  });
+  const bearer = { "Content-Type": "application/json", Authorization: "Bearer ingest-secret" };
+
+  it("full loop: staff enqueues → runner claims → result → visible", async () => {
+    await seedStaff();
+    const enq = await call("/c/ds-2026/admin/provision/request",
+      { ...form({ assignment_id: "A1", action: "plan" }), headers: { ...form({}).headers, ...cookie(await staffSession()) } });
+    expect(enq.status).toBe(302);
+
+    const claim = await call("/api/provision/claim", { method: "POST", headers: bearer, body: "{}" });
+    const cj = await claim.json() as { request: { id: number; assignment_id: string; action: string; status: string } };
+    expect(cj.request.assignment_id).toBe("A1");
+    expect(cj.request.action).toBe("plan");
+    expect(cj.request.status).toBe("claimed");
+
+    const done = await call("/api/provision/result",
+      { method: "POST", headers: bearer, body: JSON.stringify({ id: cj.request.id, status: "done", result: { repos: 3 } }) });
+    expect((await done.json() as { ok: boolean }).ok).toBe(true);
+
+    const page = await call("/c/ds-2026/admin/provision", { headers: cookie(await staffSession()) });
+    const body = await page.text();
+    expect(body).toContain("done");
+    expect(body).toContain("&quot;repos&quot;:3"); // result JSON echoed (escaped, no spaces)
+  });
+
+  it("claim returns null when the queue is empty", async () => {
+    const res = await call("/api/provision/claim", { method: "POST", headers: bearer, body: "{}" });
+    expect((await res.json() as { request: unknown }).request).toBeNull();
+  });
+
+  it("a non-staff cannot enqueue a request (403)", async () => {
+    const nobody = await signSession({ exp: Date.now() + 60000, nycu: { id: "x", name: "X" } }, SECRET);
+    const res = await call("/c/ds-2026/admin/provision/request",
+      { ...form({ assignment_id: "A1", action: "plan" }), headers: { ...form({}).headers, ...cookie(nobody) } });
+    expect(res.status).toBe(403);
+  });
+
+  it("an unknown action is rejected (400)", async () => {
+    await seedStaff();
+    const res = await call("/c/ds-2026/admin/provision/request",
+      { ...form({ assignment_id: "A1", action: "repos_apply" }), headers: { ...form({}).headers, ...cookie(await staffSession()) } });
+    expect(res.status).toBe(400); // APPLY not in the MVP action set
+  });
+
+  it("the runner API needs the bearer token (401)", async () => {
+    expect((await call("/api/provision/claim", { method: "POST", body: "{}" })).status).toBe(401);
+    expect((await call("/api/provision/result", { method: "POST", body: "{}" })).status).toBe(401);
+  });
+});

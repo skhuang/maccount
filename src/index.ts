@@ -45,6 +45,9 @@ import {
 } from "./db/grades";
 import { buildScoreboard, scoreboardCsv } from "./scoreboard";
 import {
+  enqueueRequest, claimNextRequest, finishRequest, listRequests, PROVISION_ACTIONS,
+} from "./db/provision";
+import {
   listStaff, addStaff, removeStaff, isStaffAnywhere, isStaffMember, coursesForStaff,
 } from "./db/staff";
 import { listCourses, getCourse, getCourseByMoodleId, upsertCourse, type CourseRow } from "./db/courses";
@@ -58,7 +61,7 @@ import {
 import { toCsv, toRosterCsv, toGithubAccessCsv, type GithubAccessRow } from "./csv";
 import {
   adminPage, adminHomePage, bindingsPage, orgMembersPage, dashboardPage, examPage, coursePrejoinPage,
-  privacyPage, termsPage, scoreboardPage,
+  privacyPage, termsPage, scoreboardPage, provisionPage,
 } from "./html";
 import { pickLang, langCookie } from "./i18n";
 
@@ -85,6 +88,8 @@ export default {
       if (em && req.method === "GET") return await meExam(req, env, url, em[1]);
       const mc = p.match(/^\/me\/([A-Za-z0-9_-]+)$/);
       if (mc && req.method === "GET") return await meCourse(req, env, url, mc[1]);
+      if (p === "/api/provision/claim" && req.method === "POST") return await provisionClaim(req, env);
+      if (p === "/api/provision/result" && req.method === "POST") return await provisionResult(req, env);
       if (p === "/api/grades/ingest" && req.method === "POST")
         return await gradesIngest(req, env);
       if (p === "/api/assignment-visibility" && req.method === "POST")
@@ -828,6 +833,8 @@ async function courseAdminRouter(
   if (sub === "" && m === "GET") return await courseAdmin(req, env, url, courseId);
   if (sub === "/scoreboard" && m === "GET") return await courseScoreboard(req, env, url, courseId);
   if (sub === "/scoreboard.csv" && m === "GET") return await courseScoreboardCsv(req, env, url, courseId);
+  if (sub === "/provision" && m === "GET") return await courseProvision(req, env, url, courseId);
+  if (sub === "/provision/request" && m === "POST") return await courseProvisionRequest(req, env, courseId);
   if (sub === "/export.csv" && m === "GET") return await courseExport(req, env, courseId);
   if (sub === "/roster.csv" && m === "GET") return await courseRoster(req, env, courseId);
   if (sub === "/github.csv" && m === "GET") return await courseGithubCsv(req, env, courseId);
@@ -901,6 +908,67 @@ async function courseScoreboardCsv(req: Request, env: Env, url: URL, courseId: s
       "Content-Disposition": `attachment; filename="scoreboard-${aid}.csv"`,
     },
   });
+}
+
+// ── provisioning control plane ────────────────────────────────────────────
+// TA-facing page: enqueue requests + see recent results (the runner executes).
+async function courseProvision(req: Request, env: Env, url: URL, courseId: string): Promise<Response> {
+  const s = await requireCourseStaff(req, env, courseId);
+  if (s instanceof Response) return s;
+  const lang = pickLang(url, req.headers.get("Cookie"));
+  const [assignments, requests] = await Promise.all([
+    listAssignmentsForCourse(env.DB, courseId),
+    listRequests(env.DB, courseId, 20),
+  ]);
+  return new Response(provisionPage(lang, courseId, assignments, requests), {
+    headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
+  });
+}
+
+async function courseProvisionRequest(req: Request, env: Env, courseId: string): Promise<Response> {
+  const s = await requireCourseStaff(req, env, courseId);
+  if (s instanceof Response) return s;
+  const form = await req.formData();
+  const assignment_id = String(form.get("assignment_id") ?? "");
+  const action = String(form.get("action") ?? "");
+  if (!assignment_id || !(PROVISION_ACTIONS as readonly string[]).includes(action)) {
+    return new Response("bad request", { status: 400 });
+  }
+  await enqueueRequest(env.DB, {
+    course_id: courseId, assignment_id, action,
+    requested_by: s.nycu!.id, now: new Date(Date.now()).toISOString(),
+  });
+  return redirect(`/c/${encodeURIComponent(courseId)}/admin/provision`);
+}
+
+// Runner-facing (same Bearer token as grades ingest): claim + report results.
+function jsonResponse(obj: unknown, status = 200): Response {
+  return new Response(JSON.stringify(obj), {
+    status, headers: { "Content-Type": "application/json" },
+  });
+}
+
+async function provisionClaim(req: Request, env: Env): Promise<Response> {
+  if (!bearerOk(req, env)) return new Response("Unauthorized", { status: 401 });
+  const body = (await req.json().catch(() => ({}))) as { courses?: unknown };
+  const courses = Array.isArray(body.courses)
+    ? body.courses.filter((x): x is string => typeof x === "string")
+    : undefined;
+  const request = await claimNextRequest(env.DB, new Date(Date.now()).toISOString(), courses);
+  return jsonResponse({ request });
+}
+
+async function provisionResult(req: Request, env: Env): Promise<Response> {
+  if (!bearerOk(req, env)) return new Response("Unauthorized", { status: 401 });
+  const body = (await req.json().catch(() => null)) as
+    | { id?: unknown; status?: unknown; result?: unknown } | null;
+  const id = Number(body?.id);
+  if (!body || !Number.isFinite(id) || id <= 0) return new Response("bad request", { status: 400 });
+  const status = body.status === "error" ? "error" : "done";
+  const ok = await finishRequest(
+    env.DB, id, status, JSON.stringify(body.result ?? null), new Date(Date.now()).toISOString(),
+  );
+  return ok ? jsonResponse({ ok: true }) : new Response("unknown request", { status: 404 });
 }
 
 // Enrolled student_ids for a course, or null if the course has no roster yet
