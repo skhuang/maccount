@@ -2068,8 +2068,28 @@ describe("provisioning control plane", () => {
   it("an unknown action is rejected (400)", async () => {
     await seedStaff();
     const res = await call("/c/ds-2026/admin/provision/request",
-      { ...form({ assignment_id: "A1", action: "repos_apply" }), headers: { ...form({}).headers, ...cookie(await staffSession()) } });
-    expect(res.status).toBe(400); // APPLY not in the MVP action set
+      { ...form({ assignment_id: "A1", action: "bogus" }), headers: { ...form({}).headers, ...cookie(await staffSession()) } });
+    expect(res.status).toBe(400);
+  });
+
+  it("a TA (non-owner) cannot trigger a write action (403)", async () => {
+    await seedStaff(); // ta01 is course staff but not ADMIN
+    for (const action of ["config", "repos_apply"]) {
+      const res = await call("/c/ds-2026/admin/provision/request",
+        { ...form({ assignment_id: "A1", action }), headers: { ...form({}).headers, ...cookie(await staffSession()) } });
+      expect(res.status).toBe(403);
+    }
+  });
+
+  it("the course owner can trigger write actions", async () => {
+    const owner = await signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "Owner" } }, SECRET);
+    for (const action of ["config", "repos_apply"]) {
+      const res = await call("/c/ds-2026/admin/provision/request",
+        { ...form({ assignment_id: "A1", action }), headers: { ...form({}).headers, ...cookie(owner) } });
+      expect(res.status).toBe(302);
+    }
+    const claim = await call("/api/provision/claim", { method: "POST", headers: bearer, body: "{}" });
+    expect((await claim.json() as { request: { action: string } }).request.action).toBe("config");
   });
 
   it("the runner API needs the bearer token (401)", async () => {

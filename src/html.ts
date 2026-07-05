@@ -1001,19 +1001,29 @@ export function provisionPage(
   courseId: string,
   assignments: { assignment_id: string; title: string | null }[],
   requests: ProvisionRequest[],
+  isOwner = false,
 ): string {
   const base = `/c/${encodeURIComponent(courseId)}/admin`;
-  const actForm = (aid: string, action: string, label: string) =>
-    `<form method="POST" action="${base}/provision/request" style="display:inline;max-width:none">
+  const actForm = (aid: string, action: string, label: string, confirm?: string) =>
+    `<form method="POST" action="${base}/provision/request" style="display:inline;max-width:none"${confirm ? ` onsubmit="return confirm('${confirm}')"` : ""}>
     <input type="hidden" name="assignment_id" value="${h(aid)}">
     <input type="hidden" name="action" value="${action}">
     <button type="submit">${label}</button></form>`;
+  const actions = (aid: string) => {
+    let b = `${actForm(aid, "plan", "Plan (dry-run)")} ${actForm(aid, "status", "Status")}`;
+    if (isOwner) {
+      // Write actions — OWNER only. Suggested order: create repos, then push config.
+      b += ` ${actForm(aid, "repos_apply", "Create repos (APPLY)", "APPLY：建立真實學生 repo?")}`;
+      b += ` ${actForm(aid, "config", "Push config")}`;
+    }
+    return b;
+  };
   const aRows =
     assignments
       .map(
         (a) =>
           `<tr><td>${h(a.title || a.assignment_id)}<br><span class="muted text-small">${h(a.assignment_id)}</span></td>
-      <td>${actForm(a.assignment_id, "plan", "Plan (dry-run)")} ${actForm(a.assignment_id, "status", "Status")}</td></tr>`,
+      <td>${actions(a.assignment_id)}</td></tr>`,
       )
       .join("") ||
     `<tr><td colspan="2" class="muted">此課程尚無作業(先在 runner 建 manifest)。</td></tr>`;
@@ -1030,7 +1040,11 @@ export function provisionPage(
 <body>
 <p style="font-size:.9em"><a href="${base}">← ${h(courseId)} admin</a></p>
 <h1>Provisioning 遙控 / Remote</h1>
-<p class="muted text-small">按動作 → runner 輪詢並在本地執行(dry-run / status 為唯讀,不建 repo、不寫 course.yaml)。重新整理看結果。</p>
+<p class="muted text-small">按動作 → runner 輪詢並在本地執行。Plan / Status 為唯讀(任何助教);${
+    isOwner
+      ? "Create repos (APPLY) / Push config 為寫入動作(僅課程 owner)。建議順序:先 Create repos → 再 Push config。"
+      : "寫入動作(建 repo / push config)僅課程 owner 可執行。"
+  }重新整理看結果。</p>
 <table border="1" cellpadding="6" cellspacing="0"><thead><tr><th>作業 / Assignment</th><th>動作 / Action</th></tr></thead>
 <tbody>${aRows}</tbody></table>
 <h2>最近請求 / Recent requests</h2>

@@ -45,7 +45,7 @@ import {
 } from "./db/grades";
 import { buildScoreboard, scoreboardCsv } from "./scoreboard";
 import {
-  enqueueRequest, claimNextRequest, finishRequest, listRequests, PROVISION_ACTIONS,
+  enqueueRequest, claimNextRequest, finishRequest, listRequests, PROVISION_ACTIONS, isWriteAction,
 } from "./db/provision";
 import {
   listStaff, addStaff, removeStaff, isStaffAnywhere, isStaffMember, coursesForStaff,
@@ -916,11 +916,12 @@ async function courseProvision(req: Request, env: Env, url: URL, courseId: strin
   const s = await requireCourseStaff(req, env, courseId);
   if (s instanceof Response) return s;
   const lang = pickLang(url, req.headers.get("Cookie"));
+  const isOwner = isAdmin(env, s.nycu!.id);
   const [assignments, requests] = await Promise.all([
     listAssignmentsForCourse(env.DB, courseId),
     listRequests(env.DB, courseId, 20),
   ]);
-  return new Response(provisionPage(lang, courseId, assignments, requests), {
+  return new Response(provisionPage(lang, courseId, assignments, requests, isOwner), {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
   });
 }
@@ -933,6 +934,11 @@ async function courseProvisionRequest(req: Request, env: Env, courseId: string):
   const action = String(form.get("action") ?? "");
   if (!assignment_id || !(PROVISION_ACTIONS as readonly string[]).includes(action)) {
     return new Response("bad request", { status: 400 });
+  }
+  // Write actions (push config / create repos) are OWNER-only; a plain TA can
+  // only trigger read-only plan/status.
+  if (isWriteAction(action) && !isAdmin(env, s.nycu!.id)) {
+    return new Response("owner only", { status: 403 });
   }
   await enqueueRequest(env.DB, {
     course_id: courseId, assignment_id, action,
