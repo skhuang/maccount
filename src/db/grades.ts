@@ -109,6 +109,34 @@ export async function listGradesForProblem(
   return results ?? [];
 }
 
+// All grades for one assignment (across students) — the staff scoreboard.
+// Includes repo-only rows (score null) that provisioning registered, so
+// non-submitters appear too.
+export async function listGradesForAssignment(
+  db: D1Database, course_id: string, assignment_id: string,
+): Promise<GradeRow[]> {
+  const { results } = await db
+    .prepare(`SELECT ${COLS} FROM grades WHERE course_id = ? AND assignment_id = ? ORDER BY student_id, problem_id`)
+    .bind(course_id, assignment_id)
+    .all<GradeRow>();
+  return results ?? [];
+}
+
+// Distinct assignments seen in a course's grades (+ a title) — the scoreboard picker.
+export async function listAssignmentsForCourse(
+  db: D1Database, course_id: string,
+): Promise<{ assignment_id: string; title: string | null }[]> {
+  const { results } = await db
+    .prepare(
+      "SELECT assignment_id, MAX(assignment_title) AS title FROM grades" +
+      " WHERE course_id = ? AND assignment_id IS NOT NULL" +
+      " GROUP BY assignment_id ORDER BY assignment_id",
+    )
+    .bind(course_id)
+    .all<{ assignment_id: string; title: string | null }>();
+  return results ?? [];
+}
+
 // Instructor toggle: hide/show an assignment on the student dashboard (/me).
 // Independent of the grade rows, so the dsjudge upsert never resets it.
 export async function setAssignmentVisibility(

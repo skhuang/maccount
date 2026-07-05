@@ -41,8 +41,9 @@ import {
 } from "./db/bindings";
 import {
   upsertGrades, listGradesFor, listGradesForProblem, listGradesForStudentAssignment, GradeInput,
-  setAssignmentVisibility,
+  setAssignmentVisibility, listGradesForAssignment, listAssignmentsForCourse,
 } from "./db/grades";
+import { buildScoreboard, scoreboardCsv } from "./scoreboard";
 import {
   listStaff, addStaff, removeStaff, isStaffAnywhere, isStaffMember, coursesForStaff,
 } from "./db/staff";
@@ -57,7 +58,7 @@ import {
 import { toCsv, toRosterCsv, toGithubAccessCsv, type GithubAccessRow } from "./csv";
 import {
   adminPage, adminHomePage, bindingsPage, orgMembersPage, dashboardPage, examPage, coursePrejoinPage,
-  privacyPage, termsPage,
+  privacyPage, termsPage, scoreboardPage,
 } from "./html";
 import { pickLang, langCookie } from "./i18n";
 
@@ -787,6 +788,8 @@ async function courseAdminRouter(
 ): Promise<Response> {
   const m = req.method;
   if (sub === "" && m === "GET") return await courseAdmin(req, env, url, courseId);
+  if (sub === "/scoreboard" && m === "GET") return await courseScoreboard(req, env, url, courseId);
+  if (sub === "/scoreboard.csv" && m === "GET") return await courseScoreboardCsv(req, env, url, courseId);
   if (sub === "/export.csv" && m === "GET") return await courseExport(req, env, courseId);
   if (sub === "/roster.csv" && m === "GET") return await courseRoster(req, env, courseId);
   if (sub === "/github.csv" && m === "GET") return await courseGithubCsv(req, env, courseId);
@@ -827,6 +830,37 @@ async function courseAdmin(req: Request, env: Env, url: URL, courseId: string): 
     adminPage(lang, course, scoped, { isOwner, staff, staffMsg, driveMsg, formsMsg, classroomMsg, enrolled, forms }),
     { headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) } },
   );
+}
+
+// Staff/TA scoreboard for one assignment (score+verdict+repo only; iron rule 2).
+// Reads maccount's own grades — never touches the judge host.
+async function courseScoreboard(req: Request, env: Env, url: URL, courseId: string): Promise<Response> {
+  const s = await requireCourseStaff(req, env, courseId);
+  if (s instanceof Response) return s;
+  const lang = pickLang(url, req.headers.get("Cookie"));
+  const aid = url.searchParams.get("aid");
+  const [assignments, rows] = await Promise.all([
+    listAssignmentsForCourse(env.DB, courseId),
+    aid ? listGradesForAssignment(env.DB, courseId, aid) : Promise.resolve([]),
+  ]);
+  const board = aid ? buildScoreboard(rows) : null;
+  return new Response(scoreboardPage(lang, courseId, aid, board, assignments), {
+    headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
+  });
+}
+
+async function courseScoreboardCsv(req: Request, env: Env, url: URL, courseId: string): Promise<Response> {
+  const s = await requireCourseStaff(req, env, courseId);
+  if (s instanceof Response) return s;
+  const aid = url.searchParams.get("aid");
+  if (!aid) return new Response("missing aid", { status: 400 });
+  const board = buildScoreboard(await listGradesForAssignment(env.DB, courseId, aid));
+  return new Response(scoreboardCsv(board), {
+    headers: {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename="scoreboard-${aid}.csv"`,
+    },
+  });
 }
 
 // Enrolled student_ids for a course, or null if the course has no roster yet
