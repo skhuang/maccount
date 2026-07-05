@@ -1,5 +1,6 @@
 import type { BindingRow } from "./csv";
 import type { GradeRow } from "./db/grades";
+import type { Scoreboard } from "./scoreboard";
 import { T, langToggle, type Lang } from "./i18n";
 import { accountStatusCard, confirmAttrs, fmtTime, h, helpHint, repoHref, verdictBadge } from "./ui/components";
 import { documentStart } from "./ui/layout";
@@ -705,6 +706,7 @@ ${adminNav}
 <section class="admin-section" id="bindings"><h2 class="with-help">${t.admin_bindings.replace("{n}", String(rows.length))}${helpHint(t.help_bindings, t.help_label)}</h2>
 ${banner}
 <p><a href="${base}/export.csv">${t.export_full}</a>　|　<a href="${base}/roster.csv">${t.export_roster}</a>　|　<a href="${base}/github.csv">${t.export_github}</a>${helpHint(t.help_exports, t.help_label)}</p>
+<p><a href="${base}/scoreboard">📊 記分板 / Scoreboard</a></p>
 ${rows.length ? tableTools(t, "course-bindings-table", rows.length) : ""}
 <table id="course-bindings-table" class="mobile-compact" border="1" cellpadding="6" cellspacing="0">
 <thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("GitHub", 2)}${sortableTh(t.th_github_id, 3, "number", "mobile-secondary")}<th>Google</th>${sortableTh(t.th_updated, 5, "text", "mobile-secondary")}${isOwner ? `<th>${t.th_actions}</th>` : ""}</tr></thead>
@@ -926,6 +928,67 @@ ${trs}
 <p class="muted text-small">${t.privacy_note}</p>
 ${legalFooter(t)}
 ${uiEnhancements(t)}
+</body></html>`;
+}
+
+// Staff/TA scoreboard for one assignment (per-course /admin). Shows score +
+// verdict + the student's own repo only (iron rule 2) — the full board is
+// instructor/TA-facing. Picks the assignment from a dropdown; empty aid → picker.
+export function scoreboardPage(
+  lang: Lang,
+  courseId: string,
+  aid: string | null,
+  board: Scoreboard | null,
+  assignments: { assignment_id: string; title: string | null }[],
+): string {
+  const base = `/c/${encodeURIComponent(courseId)}/admin`;
+  const opts = assignments
+    .map((a) => `<option value="${h(a.assignment_id)}"${a.assignment_id === aid ? " selected" : ""}>${h(a.title || a.assignment_id)}</option>`)
+    .join("");
+  const picker = `<form method="GET" action="${base}/scoreboard" style="max-width:none">
+  <label>作業 / Assignment
+  <select name="aid" onchange="this.form.submit()">
+  <option value="">— 選擇 / choose —</option>${opts}</select></label></form>`;
+
+  let table = "";
+  if (aid && board) {
+    if (board.rows.length === 0) {
+      table = `<p class="muted">此作業尚無成績資料。 / No grades yet for this assignment.</p>`;
+    } else {
+      const thProblems = board.problems
+        .map((p) => `<th>${h(p.problem_id)}<br><span class="muted text-small">${p.max_score ?? "?"}</span></th>`)
+        .join("");
+      const trs = board.rows
+        .map((r) => {
+          const cells = board.problems
+            .map((p) => {
+              const c = r.cells[p.problem_id];
+              if (!c) return `<td class="muted">—</td>`;
+              const val = c.score == null ? "·" : h(c.score);
+              const url = repoHref(c.repo);
+              const inner = url
+                ? `<a href="${h(url)}" target="_blank" rel="noopener" title="${h(c.verdict || "")}">${val}</a>`
+                : `<span title="${h(c.verdict || "")}">${val}</span>`;
+              return `<td>${inner} ${verdictBadge(c.verdict)}</td>`;
+            })
+            .join("");
+          return `<tr${r.rank === 1 ? ' style="background:var(--success-soft)"' : ""}><td>${r.rank}</td><td>${h(r.student_id)}</td>${cells}<td><b>${r.total}</b></td></tr>`;
+        })
+        .join("\n");
+      table = `<p><a href="${base}/scoreboard.csv?aid=${encodeURIComponent(aid)}">⬇ 下載 CSV</a> · 滿分 ${board.max_total} · ${board.rows.length} 人</p>
+<table class="mobile-card-table" border="1" cellpadding="6" cellspacing="0">
+<thead><tr><th>#</th><th>學號</th>${thProblems}<th>總分</th></tr></thead>
+<tbody>${trs}</tbody></table>`;
+    }
+  }
+
+  return `${documentStart(lang, "Scoreboard", UI_CSS)}
+<body>
+<p style="font-size:.9em"><a href="${base}">← ${h(courseId)} admin</a></p>
+<h1>記分板 / Scoreboard</h1>
+${picker}
+${table}
+<p class="muted text-small">只顯示分數、判定與學生自己的 repo(不含測資)。 / Score, verdict, and the student's own repo only.</p>
 </body></html>`;
 }
 

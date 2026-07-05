@@ -6,6 +6,8 @@ import { listBindings, upsertBinding } from "../src/db/bindings";
 import { bulkEnroll } from "../src/db/enrollments";
 import { encryptSecret } from "../src/crypto";
 import { GROUP_MEMBER_SCOPE, STAFF_GOOGLE_SCOPE } from "../src/oauth/drive";
+import { buildScoreboard } from "../src/scoreboard";
+import type { GradeRow } from "../src/db/grades";
 import type { Env } from "../src/env";
 
 const SECRET = "test-secret";
@@ -1935,5 +1937,82 @@ describe("GET /api/roster?course_id= (per-course, token)", () => {
     const res = await worker.fetch(
       new Request("https://api.example/api/roster?course_id=ds-2026-ta"), testEnv);
     expect(res.status).toBe(401);
+  });
+});
+
+describe("staff scoreboard", () => {
+  const g = (o: Partial<GradeRow>): GradeRow => ({
+    course_id: "ds-2026", student_id: "S", problem_id: "p1", verdict: null, score: null,
+    max_score: 100, updated_at: "t", repo: null, assignment_id: "A1",
+    assignment_type: "exam", assignment_title: "Midterm", ...o,
+  });
+
+  it("buildScoreboard ranks by total (competition) and includes non-submitters", () => {
+    const b = buildScoreboard([
+      g({ student_id: "S1", problem_id: "p1", score: 100 }),
+      g({ student_id: "S1", problem_id: "p2", score: 80 }),   // S1 total 180
+      g({ student_id: "S2", problem_id: "p1", score: 100 }),
+      g({ student_id: "S2", problem_id: "p2", score: 100 }),  // S2 total 200
+      g({ student_id: "S3", problem_id: "p1", score: null }), // non-submitter → 0
+    ]);
+    expect(b.problems.map((p) => p.problem_id)).toEqual(["p1", "p2"]);
+    expect(b.max_total).toBe(200);
+    expect(b.rows.map((r) => [r.student_id, r.total, r.rank])).toEqual([
+      ["S2", 200, 1], ["S1", 180, 2], ["S3", 0, 3],
+    ]);
+  });
+
+  it("ties share a rank (1,1,3)", () => {
+    const b = buildScoreboard([
+      g({ student_id: "S1", score: 50 }), g({ student_id: "S2", score: 50 }),
+      g({ student_id: "S3", score: 10 }),
+    ]);
+    const ranks = Object.fromEntries(b.rows.map((r) => [r.student_id, r.rank]));
+    expect([ranks.S1, ranks.S2, ranks.S3]).toEqual([1, 1, 3]);
+  });
+
+  const seedGrades = async () => {
+    const rows = [
+      ["ds-2026", "S1", "p1", "AC", 100, 100, "nycu/A1-s1"],
+      ["ds-2026", "S1", "p2", "WA", 40, 100, "nycu/A1-s1b"],
+      ["ds-2026", "S2", "p1", "AC", 100, 100, "nycu/A1-s2"],
+    ];
+    for (const r of rows) {
+      await env.DB.prepare(
+        "INSERT INTO grades (course_id, student_id, problem_id, verdict, score, max_score," +
+        " updated_at, repo, assignment_id, assignment_type, assignment_title)" +
+        " VALUES (?1,?2,?3,?4,?5,?6,'t',?7,'A1','exam','Midterm')",
+      ).bind(...r).run();
+    }
+    await env.DB.prepare(
+      "INSERT INTO staff (course_id, nycu_id, added_by, added_at) VALUES ('ds-2026','ta01','admin1','t')",
+    ).run();
+  };
+  const staffSession = () =>
+    signSession({ exp: Date.now() + 60000, nycu: { id: "ta01", name: "TA" } }, SECRET);
+
+  it("a TA sees the scoreboard for their course", async () => {
+    await seedGrades();
+    const res = await call("/c/ds-2026/admin/scoreboard?aid=A1", { headers: cookie(await staffSession()) });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("記分板");
+    expect(body).toContain("S1");
+    expect(body).toContain("S2");
+  });
+
+  it("CSV export works for a TA", async () => {
+    await seedGrades();
+    const res = await call("/c/ds-2026/admin/scoreboard.csv?aid=A1", { headers: cookie(await staffSession()) });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toContain("text/csv");
+    expect(await res.text()).toContain("rank,student_id,p1,p2,total");
+  });
+
+  it("a logged-in non-staff is denied the scoreboard (403)", async () => {
+    await seedGrades();
+    const nonStaff = await signSession({ exp: Date.now() + 60000, nycu: { id: "nobody", name: "N" } }, SECRET);
+    const res = await call("/c/ds-2026/admin/scoreboard?aid=A1", { headers: cookie(nonStaff) });
+    expect(res.status).toBe(403);
   });
 });
