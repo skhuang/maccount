@@ -2,8 +2,16 @@
 // claims + executes + writes the result back. maccount only records intent.
 // See migrations/0020_provision_requests.sql.
 
-export const PROVISION_ACTIONS = ["plan", "status"] as const; // MVP: read-only
+// Read-only actions any course staff/TA may trigger.
+export const READ_ACTIONS = ["plan", "status"] as const;
+// Write actions (push course.yaml / create repos) — course OWNER (ADMIN) only.
+export const WRITE_ACTIONS = ["config", "repos_apply"] as const;
+export const PROVISION_ACTIONS = [...READ_ACTIONS, ...WRITE_ACTIONS] as const;
 export type ProvisionAction = (typeof PROVISION_ACTIONS)[number];
+
+export function isWriteAction(action: string): boolean {
+  return (WRITE_ACTIONS as readonly string[]).includes(action);
+}
 
 export interface ProvisionRequest {
   id: number;
