@@ -1045,6 +1045,19 @@ export function provisionPage(
       ? "Create repos (APPLY) / Push config 為寫入動作(僅課程 owner)。建議順序:先 Create repos → 再 Push config。"
       : "寫入動作(建 repo / push config)僅課程 owner 可執行。"
   }重新整理看結果。</p>
+<h2>任意作業 / By assignment id</h2>
+<p class="muted text-small">下方清單只列「已 provision 過」的作業;要對<b>尚未 provision</b> 的新作業(如剛在 runner 建好 manifest 的)觸發,在此輸入 assignment_id。</p>
+<form method="POST" action="${base}/provision/request">
+<input name="assignment_id" placeholder="assignment_id, e.g. ds2026-lab-polyshapes" required style="min-width:22rem">
+<button type="submit" name="action" value="plan">Plan (dry-run)</button>
+<button type="submit" name="action" value="status">Status</button>${
+    isOwner
+      ? `\n<button type="submit" name="action" value="repos_apply" onclick="return confirm('APPLY:建立真實學生 repo?')">Create repos (APPLY)</button>
+<button type="submit" name="action" value="config">Push config</button>`
+      : ""
+  }
+</form>
+<h2>已知作業 / Known assignments</h2>
 <table border="1" cellpadding="6" cellspacing="0"><thead><tr><th>作業 / Assignment</th><th>動作 / Action</th></tr></thead>
 <tbody>${aRows}</tbody></table>
 <h2>最近請求 / Recent requests</h2>
