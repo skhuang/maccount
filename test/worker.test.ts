@@ -2092,6 +2092,20 @@ describe("provisioning control plane", () => {
     expect((await claim.json() as { request: { action: string } }).request.action).toBe("config");
   });
 
+  it("owner can enqueue a not-yet-provisioned assignment via the manual field", async () => {
+    const owner = await signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "Owner" } }, SECRET);
+    const page = await call("/c/ds-2026/admin/provision", { headers: cookie(owner) });
+    expect(await page.text()).toContain('name="assignment_id"');   // manual entry field present
+    // an assignment with NO grades yet (not in the dropdown) still enqueues
+    const res = await call("/c/ds-2026/admin/provision/request",
+      { ...form({ assignment_id: "ds2026-lab-polyshapes", action: "repos_apply" }),
+        headers: { ...form({}).headers, ...cookie(owner) } });
+    expect(res.status).toBe(302);
+    const claim = await call("/api/provision/claim", { method: "POST", headers: bearer, body: "{}" });
+    expect((await claim.json() as { request: { assignment_id: string } }).request.assignment_id)
+      .toBe("ds2026-lab-polyshapes");
+  });
+
   it("the runner API needs the bearer token (401)", async () => {
     expect((await call("/api/provision/claim", { method: "POST", body: "{}" })).status).toBe(401);
     expect((await call("/api/provision/result", { method: "POST", body: "{}" })).status).toBe(401);
