@@ -1031,6 +1031,29 @@ describe("course edit + enrollment", () => {
     expect((await ing({ course_id: "ds-2026", student_ids: ["x"] }, "wrong")).status).toBe(401);
   });
 
+  it("token API resolve-google maps a bound Google account → 學號", async () => {
+    await env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, github_id, google_sub, google_email, created_at, updated_at) VALUES ('0856001','王小明',NULL,'gsub-1','ming@gmail.com','t','t')",
+    ).run();
+    const get = (qs: string, tok = "ingest-secret") =>
+      call(`/api/resolve-google?${qs}`, { headers: { Authorization: `Bearer ${tok}` } });
+
+    const bySub = await get("sub=gsub-1");
+    expect(bySub.status).toBe(200);
+    expect(await bySub.json()).toEqual({ student_id: "0856001" });
+
+    const byEmail = await get("email=MING@gmail.com");   // case-insensitive fallback
+    expect(byEmail.status).toBe(200);
+    expect(await byEmail.json()).toEqual({ student_id: "0856001" });
+
+    const unbound = await get("sub=nope");                // not bound → 404 {null}
+    expect(unbound.status).toBe(404);
+    expect(await unbound.json()).toEqual({ student_id: null });
+
+    expect((await get("sub=gsub-1", "wrong")).status).toBe(401);   // bad token
+    expect((await get("")).status).toBe(400);                       // missing param
+  });
+
   it("token API ingest resolves moodle_course_id → course_id", async () => {
     await env.DB.prepare("UPDATE courses SET moodle_course_id='21910' WHERE course_id='ds-2026'").run();
     const res = await call("/api/enrollments/ingest", {

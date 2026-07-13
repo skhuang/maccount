@@ -35,6 +35,7 @@ import {
   getBinding,
   getBindingByGithubId,
   getBindingByGoogleSub,
+  getBindingByGoogleEmail,
   orgBindingView,
   GithubConflictError,
   GoogleConflictError,
@@ -95,6 +96,8 @@ export default {
       if (p === "/api/assignment-visibility" && req.method === "POST")
         return await assignmentVisibility(req, env);
       if (p === "/api/roster" && req.method === "GET") return await apiRoster(req, env);
+      if (p === "/api/resolve-google" && req.method === "GET")
+        return await apiResolveGoogle(req, env, url);
       if (p === "/api/grades" && req.method === "GET") return await apiGrades(req, env, url);
       if (p === "/api/enrollments/ingest" && req.method === "POST")
         return await enrollmentsIngest(req, env);
@@ -616,6 +619,29 @@ async function apiRoster(req: Request, env: Env): Promise<Response> {
   return new Response(toRosterCsv(rows), {
     headers: { "Content-Type": "text/csv; charset=utf-8" },
   });
+}
+
+// Resolve a bound Google account -> 學號 (token-auth). Used by oj-exam's
+// "sign in with Google": the frontend runs its OWN Google OAuth, gets a verified
+// google `sub` (stable across clients) / email, then asks here which NYCU
+// account it is bound to. Returns ONLY the student_id (no other PII); 404 with
+// {student_id:null} when the Google account isn't bound (frontend then refuses
+// the login — a Google account alone never grants access).
+async function apiResolveGoogle(req: Request, env: Env, url: URL): Promise<Response> {
+  if (!bearerOk(req, env)) return new Response("Unauthorized", { status: 401 });
+  const sub = url.searchParams.get("sub");
+  const email = url.searchParams.get("email");
+  const json = (body: unknown, status: number) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
+  if (!sub && !email) return json({ error: "need sub or email" }, 400);
+  const row = sub
+    ? await getBindingByGoogleSub(env.DB, sub)
+    : await getBindingByGoogleEmail(env.DB, email!);
+  if (!row) return json({ student_id: null }, 404);
+  return json({ student_id: row.nycu_id }, 200);
 }
 
 // Grades for one problem (token-auth) — the OJ→Moodle "程式作業自動批改" pulls

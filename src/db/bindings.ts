@@ -181,3 +181,19 @@ export async function getBindingByGoogleSub(
     .bind(google_sub)
     .first<BindingRow>();
 }
+
+// Email fallback for the reverse lookup (prefer google_sub, which is stable
+// across OAuth clients). Case-insensitive; google_email isn't unique-indexed so
+// take one row deterministically.
+export async function getBindingByGoogleEmail(
+  db: D1Database, google_email: string,
+): Promise<BindingRow | null> {
+  return await db
+    .prepare(
+      `SELECT ${BINDING_COLS} FROM bindings
+       WHERE google_email IS NOT NULL AND lower(google_email) = lower(?)
+       ORDER BY created_at LIMIT 1`,
+    )
+    .bind(google_email)
+    .first<BindingRow>();
+}
