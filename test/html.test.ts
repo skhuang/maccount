@@ -305,6 +305,7 @@ describe("dashboardPage", () => {
     assignment_id: "lab01",
     assignment_type: "lab",
     assignment_title: "Lab 1",
+    points: null,
   };
 
   it("renders account status cards, course cards, and accessible verdict badges", () => {
