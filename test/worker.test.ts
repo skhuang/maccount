@@ -1375,8 +1375,8 @@ describe("/api/grades/ingest", () => {
     });
     const cols = await env.DB.prepare("SELECT * FROM grades LIMIT 1").first();
     expect(Object.keys(cols ?? {})).toEqual([
-      "course_id", "student_id", "problem_id", "verdict", "score", "max_score", "updated_at", "repo",
-      "assignment_id", "assignment_type", "assignment_title",
+      "course_id", "assignment_id", "student_id", "problem_id", "verdict", "score", "max_score",
+      "updated_at", "repo", "assignment_type", "assignment_title",
     ]);
   });
 
@@ -1393,10 +1393,33 @@ describe("/api/grades/ingest", () => {
     let row = await env.DB.prepare("SELECT score, repo, assignment_type FROM grades WHERE student_id='S1'").first<{ score: number | null; repo: string; assignment_type: string }>();
     expect(row?.score).toBe(null); // not 0 → /me shows "go solve"
     expect(row?.repo).toBe("org/p1-S1");
-    // later grade push: score, no assignment_title → title preserved (COALESCE)
-    await ingest([{ course_id: "ds-2026", student_id: "S1", problem_id: "p1", verdict: "AC", score: 90, max_score: 100, updated_at: "t2" }]);
+    // later grade push carries the SAME assignment_id (dsjudge always does) but no
+    // title → merges into the keyed row; title preserved (COALESCE).
+    await ingest([{ course_id: "ds-2026", student_id: "S1", problem_id: "p1", assignment_id: "mid",
+      verdict: "AC", score: 90, max_score: 100, updated_at: "t2" }]);
     row = await env.DB.prepare("SELECT score, assignment_title FROM grades WHERE student_id='S1'").first();
     expect(row).toMatchObject({ score: 90, assignment_title: "期中考" });
+  });
+
+  it("same problem in two assignments keeps separate rows (assignment_id in key)", async () => {
+    const ingest = (b: unknown) =>
+      call("/api/grades/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer ingest-secret" },
+        body: JSON.stringify(b),
+      });
+    // same course + student + problem, DIFFERENT assignment → two independent rows
+    await ingest([{ course_id: "ds-2026", student_id: "S9", problem_id: "tpl-matrix",
+      assignment_id: "ds2026-lab4", verdict: "WA", score: 40, max_score: 100, updated_at: "t1" }]);
+    await ingest([{ course_id: "ds-2026", student_id: "S9", problem_id: "tpl-matrix",
+      assignment_id: "ds2026-lab4-github", verdict: "AC", score: 95, max_score: 100, updated_at: "t2" }]);
+    const { results } = await env.DB
+      .prepare("SELECT assignment_id, score FROM grades WHERE student_id='S9' AND problem_id='tpl-matrix' ORDER BY assignment_id")
+      .all<{ assignment_id: string; score: number }>();
+    expect(results).toEqual([
+      { assignment_id: "ds2026-lab4", score: 40 },
+      { assignment_id: "ds2026-lab4-github", score: 95 },
+    ]);
   });
 
   it("stores the repo and /me links it; absent repo → no link", async () => {

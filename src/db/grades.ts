@@ -1,8 +1,9 @@
 // OJ grades mirror, per course-offering. Rows are pushed in by the trusted OJ
 // runner via /api/grades/ingest; the student /me page reads them back. Only
 // score + verdict (+ the student's own repo) are stored (iron rule 2). Keyed by
-// (course_id, student_id, problem_id) so two offerings can reuse a problem_id —
-// see migrations/0002 + 0006 + 0007(repo) + 0008(assignment grouping).
+// (course_id, assignment_id, student_id, problem_id) so a problem reused across
+// assignments (and across offerings) keeps a separate row per assignment —
+// see migrations/0002 + 0006 + 0007(repo) + 0008(assignment grouping) + 0021(key).
 
 export interface GradeRow {
   course_id: string;
@@ -37,31 +38,33 @@ const COLS =
   "course_id, student_id, problem_id, verdict, score, max_score, updated_at, repo, " +
   "assignment_id, assignment_type, assignment_title";
 
-// Upsert a batch keyed by (course_id, student_id, problem_id). Returns count
-// written. COALESCE-keeps existing values for fields the writer leaves null, so
-// the provisioning push (repo + assignment_*, no score) and the grade push
-// (score/verdict, no title) don't clobber each other regardless of order.
+// Upsert a batch keyed by (course_id, assignment_id, student_id, problem_id) —
+// assignment_id is part of the key (migration 0021), so a problem reused across
+// assignments keeps a separate row per assignment. A null assignment_id maps to
+// '' (the legacy bucket). Returns count written. COALESCE-keeps existing values
+// for fields the writer leaves null, so the provisioning push (repo + assignment_*,
+// no score) and the grade push (score/verdict, no title) don't clobber each other
+// regardless of order. assignment_id is NOT in the UPDATE set (it's a key column).
 export async function upsertGrades(db: D1Database, rows: GradeInput[]): Promise<number> {
   if (rows.length === 0) return 0;
   const stmt = db.prepare(
     `INSERT INTO grades
-       (course_id, student_id, problem_id, verdict, score, max_score, updated_at, repo,
-        assignment_id, assignment_type, assignment_title)
+       (course_id, assignment_id, student_id, problem_id, verdict, score, max_score,
+        updated_at, repo, assignment_type, assignment_title)
      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
-     ON CONFLICT(course_id, student_id, problem_id) DO UPDATE SET
-       verdict = COALESCE(?4, verdict),
-       score = COALESCE(?5, score),
-       max_score = COALESCE(?6, max_score),
-       updated_at = ?7,
-       repo = COALESCE(?8, repo),
-       assignment_id = COALESCE(?9, assignment_id),
+     ON CONFLICT(course_id, assignment_id, student_id, problem_id) DO UPDATE SET
+       verdict = COALESCE(?5, verdict),
+       score = COALESCE(?6, score),
+       max_score = COALESCE(?7, max_score),
+       updated_at = ?8,
+       repo = COALESCE(?9, repo),
        assignment_type = COALESCE(?10, assignment_type),
        assignment_title = COALESCE(?11, assignment_title)`,
   );
   const batch = rows.map((r) =>
     stmt.bind(
-      r.course_id, r.student_id, r.problem_id, r.verdict, r.score, r.max_score, r.updated_at,
-      r.repo ?? null, r.assignment_id ?? null, r.assignment_type ?? null, r.assignment_title ?? null,
+      r.course_id, r.assignment_id ?? "", r.student_id, r.problem_id, r.verdict, r.score,
+      r.max_score, r.updated_at, r.repo ?? null, r.assignment_type ?? null, r.assignment_title ?? null,
     ),
   );
   await db.batch(batch);
