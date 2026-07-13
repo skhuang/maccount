@@ -1376,7 +1376,7 @@ describe("/api/grades/ingest", () => {
     const cols = await env.DB.prepare("SELECT * FROM grades LIMIT 1").first();
     expect(Object.keys(cols ?? {})).toEqual([
       "course_id", "assignment_id", "student_id", "problem_id", "verdict", "score", "max_score",
-      "updated_at", "repo", "assignment_type", "assignment_title",
+      "updated_at", "repo", "assignment_type", "assignment_title", "points",
     ]);
   });
 
@@ -1990,7 +1990,7 @@ describe("staff scoreboard", () => {
   const g = (o: Partial<GradeRow>): GradeRow => ({
     course_id: "ds-2026", student_id: "S", problem_id: "p1", verdict: null, score: null,
     max_score: 100, updated_at: "t", repo: null, assignment_id: "A1",
-    assignment_type: "exam", assignment_title: "Midterm", ...o,
+    assignment_type: "exam", assignment_title: "Midterm", points: null, ...o,
   });
 
   it("buildScoreboard ranks by total (competition) and includes non-submitters", () => {
@@ -2015,6 +2015,18 @@ describe("staff scoreboard", () => {
     ]);
     const ranks = Object.fromEntries(b.rows.map((r) => [r.student_id, r.rank]));
     expect([ranks.S1, ranks.S2, ranks.S3]).toEqual([1, 1, 3]);
+  });
+
+  it("weights cells by points (score/max_score*points), matching dsjudge", () => {
+    const b = buildScoreboard([
+      g({ student_id: "S1", problem_id: "p1", score: 100, max_score: 100, points: 33 }), // → 33
+      g({ student_id: "S1", problem_id: "p2", score: 50, max_score: 100, points: 33 }),  // → round(16.5)=17 (JS)
+    ]);
+    expect(b.max_total).toBe(66);                       // Σ points, not Σ max_score
+    const s1 = b.rows.find((r) => r.student_id === "S1")!;
+    expect(s1.cells.p1.score).toBe(33);
+    expect(s1.cells.p2.score).toBe(17);                 // Math.round rounds half up
+    expect(s1.total).toBe(50);
   });
 
   const seedGrades = async () => {

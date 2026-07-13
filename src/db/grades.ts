@@ -17,6 +17,7 @@ export interface GradeRow {
   assignment_id: string | null;    // which assignment this problem belongs to
   assignment_type: string | null;  // lab | exam
   assignment_title: string | null;
+  points: number | null;           // this assignment's weight for the problem
 }
 
 export interface GradeInput {
@@ -32,11 +33,12 @@ export interface GradeInput {
   assignment_id?: string | null;
   assignment_type?: string | null;
   assignment_title?: string | null;
+  points?: number | null;
 }
 
 const COLS =
   "course_id, student_id, problem_id, verdict, score, max_score, updated_at, repo, " +
-  "assignment_id, assignment_type, assignment_title";
+  "assignment_id, assignment_type, assignment_title, points";
 
 // Upsert a batch keyed by (course_id, assignment_id, student_id, problem_id) —
 // assignment_id is part of the key (migration 0021), so a problem reused across
@@ -50,8 +52,8 @@ export async function upsertGrades(db: D1Database, rows: GradeInput[]): Promise<
   const stmt = db.prepare(
     `INSERT INTO grades
        (course_id, assignment_id, student_id, problem_id, verdict, score, max_score,
-        updated_at, repo, assignment_type, assignment_title)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+        updated_at, repo, assignment_type, assignment_title, points)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
      ON CONFLICT(course_id, assignment_id, student_id, problem_id) DO UPDATE SET
        verdict = COALESCE(?5, verdict),
        score = COALESCE(?6, score),
@@ -59,12 +61,14 @@ export async function upsertGrades(db: D1Database, rows: GradeInput[]): Promise<
        updated_at = ?8,
        repo = COALESCE(?9, repo),
        assignment_type = COALESCE(?10, assignment_type),
-       assignment_title = COALESCE(?11, assignment_title)`,
+       assignment_title = COALESCE(?11, assignment_title),
+       points = COALESCE(?12, points)`,
   );
   const batch = rows.map((r) =>
     stmt.bind(
       r.course_id, r.assignment_id ?? "", r.student_id, r.problem_id, r.verdict, r.score,
       r.max_score, r.updated_at, r.repo ?? null, r.assignment_type ?? null, r.assignment_title ?? null,
+      r.points ?? null,
     ),
   );
   await db.batch(batch);
@@ -153,6 +157,32 @@ export async function setAssignmentVisibility(
       " ON CONFLICT(course_id, assignment_id) DO UPDATE SET hidden = ?, updated_at = ?")
     .bind(course_id, assignment_id, hidden ? 1 : 0, updated_at, hidden ? 1 : 0, updated_at)
     .run();
+}
+
+// Instructor manual switch: open the anonymised scoreboard to students on
+// /me/exam/<id>/scoreboard. Default OFF (no row -> not visible). Stored on the
+// same assignment_visibility row; independent of `hidden`.
+export async function setScoreboardVisible(
+  db: D1Database, course_id: string, assignment_id: string, visible: boolean,
+  updated_at: string,
+): Promise<void> {
+  await db
+    .prepare(
+      "INSERT INTO assignment_visibility (course_id, assignment_id, hidden, scoreboard_visible, updated_at)" +
+      " VALUES (?, ?, 0, ?, ?)" +
+      " ON CONFLICT(course_id, assignment_id) DO UPDATE SET scoreboard_visible = ?, updated_at = ?")
+    .bind(course_id, assignment_id, visible ? 1 : 0, updated_at, visible ? 1 : 0, updated_at)
+    .run();
+}
+
+export async function isScoreboardVisible(
+  db: D1Database, course_id: string, assignment_id: string,
+): Promise<boolean> {
+  const row = await db
+    .prepare("SELECT scoreboard_visible FROM assignment_visibility WHERE course_id = ? AND assignment_id = ?")
+    .bind(course_id, assignment_id)
+    .first<{ scoreboard_visible: number }>();
+  return !!row && row.scoreboard_visible === 1;
 }
 
 // Hidden assignment ids for a course (for a staff overview).

@@ -901,9 +901,12 @@ ${uiEnhancements(t)}
 
 // One exam, the logged-in student's view: each coding problem with its repo
 // ("去解題") link + score. Reached from /me's exam list.
-export function examPage(lang: Lang, assignmentId: string, rows: GradeRow[]): string {
+export function examPage(lang: Lang, assignmentId: string, rows: GradeRow[], boardOpen = false): string {
   const t = T[lang];
   const title = rows.find((r) => r.assignment_title)?.assignment_title || assignmentId;
+  const boardLink = boardOpen
+    ? `<p><a href="/me/exam/${encodeURIComponent(assignmentId)}/scoreboard">📊 計分板 / Scoreboard</a></p>`
+    : "";
   const trs = rows
     .map((g) => {
       const url = repoHref(g.repo);
@@ -921,6 +924,7 @@ ${langToggle(`/me/exam/${encodeURIComponent(assignmentId)}`, lang)}
 <p style="font-size:.9em"><a href="/me">← ${t.acct_heading}</a></p>
 <h1>${h(title)}</h1>
 <p class="muted text-small">${t.exam_intro}</p>
+${boardLink}
 <table class="mobile-card-table" border="1" cellpadding="6" cellspacing="0">
 <thead><tr><th>${t.col_problem}</th><th>repo</th><th>${t.col_result}</th><th>${t.col_score}</th></tr></thead>
 <tbody>
@@ -929,6 +933,42 @@ ${trs}
 <p class="muted text-small">${t.privacy_note}</p>
 ${legalFooter(t)}
 ${uiEnhancements(t)}
+</body></html>`;
+}
+
+// Student-facing ANONYMISED scoreboard for one assignment (/me/exam/<id>/scoreboard).
+// 學號 masked, own row highlighted; score + rank only — no repo, no raw id
+// (iron rule 2). Points-weighted totals (matches the dsjudge board).
+export interface AnonBoard {
+  problems: { problem_id: string; max_score: number | null }[];
+  max_total: number;
+  rows: { rank: number; student: string; you: boolean; total: number; cells: Record<string, number | null> }[];
+}
+export function studentScoreboardPage(lang: Lang, assignmentId: string, title: string, board: AnonBoard): string {
+  const thP = board.problems
+    .map((p) => `<th>${h(p.problem_id)}<br><span class="muted text-small">${p.max_score ?? "?"}</span></th>`)
+    .join("");
+  const trs = board.rows
+    .map((r) => {
+      const cells = board.problems
+        .map((p) => `<td>${r.cells[p.problem_id] == null ? "·" : h(r.cells[p.problem_id]!)}</td>`)
+        .join("");
+      return `<tr${r.you ? ' style="background:var(--success-soft);font-weight:600"' : ""}>` +
+        `<td>${r.rank}</td><td>${h(r.student)}${r.you ? " (你 / you)" : ""}</td>${cells}<td><b>${r.total}</b></td></tr>`;
+    })
+    .join("\n");
+  const body = board.rows.length === 0
+    ? `<p class="muted">尚無成績。 / No scores yet.</p>`
+    : `<p class="muted text-small">滿分 ${board.max_total} · ${board.rows.length} 人 · 學號已遮罩 / masked</p>
+<table class="mobile-card-table" border="1" cellpadding="6" cellspacing="0">
+<thead><tr><th>#</th><th>學號 / ID</th>${thP}<th>總分 / Total</th></tr></thead>
+<tbody>${trs}</tbody></table>`;
+  return `${documentStart(lang, h(title), UI_CSS)}
+<body style="font-family:system-ui;max-width:900px;margin:2rem auto;padding:0 1rem;line-height:1.6">
+<p style="font-size:.9em"><a href="/me/exam/${encodeURIComponent(assignmentId)}">← ${h(title)}</a></p>
+<h1>📊 計分板 / Scoreboard</h1>
+${body}
+<p class="muted text-small">只顯示名次與分數,學號已遮罩;不含測資或他人 repo。 / Rank + score only; ids masked; no test data.</p>
 </body></html>`;
 }
 

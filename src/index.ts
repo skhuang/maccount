@@ -43,6 +43,7 @@ import {
 import {
   upsertGrades, listGradesFor, listGradesForProblem, listGradesForStudentAssignment, GradeInput,
   setAssignmentVisibility, listGradesForAssignment, listAssignmentsForCourse,
+  setScoreboardVisible, isScoreboardVisible,
 } from "./db/grades";
 import { buildScoreboard, scoreboardCsv } from "./scoreboard";
 import {
@@ -62,7 +63,7 @@ import {
 import { toCsv, toRosterCsv, toGithubAccessCsv, type GithubAccessRow } from "./csv";
 import {
   adminPage, adminHomePage, bindingsPage, orgMembersPage, dashboardPage, examPage, coursePrejoinPage,
-  privacyPage, termsPage, scoreboardPage, provisionPage,
+  privacyPage, termsPage, scoreboardPage, provisionPage, studentScoreboardPage,
 } from "./html";
 import { pickLang, langCookie } from "./i18n";
 
@@ -85,6 +86,8 @@ export default {
       if (p === "/terms" && req.method === "GET") return publicPage(termsPage(pickLang(url, req.headers.get("Cookie"))));
       if (p === "/logout") return logout(env);
       if (p === "/me" && req.method === "GET") return await mePage(req, env, url);
+      const esb = p.match(/^\/me\/exam\/([A-Za-z0-9._-]+)\/scoreboard$/);
+      if (esb && req.method === "GET") return await meExamScoreboard(req, env, url, esb[1]);
       const em = p.match(/^\/me\/exam\/([A-Za-z0-9._-]+)$/);
       if (em && req.method === "GET") return await meExam(req, env, url, em[1]);
       const mc = p.match(/^\/me\/([A-Za-z0-9_-]+)$/);
@@ -549,6 +552,12 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
   });
 }
 
+// Mask a 學號 for the anonymised board: hide the first three characters
+// (110612168 -> ***612168). Never expose a raw id (iron rule 2).
+function maskSid(sid: string): string {
+  return sid.length <= 3 ? "*".repeat(sid.length) : "***" + sid.slice(3);
+}
+
 // GET /me/exam/<assignment_id> — the student's own view of one exam: its coding
 // problems with repo ("去解題") links + scores. Only the logged-in student's rows.
 async function meExam(req: Request, env: Env, url: URL, assignmentId: string): Promise<Response> {
@@ -557,7 +566,42 @@ async function meExam(req: Request, env: Env, url: URL, assignmentId: string): P
   const lang = pickLang(url, req.headers.get("Cookie"));
   const rows = await listGradesForStudentAssignment(env.DB, s.nycu!.id, assignmentId);
   if (rows.length === 0) return new Response("Not found", { status: 404 });
-  return new Response(examPage(lang, assignmentId, rows), {
+  const boardOpen = await isScoreboardVisible(env.DB, rows[0].course_id, assignmentId);
+  return new Response(examPage(lang, assignmentId, rows, boardOpen), {
+    headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
+  });
+}
+
+// GET /me/exam/<assignment_id>/scoreboard — the student-facing ANONYMISED board
+// for one assignment. Only when the instructor has opened it (scoreboard_visible)
+// and only for a logged-in student who has a row in it. 學號 masked, own row
+// highlighted, no raw student id ever leaves (iron rule 2). Points-weighted to
+// match the dsjudge board.
+async function meExamScoreboard(req: Request, env: Env, url: URL, assignmentId: string): Promise<Response> {
+  const s = await requireLogin(req, env);
+  if (s instanceof Response) return s;
+  const lang = pickLang(url, req.headers.get("Cookie"));
+  const me = s.nycu!.id;
+  const mine = await listGradesForStudentAssignment(env.DB, me, assignmentId);
+  if (mine.length === 0) return new Response("Not found", { status: 404 });
+  const courseId = mine[0].course_id;
+  if (!(await isScoreboardVisible(env.DB, courseId, assignmentId))) {
+    return new Response("Scoreboard not open", { status: 404 });
+  }
+  const board = buildScoreboard(await listGradesForAssignment(env.DB, courseId, assignmentId));
+  const title = mine.find((r) => r.assignment_title)?.assignment_title || assignmentId;
+  const anon = {
+    problems: board.problems,
+    max_total: board.max_total,
+    rows: board.rows.map((r) => ({
+      rank: r.rank,
+      student: maskSid(r.student_id),
+      you: r.student_id === me,
+      total: r.total,
+      cells: Object.fromEntries(board.problems.map((p) => [p.problem_id, r.cells[p.problem_id]?.score ?? null])),
+    })),
+  };
+  return new Response(studentScoreboardPage(lang, assignmentId, title, anon), {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
   });
 }
@@ -712,12 +756,22 @@ async function assignmentVisibility(req: Request, env: Env): Promise<Response> {
     return new Response("Bad request: assignment_id required", { status: 400 });
   }
   const course_id = (typeof x.course_id === "string" && x.course_id) || defaultCourse(env);
-  const hidden = x.hidden === true || x.hidden === 1 || x.hidden === "1" || x.hidden === "true";
-  await setAssignmentVisibility(
-    env.DB, course_id, x.assignment_id, hidden, new Date(Date.now()).toISOString());
-  return new Response(
-    JSON.stringify({ ok: true, course_id, assignment_id: x.assignment_id, hidden }),
-    { headers: { "Content-Type": "application/json" } });
+  const now = new Date(Date.now()).toISOString();
+  const truthy = (v: unknown) => v === true || v === 1 || v === "1" || v === "true";
+  // Two independent switches; set whichever the body carries. `hidden` removes the
+  // assignment from /me entirely; `scoreboard_visible` opens the anonymised board.
+  const out: Record<string, unknown> = { ok: true, course_id, assignment_id: x.assignment_id };
+  if ("hidden" in x) {
+    const hidden = truthy(x.hidden);
+    await setAssignmentVisibility(env.DB, course_id, x.assignment_id, hidden, now);
+    out.hidden = hidden;
+  }
+  if ("scoreboard_visible" in x) {
+    const vis = truthy(x.scoreboard_visible);
+    await setScoreboardVisible(env.DB, course_id, x.assignment_id, vis, now);
+    out.scoreboard_visible = vis;
+  }
+  return new Response(JSON.stringify(out), { headers: { "Content-Type": "application/json" } });
 }
 
 // Owner = a bootstrap admin in ADMIN_IDS (manages staff + destructive ops).
