@@ -737,6 +737,8 @@ async function gradesIngest(req: Request, env: Env): Promise<Response> {
       assignment_id: typeof x.assignment_id === "string" && x.assignment_id ? x.assignment_id : null,
       assignment_type: x.assignment_type === "exam" ? "exam" : x.assignment_type === "lab" ? "lab" : null,
       assignment_title: typeof x.assignment_title === "string" && x.assignment_title ? x.assignment_title : null,
+      // Per-problem assignment weight, so the student scoreboard can points-weight.
+      points: x.points == null || x.points === "" ? null : Number(x.points),
     });
   }
   const upserted = await upsertGrades(env.DB, rows);

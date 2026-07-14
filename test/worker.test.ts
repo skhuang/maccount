@@ -1401,6 +1401,17 @@ describe("/api/grades/ingest", () => {
     expect(row).toMatchObject({ score: 90, assignment_title: "期中考" });
   });
 
+  it("ingest persists points (for the points-weighted scoreboard)", async () => {
+    await call("/api/grades/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer ingest-secret" },
+      body: JSON.stringify([{ course_id: "ds-2026", student_id: "SP", problem_id: "p1",
+        assignment_id: "mid", points: 33, repo: "org/p1-SP", updated_at: "t1" }]),
+    });
+    const row = await env.DB.prepare("SELECT points FROM grades WHERE student_id='SP'").first<{ points: number }>();
+    expect(row?.points).toBe(33);
+  });
+
   it("same problem in two assignments keeps separate rows (assignment_id in key)", async () => {
     const ingest = (b: unknown) =>
       call("/api/grades/ingest", {
