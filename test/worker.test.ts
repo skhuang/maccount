@@ -1922,6 +1922,19 @@ describe("/api/grades (token-auth pull for 程式作業自動批改)", () => {
     expect(body.grades.every((g) => g.problem_id === "lab01-stack")).toBe(true);
   });
 
+  it("filters by assignment_id when given (a problem reused across assignments)", async () => {
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO grades (course_id, assignment_id, student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('ds-2026','A1','S1','pX','AC',100,100,'t')"),
+      env.DB.prepare("INSERT INTO grades (course_id, assignment_id, student_id, problem_id, verdict, score, max_score, updated_at) VALUES ('ds-2026','A2','S2','pX','WA',10,100,'t')"),
+    ]);
+    const res = await call("/api/grades?problem_id=pX&assignment_id=A1", {
+      headers: { Authorization: "Bearer ingest-secret" },
+    });
+    const body = (await res.json()) as { grades: { student_id: string; assignment_id: string }[] };
+    expect(body.grades.map((g) => g.student_id)).toEqual(["S1"]);       // only A1, not A2
+    expect(body.grades.every((g) => g.assignment_id === "A1")).toBe(true);
+  });
+
   it("401 without a valid token", async () => {
     expect((await call("/api/grades?problem_id=lab01-stack")).status).toBe(401);
   });

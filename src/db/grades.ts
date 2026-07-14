@@ -104,15 +104,18 @@ export async function listGradesForStudentAssignment(
 }
 
 // All grades for one problem — for the OJ→Moodle "程式作業自動批改" pull. Optionally
-// scope to a course; omit course_id to keep the legacy cross-course behavior.
+// scope to a course and/or an assignment; omit both to keep the legacy
+// cross-course/cross-assignment behavior. Scoping by assignment_id matters now a
+// problem can appear in several assignments (post the assignment_id re-key).
 export async function listGradesForProblem(
-  db: D1Database, problem_id: string, course_id?: string,
+  db: D1Database, problem_id: string, course_id?: string, assignment_id?: string,
 ): Promise<GradeRow[]> {
-  const sql = course_id
-    ? `SELECT ${COLS} FROM grades WHERE problem_id = ? AND course_id = ? ORDER BY student_id`
-    : `SELECT ${COLS} FROM grades WHERE problem_id = ? ORDER BY student_id`;
-  const stmt = course_id ? db.prepare(sql).bind(problem_id, course_id) : db.prepare(sql).bind(problem_id);
-  const { results } = await stmt.all<GradeRow>();
+  const where = ["problem_id = ?"];
+  const params: string[] = [problem_id];
+  if (course_id) { where.push("course_id = ?"); params.push(course_id); }
+  if (assignment_id) { where.push("assignment_id = ?"); params.push(assignment_id); }
+  const sql = `SELECT ${COLS} FROM grades WHERE ${where.join(" AND ")} ORDER BY student_id`;
+  const { results } = await db.prepare(sql).bind(...params).all<GradeRow>();
   return results ?? [];
 }
 

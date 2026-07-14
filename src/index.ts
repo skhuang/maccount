@@ -694,7 +694,9 @@ async function apiGrades(req: Request, env: Env, url: URL): Promise<Response> {
   if (!bearerOk(req, env)) return new Response("Unauthorized", { status: 401 });
   const problemId = url.searchParams.get("problem_id");
   if (!problemId) return new Response("problem_id required", { status: 400 });
-  const grades = await listGradesForProblem(env.DB, problemId);
+  const courseId = url.searchParams.get("course_id") || undefined;
+  const assignmentId = url.searchParams.get("assignment_id") || undefined;
+  const grades = await listGradesForProblem(env.DB, problemId, courseId, assignmentId);
   return new Response(JSON.stringify({ ok: true, grades }), {
     headers: { "Content-Type": "application/json" },
   });
