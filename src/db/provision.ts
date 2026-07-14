@@ -4,8 +4,11 @@
 
 // Read-only actions any course staff/TA may trigger.
 export const READ_ACTIONS = ["plan", "status"] as const;
-// Write actions (push course.yaml / create repos) — course OWNER (ADMIN) only.
-export const WRITE_ACTIONS = ["config", "repos_apply"] as const;
+// Write actions — course OWNER (ADMIN) only. config/repos_apply touch course.yaml
+// / create GitHub repos; register (re)pushes repo links + points to /me without
+// creating repos; scoreboard_open/close flip the student scoreboard's visibility.
+export const WRITE_ACTIONS =
+  ["config", "repos_apply", "register", "scoreboard_open", "scoreboard_close"] as const;
 export const PROVISION_ACTIONS = [...READ_ACTIONS, ...WRITE_ACTIONS] as const;
 export type ProvisionAction = (typeof PROVISION_ACTIONS)[number];
 

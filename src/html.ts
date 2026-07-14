@@ -1055,6 +1055,10 @@ export function provisionPage(
       // Write actions — OWNER only. Suggested order: create repos, then push config.
       b += ` ${actForm(aid, "repos_apply", "Create repos (APPLY)", "APPLY：建立真實學生 repo?")}`;
       b += ` ${actForm(aid, "config", "Push config")}`;
+      // maccount-only pushes (no repo create): register /me + scoreboard visibility.
+      b += ` ${actForm(aid, "register", "Register on /me")}`;
+      b += ` ${actForm(aid, "scoreboard_open", "Open scoreboard")}`;
+      b += ` ${actForm(aid, "scoreboard_close", "Close scoreboard")}`;
     }
     return b;
   };
@@ -1093,7 +1097,10 @@ export function provisionPage(
 <button type="submit" name="action" value="status">Status</button>${
     isOwner
       ? `\n<button type="submit" name="action" value="repos_apply" onclick="return confirm('APPLY:建立真實學生 repo?')">Create repos (APPLY)</button>
-<button type="submit" name="action" value="config">Push config</button>`
+<button type="submit" name="action" value="config">Push config</button>
+<button type="submit" name="action" value="register">Register on /me</button>
+<button type="submit" name="action" value="scoreboard_open">Open scoreboard</button>
+<button type="submit" name="action" value="scoreboard_close">Close scoreboard</button>`
       : ""
   }
 </form>

@@ -2156,7 +2156,7 @@ describe("provisioning control plane", () => {
 
   it("a TA (non-owner) cannot trigger a write action (403)", async () => {
     await seedStaff(); // ta01 is course staff but not ADMIN
-    for (const action of ["config", "repos_apply"]) {
+    for (const action of ["config", "repos_apply", "register", "scoreboard_open", "scoreboard_close"]) {
       const res = await call("/c/ds-2026/admin/provision/request",
         { ...form({ assignment_id: "A1", action }), headers: { ...form({}).headers, ...cookie(await staffSession()) } });
       expect(res.status).toBe(403);
@@ -2165,7 +2165,7 @@ describe("provisioning control plane", () => {
 
   it("the course owner can trigger write actions", async () => {
     const owner = await signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "Owner" } }, SECRET);
-    for (const action of ["config", "repos_apply"]) {
+    for (const action of ["config", "repos_apply", "register", "scoreboard_open", "scoreboard_close"]) {
       const res = await call("/c/ds-2026/admin/provision/request",
         { ...form({ assignment_id: "A1", action }), headers: { ...form({}).headers, ...cookie(owner) } });
       expect(res.status).toBe(302);
