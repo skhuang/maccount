@@ -1054,6 +1054,30 @@ describe("course edit + enrollment", () => {
     expect((await get("")).status).toBe(400);                       // missing param
   });
 
+  it("token API resolve-github maps a bound GitHub account → 學號", async () => {
+    await env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, created_at, updated_at) VALUES ('0856002','李小華',424242,'HuaLee','t','t')",
+    ).run();
+    const get = (qs: string, tok = "ingest-secret") =>
+      call(`/api/resolve-github?${qs}`, { headers: { Authorization: `Bearer ${tok}` } });
+
+    const byId = await get("github_id=424242");
+    expect(byId.status).toBe(200);
+    expect(await byId.json()).toEqual({ student_id: "0856002" });
+
+    const byLogin = await get("login=hualee");           // case-insensitive fallback
+    expect(byLogin.status).toBe(200);
+    expect(await byLogin.json()).toEqual({ student_id: "0856002" });
+
+    const unbound = await get("github_id=999999");        // not bound → 404 {null}
+    expect(unbound.status).toBe(404);
+    expect(await unbound.json()).toEqual({ student_id: null });
+
+    expect((await get("github_id=notanumber")).status).toBe(400);  // bad id
+    expect((await get("github_id=424242", "wrong")).status).toBe(401);
+    expect((await get("")).status).toBe(400);
+  });
+
   it("token API ingest resolves moodle_course_id → course_id", async () => {
     await env.DB.prepare("UPDATE courses SET moodle_course_id='21910' WHERE course_id='ds-2026'").run();
     const res = await call("/api/enrollments/ingest", {

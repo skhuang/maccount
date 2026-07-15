@@ -34,6 +34,7 @@ import {
   deleteBinding,
   getBinding,
   getBindingByGithubId,
+  getBindingByGithubLogin,
   getBindingByGoogleSub,
   getBindingByGoogleEmail,
   orgBindingView,
@@ -101,6 +102,8 @@ export default {
       if (p === "/api/roster" && req.method === "GET") return await apiRoster(req, env);
       if (p === "/api/resolve-google" && req.method === "GET")
         return await apiResolveGoogle(req, env, url);
+      if (p === "/api/resolve-github" && req.method === "GET")
+        return await apiResolveGithub(req, env, url);
       if (p === "/api/grades" && req.method === "GET") return await apiGrades(req, env, url);
       if (p === "/api/enrollments/ingest" && req.method === "POST")
         return await enrollmentsIngest(req, env);
@@ -684,6 +687,30 @@ async function apiResolveGoogle(req: Request, env: Env, url: URL): Promise<Respo
   const row = sub
     ? await getBindingByGoogleSub(env.DB, sub)
     : await getBindingByGoogleEmail(env.DB, email!);
+  if (!row) return json({ student_id: null }, 404);
+  return json({ student_id: row.nycu_id }, 200);
+}
+
+// Resolve a bound GitHub account -> 學號 (token-auth). Same shape as
+// resolve-google, for oj-exam's "sign in with GitHub": the frontend runs its own
+// GitHub OAuth, gets the stable numeric `github_id` (a login can be renamed) /
+// login, then asks which NYCU account it is bound to. student_id only; 404
+// {student_id:null} when unbound; a GitHub account alone never grants access.
+async function apiResolveGithub(req: Request, env: Env, url: URL): Promise<Response> {
+  if (!bearerOk(req, env)) return new Response("Unauthorized", { status: 401 });
+  const idParam = url.searchParams.get("github_id");
+  const login = url.searchParams.get("login");
+  const json = (body: unknown, status: number) =>
+    new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  if (!idParam && !login) return json({ error: "need github_id or login" }, 400);
+  let row = null;
+  if (idParam) {
+    const id = Number(idParam);
+    if (!Number.isInteger(id)) return json({ error: "github_id must be an integer" }, 400);
+    row = await getBindingByGithubId(env.DB, id);
+  } else {
+    row = await getBindingByGithubLogin(env.DB, login!);
+  }
   if (!row) return json({ student_id: null }, 404);
   return json({ student_id: row.nycu_id }, 200);
 }
