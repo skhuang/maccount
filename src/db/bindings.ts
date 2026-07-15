@@ -173,6 +173,22 @@ export async function getBindingByGithubId(
     .first<BindingRow>();
 }
 
+// Login fallback for the reverse lookup (prefer github_id, the stable numeric
+// id — a login can be renamed). Case-insensitive; github_login isn't
+// unique-indexed so take one row deterministically.
+export async function getBindingByGithubLogin(
+  db: D1Database, github_login: string,
+): Promise<BindingRow | null> {
+  return await db
+    .prepare(
+      `SELECT ${BINDING_COLS} FROM bindings
+       WHERE github_login IS NOT NULL AND lower(github_login) = lower(?)
+       ORDER BY created_at LIMIT 1`,
+    )
+    .bind(github_login)
+    .first<BindingRow>();
+}
+
 export async function getBindingByGoogleSub(
   db: D1Database, google_sub: string,
 ): Promise<BindingRow | null> {
