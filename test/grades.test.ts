@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { env, applyD1Migrations } from "cloudflare:test";
 import {
-  upsertGrades, listGradesFor, listGradesForStudentAssignment,
+  upsertGrades, listGradesFor, listGradesForProblem, listGradesForStudentAssignment,
   setAssignmentVisibility, listHiddenAssignments,
 } from "../src/db/grades";
 
@@ -106,5 +106,73 @@ describe("assignment visibility (hide/publish on /me)", () => {
     await setAssignmentVisibility(env.DB, "ds-2026", A, true, "t");
     expect(await listGradesForStudentAssignment(env.DB, "314561004", A)).toHaveLength(0);
     expect(await listHiddenAssignments(env.DB, "ds-2026")).toEqual([A]);
+  });
+});
+
+const base = {
+  course_id: "c1",
+  student_id: "s1",
+  problem_id: "p1",
+  verdict: "AC",
+  score: 10,
+  max_score: 10,
+  updated_at: "2026-01-01T00:00:00Z",
+};
+
+describe("grades assignment_id key", () => {
+  it("same (course,student,problem) in two assignments coexist as two rows", async () => {
+    await upsertGrades(env.DB, [
+      { ...base, assignment_id: "lab1", score: 8 },
+      { ...base, assignment_id: "examA", score: 10 },
+    ]);
+    const rows = await listGradesForProblem(env.DB, "p1", "c1");
+    expect(rows.length).toBe(2);
+    const byAsg = Object.fromEntries(rows.map((r) => [r.assignment_id, r.score]));
+    expect(byAsg.lab1).toBe(8);
+    expect(byAsg.examA).toBe(10);
+  });
+
+  it("filters by assignment_id", async () => {
+    await upsertGrades(env.DB, [
+      { ...base, assignment_id: "lab1", score: 8 },
+      { ...base, assignment_id: "examA", score: 10 },
+    ]);
+    const rows = await listGradesForProblem(env.DB, "p1", "c1", "examA");
+    expect(rows.length).toBe(1);
+    expect(rows[0].score).toBe(10);
+  });
+
+  it("missing assignment_id lands in on-line-bank", async () => {
+    await upsertGrades(env.DB, [{ ...base, assignment_id: null }]);
+    const rows = await listGradesForProblem(env.DB, "p1", "c1", "on-line-bank");
+    expect(rows.length).toBe(1);
+    expect(rows[0].score).toBe(10);
+  });
+
+  it("provisioning row + grade row merge via COALESCE on the 4-key, order-independent", async () => {
+    await upsertGrades(env.DB, [
+      { course_id: "c1", student_id: "s1", problem_id: "p1", assignment_id: "examA",
+        verdict: null, score: null, max_score: null, updated_at: "t1",
+        repo: "o/r", assignment_type: "exam", assignment_title: "Exam A" },
+    ]);
+    await upsertGrades(env.DB, [
+      { course_id: "c1", student_id: "s1", problem_id: "p1", assignment_id: "examA",
+        verdict: "AC", score: 10, max_score: 10, updated_at: "t2" },
+    ]);
+    const rows = await listGradesForProblem(env.DB, "p1", "c1", "examA");
+    expect(rows.length).toBe(1);
+    expect(rows[0].score).toBe(10);
+    expect(rows[0].repo).toBe("o/r");
+    expect(rows[0].assignment_title).toBe("Exam A");
+  });
+
+  it("listGradesForStudentAssignment separates the same problem across assignments (/me/exam fix)", async () => {
+    await upsertGrades(env.DB, [
+      { ...base, assignment_id: "lab1", score: 8 },
+      { ...base, assignment_id: "examA", score: 10 },
+    ]);
+    const exam = await listGradesForStudentAssignment(env.DB, "s1", "examA");
+    expect(exam.length).toBe(1);
+    expect(exam[0].score).toBe(10);
   });
 });

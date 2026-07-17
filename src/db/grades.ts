@@ -1,8 +1,10 @@
 // OJ grades mirror, per course-offering. Rows are pushed in by the trusted OJ
 // runner via /api/grades/ingest; the student /me page reads them back. Only
 // score + verdict (+ the student's own repo) are stored (iron rule 2). Keyed by
-// (course_id, student_id, problem_id) so two offerings can reuse a problem_id —
-// see migrations/0002 + 0006 + 0007(repo) + 0008(assignment grouping).
+// (course_id, assignment_id, student_id, problem_id) so two offerings can reuse
+// a problem_id, and so can a lab + an exam reusing the same problem within one
+// course — see migrations/0002 + 0006 + 0007(repo) + 0008(assignment grouping)
+// + 0020(assignment_id folded into the PK).
 
 export interface GradeRow {
   course_id: string;
@@ -37,10 +39,11 @@ const COLS =
   "course_id, student_id, problem_id, verdict, score, max_score, updated_at, repo, " +
   "assignment_id, assignment_type, assignment_title";
 
-// Upsert a batch keyed by (course_id, student_id, problem_id). Returns count
-// written. COALESCE-keeps existing values for fields the writer leaves null, so
-// the provisioning push (repo + assignment_*, no score) and the grade push
-// (score/verdict, no title) don't clobber each other regardless of order.
+// Upsert a batch keyed by (course_id, assignment_id, student_id, problem_id).
+// Returns count written. COALESCE-keeps existing values for fields the writer
+// leaves null, so the provisioning push (repo + assignment_*, no score) and
+// the grade push (score/verdict, no title) don't clobber each other regardless
+// of order. Missing assignment_id defaults to 'on-line-bank' (see 0020).
 export async function upsertGrades(db: D1Database, rows: GradeInput[]): Promise<number> {
   if (rows.length === 0) return 0;
   const stmt = db.prepare(
@@ -48,20 +51,19 @@ export async function upsertGrades(db: D1Database, rows: GradeInput[]): Promise<
        (course_id, student_id, problem_id, verdict, score, max_score, updated_at, repo,
         assignment_id, assignment_type, assignment_title)
      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
-     ON CONFLICT(course_id, student_id, problem_id) DO UPDATE SET
+     ON CONFLICT(course_id, assignment_id, student_id, problem_id) DO UPDATE SET
        verdict = COALESCE(?4, verdict),
        score = COALESCE(?5, score),
        max_score = COALESCE(?6, max_score),
        updated_at = ?7,
        repo = COALESCE(?8, repo),
-       assignment_id = COALESCE(?9, assignment_id),
        assignment_type = COALESCE(?10, assignment_type),
        assignment_title = COALESCE(?11, assignment_title)`,
   );
   const batch = rows.map((r) =>
     stmt.bind(
       r.course_id, r.student_id, r.problem_id, r.verdict, r.score, r.max_score, r.updated_at,
-      r.repo ?? null, r.assignment_id ?? null, r.assignment_type ?? null, r.assignment_title ?? null,
+      r.repo ?? null, r.assignment_id ?? "on-line-bank", r.assignment_type ?? null, r.assignment_title ?? null,
     ),
   );
   await db.batch(batch);
@@ -96,16 +98,19 @@ export async function listGradesForStudentAssignment(
   return results ?? [];
 }
 
-// All grades for one problem — for the OJ→Moodle "程式作業自動批改" pull. Optionally
-// scope to a course; omit course_id to keep the legacy cross-course behavior.
+// All grades for one problem — the OJ→Moodle "程式作業自動批改" pull. Optionally
+// scope to a course and/or a single assignment (a problem reused across
+// assignments needs assignment_id to disambiguate). problem_id-only is kept for
+// backward compatibility (returns every matching row).
 export async function listGradesForProblem(
-  db: D1Database, problem_id: string, course_id?: string,
+  db: D1Database, problem_id: string, course_id?: string, assignment_id?: string,
 ): Promise<GradeRow[]> {
-  const sql = course_id
-    ? `SELECT ${COLS} FROM grades WHERE problem_id = ? AND course_id = ? ORDER BY student_id`
-    : `SELECT ${COLS} FROM grades WHERE problem_id = ? ORDER BY student_id`;
-  const stmt = course_id ? db.prepare(sql).bind(problem_id, course_id) : db.prepare(sql).bind(problem_id);
-  const { results } = await stmt.all<GradeRow>();
+  const conds = ["problem_id = ?"];
+  const binds: string[] = [problem_id];
+  if (course_id) { conds.push("course_id = ?"); binds.push(course_id); }
+  if (assignment_id) { conds.push("assignment_id = ?"); binds.push(assignment_id); }
+  const sql = `SELECT ${COLS} FROM grades WHERE ${conds.join(" AND ")} ORDER BY student_id`;
+  const { results } = await db.prepare(sql).bind(...binds).all<GradeRow>();
   return results ?? [];
 }
 
