@@ -279,7 +279,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `src/index.ts` (`gradesIngest` assignment_id default; `apiGrades` new params)
-- Modify: `test/worker.test.ts` (add a `describe` block)
+- Modify: `test/worker.test.ts` (add a `describe` block; fix 2 pre-existing grades tests broken by the new key)
 
 **Interfaces:**
 - Consumes: `listGradesForProblem(db, problem_id, course_id?, assignment_id?)` (Task 1); `bearerOk` (token `GRADES_INGEST_TOKEN`).
@@ -364,6 +364,34 @@ with:
   const grades = await listGradesForProblem(env.DB, problemId, courseId, assignmentId);
 ```
 
+- [ ] **Step 4b: Fix two pre-existing grades tests broken by the new key**
+
+Task 1's schema change breaks two existing tests in `test/worker.test.ts` (they encode the old column order / old omit-assignment_id merge behavior). Update them to the new model:
+
+(i) In `it("ignores extra fields (no test data ever stored)", …)`, the `Object.keys` assertion hardcodes the old column order. Replace:
+```ts
+    expect(Object.keys(cols ?? {})).toEqual([
+      "course_id", "student_id", "problem_id", "verdict", "score", "max_score", "updated_at", "repo",
+      "assignment_id", "assignment_type", "assignment_title",
+    ]);
+```
+with (assignment_id now sits at position 2, matching the new PK column order):
+```ts
+    expect(Object.keys(cols ?? {})).toEqual([
+      "course_id", "assignment_id", "student_id", "problem_id", "verdict", "score", "max_score",
+      "updated_at", "repo", "assignment_type", "assignment_title",
+    ]);
+```
+
+(ii) In `it("repo-only provisioning row keeps score null; a later grade fills it (COALESCE)", …)`, the second (grade) push omits `assignment_id`, which now defaults to `on-line-bank` — a *different* key from the provisioning push's `"mid"`, so they no longer merge. Give the grade push the same `assignment_id` so it merges on the 4-key. Replace the later-grade-push line:
+```ts
+    await ingest([{ course_id: "ds-2026", student_id: "S1", problem_id: "p1", verdict: "AC", score: 90, max_score: 100, updated_at: "t2" }]);
+```
+with:
+```ts
+    await ingest([{ course_id: "ds-2026", student_id: "S1", problem_id: "p1", assignment_id: "mid", verdict: "AC", score: 90, max_score: 100, updated_at: "t2" }]);
+```
+
 - [ ] **Step 5: Run the test to verify it passes**
 
 Run: `npx vitest run test/worker.test.ts -t "assignment_id"`
@@ -372,7 +400,7 @@ Expected: PASS.
 - [ ] **Step 6: Run the full suite**
 
 Run: `npm test`
-Expected: PASS (existing tests unaffected — additive params + a new ingest default).
+Expected: PASS — the new ingest/apiGrades tests plus the two fixed pre-existing tests; no remaining grades failures. (The full suite was red after Task 1 by design; Step 4b restores it.)
 
 - [ ] **Step 7: Commit**
 
@@ -385,13 +413,14 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 3: Docs — CLAUDE.md grades model
+### Task 3: Docs — CLAUDE.md grades model + stale comment cleanup
 
 **Files:**
 - Modify: `CLAUDE.md`
+- Modify: `src/db/grades.ts` (stale `NOT_HIDDEN` comment)
 
 **Interfaces:**
-- Consumes: nothing (docs only).
+- Consumes: nothing (docs/comment only).
 
 - [ ] **Step 1: Update the grades key + route lines**
 
@@ -416,15 +445,30 @@ to:
 `assignment_id/assignment_type(lab|exam)/assignment_title` 選填（dsjudge provision 推送,遷移 `0008`；`assignment_id` 缺省落 `on-line-bank`，並自 `0020` 起是主鍵一部分——同題跨 assignment 各自一列）。
 ```
 
-- [ ] **Step 2: Verify**
+- [ ] **Step 2: Fix the stale NOT_HIDDEN comment in grades.ts**
 
-Run: `grep -n "assignment_id.*primary\|0020\|on-line-bank\|_legacy" CLAUDE.md`
-Expected: matches for the new key/sentinel text.
+Now that `assignment_id` is `NOT NULL DEFAULT 'on-line-bank'`, no grade row is ever NULL, so the comment claiming "ungrouped grades are never hidden" is stale. In `src/db/grades.ts`, replace:
+```ts
+// Excludes assignments an instructor has hidden from the student dashboard.
+// (assignment_id NULL never matches -> ungrouped grades are never hidden.)
+```
+with:
+```ts
+// Excludes assignments an instructor has hidden from the student dashboard.
+// (Since 0020 assignment_id is NOT NULL — ungrouped rows carry 'on-line-bank',
+// which an instructor can hide like any other assignment.)
+```
+Do NOT change any code or the query logic — comment only.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Verify**
+
+Run: `grep -n "assignment_id.*主鍵\|0020\|on-line-bank\|_legacy" CLAUDE.md && grep -n "on-line-bank" src/db/grades.ts`
+Expected: matches for the new key/sentinel text in CLAUDE.md and the updated comment in grades.ts.
+
+- [ ] **Step 4: Commit**
 
 ```bash
-git add CLAUDE.md
+git add CLAUDE.md src/db/grades.ts
 git commit -m "docs: grades PK now includes assignment_id (0020); document sentinels + /api/grades params
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
