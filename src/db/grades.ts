@@ -63,7 +63,7 @@ export async function upsertGrades(db: D1Database, rows: GradeInput[]): Promise<
   const batch = rows.map((r) =>
     stmt.bind(
       r.course_id, r.student_id, r.problem_id, r.verdict, r.score, r.max_score, r.updated_at,
-      r.repo ?? null, r.assignment_id ?? "on-line-bank", r.assignment_type ?? null, r.assignment_title ?? null,
+      r.repo ?? null, r.assignment_id || "on-line-bank", r.assignment_type ?? null, r.assignment_title ?? null,
     ),
   );
   await db.batch(batch);

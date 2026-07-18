@@ -166,6 +166,23 @@ describe("grades assignment_id key", () => {
     expect(rows[0].assignment_title).toBe("Exam A");
   });
 
+  it("COALESCE merge is order-independent: grade first, then provisioning", async () => {
+    await upsertGrades(env.DB, [
+      { course_id: "c1", student_id: "s1", problem_id: "p1", assignment_id: "examA",
+        verdict: "AC", score: 10, max_score: 10, updated_at: "t1" },
+    ]);
+    await upsertGrades(env.DB, [
+      { course_id: "c1", student_id: "s1", problem_id: "p1", assignment_id: "examA",
+        verdict: null, score: null, max_score: null, updated_at: "t2",
+        repo: "o/r", assignment_type: "exam", assignment_title: "Exam A" },
+    ]);
+    const rows = await listGradesForProblem(env.DB, "p1", "c1", "examA");
+    expect(rows.length).toBe(1);
+    expect(rows[0].score).toBe(10);        // score kept (provisioning's null didn't clobber)
+    expect(rows[0].repo).toBe("o/r");      // repo filled by provisioning
+    expect(rows[0].assignment_title).toBe("Exam A");
+  });
+
   it("listGradesForStudentAssignment separates the same problem across assignments (/me/exam fix)", async () => {
     await upsertGrades(env.DB, [
       { ...base, assignment_id: "lab1", score: 8 },
