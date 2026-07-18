@@ -73,7 +73,8 @@ export async function upsertGrades(db: D1Database, rows: GradeInput[]): Promise<
 // A student's grades across all their courses (each row carries course_id +
 // assignment_* so /me can group labs flat and exams into an exam list).
 // Excludes assignments an instructor has hidden from the student dashboard.
-// (assignment_id NULL never matches -> ungrouped grades are never hidden.)
+// (Since 0020 assignment_id is NOT NULL — ungrouped rows carry 'on-line-bank',
+// which an instructor can hide like any other assignment.)
 const NOT_HIDDEN =
   "NOT EXISTS (SELECT 1 FROM assignment_visibility v" +
   " WHERE v.course_id = grades.course_id AND v.assignment_id = grades.assignment_id" +
