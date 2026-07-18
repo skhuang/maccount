@@ -618,7 +618,9 @@ async function apiGrades(req: Request, env: Env, url: URL): Promise<Response> {
   if (!bearerOk(req, env)) return new Response("Unauthorized", { status: 401 });
   const problemId = url.searchParams.get("problem_id");
   if (!problemId) return new Response("problem_id required", { status: 400 });
-  const grades = await listGradesForProblem(env.DB, problemId);
+  const courseId = url.searchParams.get("course_id") ?? undefined;
+  const assignmentId = url.searchParams.get("assignment_id") ?? undefined;
+  const grades = await listGradesForProblem(env.DB, problemId, courseId, assignmentId);
   return new Response(JSON.stringify({ ok: true, grades }), {
     headers: { "Content-Type": "application/json" },
   });
@@ -658,7 +660,7 @@ async function gradesIngest(req: Request, env: Env): Promise<Response> {
       max_score: x.max_score == null || x.max_score === "" ? null : Number(x.max_score),
       updated_at: String(x.updated_at ?? new Date(Date.now()).toISOString()),
       // Assignment grouping (provisioning sends these); lets /me list exams.
-      assignment_id: typeof x.assignment_id === "string" && x.assignment_id ? x.assignment_id : null,
+      assignment_id: typeof x.assignment_id === "string" && x.assignment_id ? x.assignment_id : "on-line-bank",
       assignment_type: x.assignment_type === "exam" ? "exam" : x.assignment_type === "lab" ? "lab" : null,
       assignment_title: typeof x.assignment_title === "string" && x.assignment_title ? x.assignment_title : null,
     });

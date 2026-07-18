@@ -1350,8 +1350,8 @@ describe("/api/grades/ingest", () => {
     });
     const cols = await env.DB.prepare("SELECT * FROM grades LIMIT 1").first();
     expect(Object.keys(cols ?? {})).toEqual([
-      "course_id", "student_id", "problem_id", "verdict", "score", "max_score", "updated_at", "repo",
-      "assignment_id", "assignment_type", "assignment_title",
+      "course_id", "assignment_id", "student_id", "problem_id", "verdict", "score", "max_score",
+      "updated_at", "repo", "assignment_type", "assignment_title",
     ]);
   });
 
@@ -1369,7 +1369,7 @@ describe("/api/grades/ingest", () => {
     expect(row?.score).toBe(null); // not 0 → /me shows "go solve"
     expect(row?.repo).toBe("org/p1-S1");
     // later grade push: score, no assignment_title → title preserved (COALESCE)
-    await ingest([{ course_id: "ds-2026", student_id: "S1", problem_id: "p1", verdict: "AC", score: 90, max_score: 100, updated_at: "t2" }]);
+    await ingest([{ course_id: "ds-2026", student_id: "S1", problem_id: "p1", assignment_id: "mid", verdict: "AC", score: 90, max_score: 100, updated_at: "t2" }]);
     row = await env.DB.prepare("SELECT score, assignment_title FROM grades WHERE student_id='S1'").first();
     expect(row).toMatchObject({ score: 90, assignment_title: "期中考" });
   });
@@ -1935,5 +1935,39 @@ describe("GET /api/roster?course_id= (per-course, token)", () => {
     const res = await worker.fetch(
       new Request("https://api.example/api/roster?course_id=ds-2026-ta"), testEnv);
     expect(res.status).toBe(401);
+  });
+});
+
+describe("/api/grades + ingest assignment_id", () => {
+  const ingest = (body: unknown) =>
+    call("/api/grades/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer ingest-secret" },
+      body: JSON.stringify(body),
+    });
+  const get = (qs: string) =>
+    call(`/api/grades?${qs}`, { headers: { Authorization: "Bearer ingest-secret" } });
+
+  it("ingest with no assignment_id lands the row in on-line-bank", async () => {
+    const r = await ingest([{ course_id: "c1", student_id: "s1", problem_id: "p1", verdict: "AC", score: 5, max_score: 5 }]);
+    expect(r.status).toBe(200);
+    const bank = await (await get("problem_id=p1&course_id=c1&assignment_id=on-line-bank")).json() as { grades: unknown[] };
+    expect(bank.grades.length).toBe(1);
+  });
+
+  it("same problem in two assignments is pullable per assignment", async () => {
+    await ingest([
+      { course_id: "c1", assignment_id: "lab1", student_id: "s1", problem_id: "p1", verdict: "AC", score: 8, max_score: 10 },
+      { course_id: "c1", assignment_id: "examA", student_id: "s1", problem_id: "p1", verdict: "AC", score: 10, max_score: 10 },
+    ]);
+    const lab = await (await get("problem_id=p1&course_id=c1&assignment_id=lab1")).json() as { grades: { score: number }[] };
+    const exam = await (await get("problem_id=p1&course_id=c1&assignment_id=examA")).json() as { grades: { score: number }[] };
+    expect(lab.grades.length).toBe(1);
+    expect(lab.grades[0].score).toBe(8);
+    expect(exam.grades.length).toBe(1);
+    expect(exam.grades[0].score).toBe(10);
+    // backward compat: problem_id-only returns both
+    const both = await (await get("problem_id=p1")).json() as { grades: unknown[] };
+    expect(both.grades.length).toBe(2);
   });
 });
