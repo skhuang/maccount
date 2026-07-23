@@ -143,10 +143,14 @@ describe("GET /api/scoreboard", () => {
       headers: { Authorization: "Bearer ingest-secret" },
     });
     expect(res.status).toBe(200);
-    const body = await res.json();
+    // Cast res.json() (returns `unknown`) so `npx tsc --noEmit` (a CI step) passes.
+    const body = (await res.json()) as {
+      ok: boolean; max_total: number;
+      rows: { rank: number; student_id: string; total: number }[];
+    };
     expect(body.ok).toBe(true);
     expect(body.max_total).toBe(100); // 50 + 50
-    const byId = Object.fromEntries(body.rows.map((r: any) => [r.student_id, r.total]));
+    const byId = Object.fromEntries(body.rows.map((r) => [r.student_id, r.total]));
     expect(byId).toEqual({ A1: 75, A2: 50 }); // A1: 50 + round(50/100*50)=25 → 75; A2: 50 + 0
     // shape: rows carry only rank/student_id/total
     expect(Object.keys(body.rows[0]).sort()).toEqual(["rank", "student_id", "total"]);
@@ -207,10 +211,10 @@ async function apiScoreboard(req: Request, env: Env, url: URL): Promise<Response
 Run: `npx vitest run test/worker.test.ts -t "GET /api/scoreboard"`
 Expected: PASS（3 個 it 通過）。
 
-- [ ] **Step 7: Full suite (no regressions)**
+- [ ] **Step 7: Full suite + typecheck (no regressions)**
 
-Run: `npm test`
-Expected: 全綠。
+Run: `npm test && npx tsc --noEmit`
+Expected: 測試全綠、tsc 無錯。**CI 有獨立的 `npx tsc --noEmit` 步驟，`npm test`(vitest) 不做型別檢查**——本地務必兩者都跑，否則 `res.json():unknown` 之類的型別錯會過了本地卻炸 CI。
 
 - [ ] **Step 8: Commit**
 
