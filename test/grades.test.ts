@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { env, applyD1Migrations } from "cloudflare:test";
 import {
   upsertGrades, listGradesFor, listGradesForStudentAssignment,
-  setAssignmentVisibility, listHiddenAssignments,
+  setAssignmentVisibility, listHiddenAssignments, listGradesForAssignmentAllCourses,
 } from "../src/db/grades";
 
 beforeAll(async () => {
@@ -106,5 +106,26 @@ describe("assignment visibility (hide/publish on /me)", () => {
     await setAssignmentVisibility(env.DB, "ds-2026", A, true, "t");
     expect(await listGradesForStudentAssignment(env.DB, "314561004", A)).toHaveLength(0);
     expect(await listHiddenAssignments(env.DB, "ds-2026")).toEqual([A]);
+  });
+});
+
+describe("listGradesForAssignmentAllCourses", () => {
+  it("returns only the target assignment's rows, across all courses", async () => {
+    await upsertGrades(env.DB, [
+      g({ course_id: "ds-2026", student_id: "A1", problem_id: "p1", assignment_id: "ds2026-lab3" }),
+      g({ course_id: "ds-2026", student_id: "A2", problem_id: "p1", assignment_id: "ds2026-lab3" }),
+      g({ course_id: "ds-2027", student_id: "B1", problem_id: "p1", assignment_id: "ds2026-lab3" }), // 另一課程、同 aid
+      g({ course_id: "ds-2026", student_id: "A1", problem_id: "p9", assignment_id: "ds2026-lab4" }), // 別的 aid
+    ]);
+    const rows = await listGradesForAssignmentAllCourses(env.DB, "ds2026-lab3");
+    expect(rows.map((r) => [r.course_id, r.student_id]).sort()).toEqual([
+      ["ds-2026", "A1"], ["ds-2026", "A2"], ["ds-2027", "B1"],
+    ]);
+    expect(rows.every((r) => r.assignment_id === "ds2026-lab3")).toBe(true);
+  });
+
+  it("returns [] for an unknown assignment", async () => {
+    await upsertGrades(env.DB, [g({ assignment_id: "ds2026-lab3" })]);
+    expect(await listGradesForAssignmentAllCourses(env.DB, "nope")).toEqual([]);
   });
 });
