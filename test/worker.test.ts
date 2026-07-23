@@ -2252,10 +2252,13 @@ describe("GET /api/scoreboard", () => {
       headers: { Authorization: "Bearer ingest-secret" },
     });
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as {
+      ok: boolean; max_total: number;
+      rows: { rank: number; student_id: string; total: number }[];
+    };
     expect(body.ok).toBe(true);
     expect(body.max_total).toBe(100); // 50 + 50
-    const byId = Object.fromEntries(body.rows.map((r: any) => [r.student_id, r.total]));
+    const byId = Object.fromEntries(body.rows.map((r) => [r.student_id, r.total]));
     expect(byId).toEqual({ A1: 75, A2: 50 }); // A1: 50 + round(50/100*50)=25 → 75; A2: 50 + 0
     // shape: rows carry only rank/student_id/total
     expect(Object.keys(body.rows[0]).sort()).toEqual(["rank", "student_id", "total"]);
