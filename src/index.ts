@@ -44,7 +44,7 @@ import {
 import {
   upsertGrades, listGradesFor, listGradesForProblem, listGradesForStudentAssignment, GradeInput,
   setAssignmentVisibility, listGradesForAssignment, listAssignmentsForCourse,
-  setScoreboardVisible, isScoreboardVisible,
+  setScoreboardVisible, isScoreboardVisible, listGradesForAssignmentAllCourses,
 } from "./db/grades";
 import { buildScoreboard, scoreboardCsv } from "./scoreboard";
 import {
@@ -105,6 +105,7 @@ export default {
       if (p === "/api/resolve-github" && req.method === "GET")
         return await apiResolveGithub(req, env, url);
       if (p === "/api/grades" && req.method === "GET") return await apiGrades(req, env, url);
+      if (p === "/api/scoreboard" && req.method === "GET") return await apiScoreboard(req, env, url);
       if (p === "/api/enrollments/ingest" && req.method === "POST")
         return await enrollmentsIngest(req, env);
       if (p === "/admin" && req.method === "GET") return await adminHome(req, env, url);
@@ -727,6 +728,23 @@ async function apiGrades(req: Request, env: Env, url: URL): Promise<Response> {
   return new Response(JSON.stringify({ ok: true, grades }), {
     headers: { "Content-Type": "application/json" },
   });
+}
+
+// GET /api/scoreboard?assignment_id=X — token-authed per-assignment scoreboard
+// (per-student weighted total + max_total) for the OJ→Moodle gradebook push.
+// Scoped by assignment_id only (see /api/grades note re course_id).
+async function apiScoreboard(req: Request, env: Env, url: URL): Promise<Response> {
+  if (!bearerOk(req, env)) return new Response("Unauthorized", { status: 401 });
+  const assignmentId = url.searchParams.get("assignment_id");
+  if (!assignmentId) return new Response("assignment_id required", { status: 400 });
+  const rows = await listGradesForAssignmentAllCourses(env.DB, assignmentId);
+  const board = buildScoreboard(rows);
+  return new Response(JSON.stringify({
+    ok: true,
+    problems: board.problems,
+    rows: board.rows.map((r) => ({ rank: r.rank, student_id: r.student_id, total: r.total })),
+    max_total: board.max_total,
+  }), { headers: { "Content-Type": "application/json" } });
 }
 
 const MAX_INGEST_ROWS = 10000;

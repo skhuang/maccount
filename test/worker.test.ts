@@ -2217,3 +2217,47 @@ describe("provisioning control plane", () => {
     expect((await call("/api/provision/result", { method: "POST", body: "{}" })).status).toBe(401);
   });
 });
+
+describe("GET /api/scoreboard", () => {
+  const ingest = (rows: unknown[]) =>
+    call("/api/grades/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer ingest-secret" },
+      body: JSON.stringify(rows),
+    });
+
+  it("rejects a missing/wrong token with 401", async () => {
+    const res = await call("/api/scoreboard?assignment_id=ds2026-lab3", {
+      headers: { Authorization: "Bearer nope" },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("400 when assignment_id is missing", async () => {
+    const res = await call("/api/scoreboard", { headers: { Authorization: "Bearer ingest-secret" } });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns per-student weighted totals + max_total for the assignment", async () => {
+    // two problems, each points=50 (weight); scores out of max_score=100.
+    await ingest([
+      { student_id: "A1", problem_id: "p1", verdict: "AC", score: 100, max_score: 100,
+        updated_at: "t1", course_id: "ds-2026", assignment_id: "ds2026-lab3", points: 50 },
+      { student_id: "A1", problem_id: "p2", verdict: "WA", score: 50, max_score: 100,
+        updated_at: "t1", course_id: "ds-2026", assignment_id: "ds2026-lab3", points: 50 },
+      { student_id: "A2", problem_id: "p1", verdict: "AC", score: 100, max_score: 100,
+        updated_at: "t1", course_id: "ds-2026", assignment_id: "ds2026-lab3", points: 50 },
+    ]);
+    const res = await call("/api/scoreboard?assignment_id=ds2026-lab3", {
+      headers: { Authorization: "Bearer ingest-secret" },
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.max_total).toBe(100); // 50 + 50
+    const byId = Object.fromEntries(body.rows.map((r: any) => [r.student_id, r.total]));
+    expect(byId).toEqual({ A1: 75, A2: 50 }); // A1: 50 + round(50/100*50)=25 → 75; A2: 50 + 0
+    // shape: rows carry only rank/student_id/total
+    expect(Object.keys(body.rows[0]).sort()).toEqual(["rank", "student_id", "total"]);
+  });
+});
