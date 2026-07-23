@@ -132,6 +132,20 @@ export async function listGradesForAssignment(
   return results ?? [];
 }
 
+// All grades for one assignment across every course — the token scoreboard API
+// (GET /api/scoreboard). seminar-moodle can't supply maccount's course slug, so
+// we scope by assignment_id alone (an assignment_id belongs to one course in
+// practice). Mirrors listGradesForAssignment (no NOT_HIDDEN: staff view).
+export async function listGradesForAssignmentAllCourses(
+  db: D1Database, assignment_id: string,
+): Promise<GradeRow[]> {
+  const { results } = await db
+    .prepare(`SELECT ${COLS} FROM grades WHERE assignment_id = ? ORDER BY student_id, problem_id`)
+    .bind(assignment_id)
+    .all<GradeRow>();
+  return results ?? [];
+}
+
 // Distinct assignments seen in a course's grades (+ a title) — the scoreboard picker.
 export async function listAssignmentsForCourse(
   db: D1Database, course_id: string,
