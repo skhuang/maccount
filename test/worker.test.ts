@@ -848,6 +848,10 @@ describe("staff/TA management", () => {
 });
 
 describe("exam list on /me + /me/exam/<id>", () => {
+  // the global beforeEach clears grades but not the assignment-level side table
+  beforeEach(async () => {
+    await env.DB.prepare("DELETE FROM assignment_visibility").run();
+  });
   const sess = () => signSession({ exp: Date.now() + 60000, nycu: { id: "S9", name: "生" } }, SECRET);
   const ins = (pid: string, type: string, aid: string, title: string, repo: string, score: string) =>
     env.DB.prepare(
@@ -874,6 +878,29 @@ describe("exam list on /me + /me/exam/<id>", () => {
     expect(body).toContain('href="https://github.com/org/mid-p1-S9"'); // 去解題
     expect(body).toContain('href="https://github.com/org/mid-p2-S9"');
     expect(body).toContain("去解題");
+  });
+
+  it("the exam window pushed by dsjudge shows on /me, the exam page and its board", async () => {
+    await ins("mid-p1", "exam", "mid", "期中考", "org/mid-p1-S9", "40");
+    const push = (body: unknown) =>
+      call("/api/assignment-visibility", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer ingest-secret" },
+        body: JSON.stringify(body),
+      });
+    await push({ assignment_id: "mid", open_at: "2026-07-29T13:40:00+08:00", due_at: "2026-07-29T16:30:00+08:00" });
+    await push({ assignment_id: "mid", scoreboard_visible: true });
+
+    const list = await (await call("/me", { headers: cookie(await sess()) })).text();
+    expect(list).toContain("截止 2026/07/29 16:30");        // next to the exam link
+
+    const page = await (await call("/me/exam/mid", { headers: cookie(await sess()) })).text();
+    expect(page).toContain("考試期間");
+    expect(page).toContain("2026/07/29 13:40");
+
+    const board = await (await call("/me/exam/mid/scoreboard", { headers: cookie(await sess()) })).text();
+    expect(board).toContain("考試期間");
+    expect(board).toContain("2026/07/29 16:30");
   });
 
   it("/me/exam/<id> with no rows for this student → 404", async () => {

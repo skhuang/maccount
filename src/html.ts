@@ -742,6 +742,9 @@ export function dashboardPage(
   enrolledCourses: { course_id: string; name: string }[] = [],
   formsByCourse: Record<string, { title: string; url: string }[]> = {},
   meetByCourse: Record<string, string> = {},
+  // Exam windows keyed `${course_id}/${assignment_id}` — shown next to each exam
+  // in the list so a student sees the deadline without opening the exam.
+  examWindows: Record<string, ExamWindow> = {},
 ): string {
   const t = T[lang];
   const accountCards = `<div class="account-grid" aria-label="${t.acct_heading}">
@@ -810,10 +813,15 @@ ${renderRows(rs)}
   // into an exam list the student enters at /me/exam/<assignment_id>.
   const courseBlock = (rs: GradeRow[]) => {
     const labRows = rs.filter((g) => g.assignment_type !== "exam");
-    const exams = new Map<string, string>(); // assignment_id -> title
+    // assignment_id -> {title, window}. The window is looked up per course so
+    // the same assignment_id in two offerings keeps its own time.
+    const exams = new Map<string, { title: string; window: ExamWindow | null }>();
     for (const g of rs) {
       if (g.assignment_type === "exam" && g.assignment_id) {
-        exams.set(g.assignment_id, g.assignment_title || g.assignment_id);
+        exams.set(g.assignment_id, {
+          title: g.assignment_title || g.assignment_id,
+          window: examWindows[`${g.course_id}/${g.assignment_id}`] ?? null,
+        });
       }
     }
     const labs = labRows.length
@@ -822,8 +830,9 @@ ${courseTable(labRows)}`
       : "";
     const examList = exams.size
       ? `<p style="margin:.3rem 0 .2rem;font-weight:600">${t.exam_list_heading}</p>
-<ul>${[...exams].map(([aid, title]) =>
-          `<li><a href="/me/exam/${encodeURIComponent(aid)}">${h(title)} ↗</a></li>`).join("")}</ul>`
+<ul>${[...exams].map(([aid, e]) =>
+          `<li><a href="/me/exam/${encodeURIComponent(aid)}">${h(e.title)} ↗</a>` +
+          `${examWindowInline(t, e.window)}</li>`).join("")}</ul>`
       : "";
     return labs + examList;
   };
@@ -915,6 +924,19 @@ export function examWindowBanner(t: Strings, w: ExamWindow | null | undefined, n
   const tag = ended ? ` <span class="muted">(${t.exam_ended})</span>` : "";
   return `<p class="text-small"><b>${t.exam_window}</b> ${t.exam_window_open} ${at(w.open_at)}` +
     ` ~ ${t.exam_window_due} ${at(w.due_at)}${tag}</p>`;
+}
+
+// Compact one-liner for the dashboard's exam LIST, where a full banner per item
+// would drown the list. Leads with the deadline (what a student scans for) and
+// falls back to the open time for an exam that only has a start bound.
+export function examWindowInline(t: Strings, w: ExamWindow | null | undefined, now = Date.now()): string {
+  if (!w || (!w.open_at && !w.due_at)) return "";
+  const dueMs = w.due_at ? Date.parse(w.due_at) : NaN;
+  const ended = Number.isFinite(dueMs) && now > dueMs;
+  const text = w.due_at
+    ? `${t.exam_window_due} ${h(fmtTime(w.due_at))}${ended ? ` (${t.exam_ended})` : ""}`
+    : `${t.exam_window_open} ${h(fmtTime(w.open_at))}`;
+  return ` <span class="muted text-small">· ${text}</span>`;
 }
 
 // One exam, the logged-in student's view: each coding problem with its repo

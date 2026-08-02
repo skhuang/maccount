@@ -3,7 +3,7 @@ import { env, applyD1Migrations } from "cloudflare:test";
 import {
   upsertGrades, listGradesFor, listGradesForStudentAssignment,
   setAssignmentVisibility, listHiddenAssignments, listGradesForAssignmentAllCourses,
-  setAssignmentWindow, setScoreboardVisible, getAssignmentMeta,
+  setAssignmentWindow, setScoreboardVisible, getAssignmentMeta, listAssignmentWindows,
 } from "../src/db/grades";
 
 beforeAll(async () => {
@@ -186,5 +186,32 @@ describe("assignment window", () => {
   it("is scoped per course offering", async () => {
     await setAssignmentWindow(env.DB, "ds-2026", A, OPEN, DUE, "t1");
     expect((await getAssignmentMeta(env.DB, "ds-2027", A)).due_at).toBeNull();
+  });
+});
+
+// Bulk read for the /me dashboard's exam list — one query for every course
+// shown, instead of one per exam.
+describe("listAssignmentWindows", () => {
+  beforeEach(async () => {
+    await env.DB.prepare("DELETE FROM assignment_visibility").run();
+  });
+
+  it("returns the windows for the requested courses only", async () => {
+    await setAssignmentWindow(env.DB, "ds-2026", "lab9", "o1", "d1", "t");
+    await setAssignmentWindow(env.DB, "ds-2026", "mid", null, "d2", "t");
+    await setAssignmentWindow(env.DB, "ds-2027", "lab9", "o3", "d3", "t");
+    const rows = await listAssignmentWindows(env.DB, ["ds-2026"]);
+    expect(rows.map((r) => [r.assignment_id, r.due_at]).sort()).toEqual([["lab9", "d1"], ["mid", "d2"]]);
+  });
+
+  it("skips rows that carry no window (visibility-only rows)", async () => {
+    await setAssignmentVisibility(env.DB, "ds-2026", "hidden-only", true, "t");
+    await setAssignmentWindow(env.DB, "ds-2026", "lab9", null, "d1", "t");
+    const rows = await listAssignmentWindows(env.DB, ["ds-2026"]);
+    expect(rows.map((r) => r.assignment_id)).toEqual(["lab9"]);
+  });
+
+  it("no courses → no query, empty result", async () => {
+    expect(await listAssignmentWindows(env.DB, [])).toEqual([]);
   });
 });

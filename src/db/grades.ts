@@ -234,6 +234,30 @@ export async function getAssignmentMeta(
   };
 }
 
+export interface AssignmentWindowRow {
+  course_id: string;
+  assignment_id: string;
+  open_at: string | null;
+  due_at: string | null;
+}
+
+// Every known window across a set of courses, in one read — the /me dashboard
+// lists a student's exams and needs each one's time without a query per exam.
+// Rows with no window at all are skipped (nothing to show for them).
+export async function listAssignmentWindows(
+  db: D1Database, course_ids: string[],
+): Promise<AssignmentWindowRow[]> {
+  if (course_ids.length === 0) return [];
+  const holes = course_ids.map(() => "?").join(", ");
+  const { results } = await db
+    .prepare(
+      "SELECT course_id, assignment_id, open_at, due_at FROM assignment_visibility" +
+      ` WHERE course_id IN (${holes}) AND (open_at IS NOT NULL OR due_at IS NOT NULL)`)
+    .bind(...course_ids)
+    .all<AssignmentWindowRow>();
+  return results ?? [];
+}
+
 // Hidden assignment ids for a course (for a staff overview).
 export async function listHiddenAssignments(
   db: D1Database, course_id: string,

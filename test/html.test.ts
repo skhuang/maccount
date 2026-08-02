@@ -529,3 +529,53 @@ describe("exam window banner", () => {
     expect(html).toContain("Opens");
   });
 });
+
+// The dashboard's exam LIST carries each exam's deadline, so a student sees it
+// without opening the exam (the list is the page they actually land on).
+describe("dashboard exam list window", () => {
+  const examGrade: GradeRow = {
+    course_id: "ds-2026",
+    student_id: "0856001",
+    problem_id: "trie-prefix",
+    verdict: "AC",
+    score: 20,
+    max_score: 20,
+    updated_at: "2026-07-29T14:00:00Z",
+    repo: "nycu/ds2026-lab9-trie-prefix-octo",
+    assignment_id: "ds2026-lab9",
+    assignment_type: "exam",
+    assignment_title: "Lab9",
+    points: 20,
+  };
+  const dash = (examWindows = {}, grades: GradeRow[] = [examGrade]) =>
+    dashboardPage("zh", { id: "0856001", name: "學生" }, null, grades, false, {}, [],
+      { "ds-2026": "資料結構 2026" }, [{ course_id: "ds-2026", name: "資料結構 2026" }],
+      {}, {}, examWindows);
+
+  it("shows the deadline next to the exam link", () => {
+    const html = dash({ "ds-2026/ds2026-lab9": { open_at: "2026-07-29T13:40:00+08:00", due_at: "2026-07-29T16:30:00+08:00" } });
+    expect(html).toContain('href="/me/exam/ds2026-lab9"');
+    expect(html).toContain("截止 2026/07/29 16:30");
+    expect(html).toContain("已結束");          // now is well past that date
+  });
+
+  it("falls back to the open time when only a start bound is set", () => {
+    const html = dash({ "ds-2026/ds2026-lab9": { open_at: "2026-07-29T13:40:00+08:00", due_at: null } });
+    expect(html).toContain("開始 2026/07/29 13:40");
+    expect(html).not.toContain("截止");
+  });
+
+  it("no window pushed → the list renders exactly as before", () => {
+    const html = dash();
+    expect(html).toContain('href="/me/exam/ds2026-lab9"');
+    expect(html).not.toContain("截止");
+    expect(html).not.toContain("開始");
+  });
+
+  it("keys the window per course, so two offerings don't share a time", () => {
+    const html = dash(
+      { "ds-2027/ds2026-lab9": { open_at: null, due_at: "2027-07-29T16:30:00+08:00" } },
+    );
+    expect(html).not.toContain("2027/07/29");  // the ds-2026 row must not pick it up
+  });
+});

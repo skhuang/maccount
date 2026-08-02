@@ -45,7 +45,7 @@ import {
   upsertGrades, listGradesFor, listGradesForProblem, listGradesForStudentAssignment, GradeInput,
   setAssignmentVisibility, listGradesForAssignment, listAssignmentsForCourse,
   setScoreboardVisible, getAssignmentMeta, setAssignmentWindow,
-  listGradesForAssignmentAllCourses,
+  listAssignmentWindows, listGradesForAssignmentAllCourses,
 } from "./db/grades";
 import { buildScoreboard, scoreboardCsv } from "./scoreboard";
 import {
@@ -538,6 +538,12 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
   // Per-course Google Meet link (manually set in course settings).
   const meetByCourse: Record<string, string> = {};
   for (const c of courses) if (c.google_meet_url) meetByCourse[c.course_id] = c.google_meet_url;
+  // Exam windows for the courses shown, in one read — the exam list puts each
+  // exam's deadline next to it so a student needn't open the exam to see it.
+  const examWindows: Record<string, { open_at: string | null; due_at: string | null }> = {};
+  for (const w of await listAssignmentWindows(env.DB, displayIds)) {
+    examWindows[`${w.course_id}/${w.assignment_id}`] = { open_at: w.open_at, due_at: w.due_at };
+  }
   const flash = {
     bound: url.searchParams.get("bound") === "1",
     gbound: url.searchParams.get("gbound") === "1",
@@ -551,7 +557,8 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
   }));
   // Show the admin link to owners AND staff-table members (of any course).
   const staff = isAdmin(env, studentId) || (await isStaffAnywhere(env.DB, studentId));
-  const html = dashboardPage(lang, s.nycu!, binding, grades, staff, flash, orgJoins, courseNames, enrolledCourses, formsByCourse, meetByCourse);
+  const html = dashboardPage(lang, s.nycu!, binding, grades, staff, flash, orgJoins, courseNames,
+    enrolledCourses, formsByCourse, meetByCourse, examWindows);
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
   });
