@@ -2,7 +2,7 @@ import type { BindingRow } from "./csv";
 import type { GradeRow } from "./db/grades";
 import type { Scoreboard } from "./scoreboard";
 import type { ProvisionRequest } from "./db/provision";
-import { T, langToggle, type Lang } from "./i18n";
+import { T, langToggle, type Lang, type Strings } from "./i18n";
 import { accountStatusCard, confirmAttrs, fmtTime, h, helpHint, repoHref, verdictBadge } from "./ui/components";
 import { documentStart } from "./ui/layout";
 import { sortableTh, tableTools, uiEnhancements } from "./ui/tables";
@@ -742,6 +742,9 @@ export function dashboardPage(
   enrolledCourses: { course_id: string; name: string }[] = [],
   formsByCourse: Record<string, { title: string; url: string }[]> = {},
   meetByCourse: Record<string, string> = {},
+  // Exam windows keyed `${course_id}/${assignment_id}` — shown next to each exam
+  // in the list so a student sees the deadline without opening the exam.
+  examWindows: Record<string, ExamWindow> = {},
 ): string {
   const t = T[lang];
   const accountCards = `<div class="account-grid" aria-label="${t.acct_heading}">
@@ -810,10 +813,15 @@ ${renderRows(rs)}
   // into an exam list the student enters at /me/exam/<assignment_id>.
   const courseBlock = (rs: GradeRow[]) => {
     const labRows = rs.filter((g) => g.assignment_type !== "exam");
-    const exams = new Map<string, string>(); // assignment_id -> title
+    // assignment_id -> {title, window}. The window is looked up per course so
+    // the same assignment_id in two offerings keeps its own time.
+    const exams = new Map<string, { title: string; window: ExamWindow | null }>();
     for (const g of rs) {
       if (g.assignment_type === "exam" && g.assignment_id) {
-        exams.set(g.assignment_id, g.assignment_title || g.assignment_id);
+        exams.set(g.assignment_id, {
+          title: g.assignment_title || g.assignment_id,
+          window: examWindows[`${g.course_id}/${g.assignment_id}`] ?? null,
+        });
       }
     }
     const labs = labRows.length
@@ -822,8 +830,9 @@ ${courseTable(labRows)}`
       : "";
     const examList = exams.size
       ? `<p style="margin:.3rem 0 .2rem;font-weight:600">${t.exam_list_heading}</p>
-<ul>${[...exams].map(([aid, title]) =>
-          `<li><a href="/me/exam/${encodeURIComponent(aid)}">${h(title)} ↗</a></li>`).join("")}</ul>`
+<ul>${[...exams].map(([aid, e]) =>
+          `<li><a href="/me/exam/${encodeURIComponent(aid)}">${h(e.title)} ↗</a>` +
+          `${examWindowInline(t, e.window)}</li>`).join("")}</ul>`
       : "";
     return labs + examList;
   };
@@ -899,9 +908,43 @@ ${uiEnhancements(t)}
 </body></html>`;
 }
 
+// The exam window (考試期間) banner, shared by the exam page and its scoreboard.
+// Times are a dsjudge snapshot pushed to assignment_visibility; an unset bound
+// renders as "未設定" rather than a bogus date. Marked ended once past due_at so
+// a student looking at an old exam isn't misled into thinking it's still live.
+export interface ExamWindow {
+  open_at: string | null;
+  due_at: string | null;
+}
+export function examWindowBanner(t: Strings, w: ExamWindow | null | undefined, now = Date.now()): string {
+  if (!w || (!w.open_at && !w.due_at)) return "";
+  const at = (v: string | null) => (v ? h(fmtTime(v)) : `<span class="muted">${t.exam_window_unset}</span>`);
+  const dueMs = w.due_at ? Date.parse(w.due_at) : NaN;
+  const ended = Number.isFinite(dueMs) && now > dueMs;
+  const tag = ended ? ` <span class="muted">(${t.exam_ended})</span>` : "";
+  return `<p class="text-small"><b>${t.exam_window}</b> ${t.exam_window_open} ${at(w.open_at)}` +
+    ` ~ ${t.exam_window_due} ${at(w.due_at)}${tag}</p>`;
+}
+
+// Compact one-liner for the dashboard's exam LIST, where a full banner per item
+// would drown the list. Leads with the deadline (what a student scans for) and
+// falls back to the open time for an exam that only has a start bound.
+export function examWindowInline(t: Strings, w: ExamWindow | null | undefined, now = Date.now()): string {
+  if (!w || (!w.open_at && !w.due_at)) return "";
+  const dueMs = w.due_at ? Date.parse(w.due_at) : NaN;
+  const ended = Number.isFinite(dueMs) && now > dueMs;
+  const text = w.due_at
+    ? `${t.exam_window_due} ${h(fmtTime(w.due_at))}${ended ? ` (${t.exam_ended})` : ""}`
+    : `${t.exam_window_open} ${h(fmtTime(w.open_at))}`;
+  return ` <span class="muted text-small">· ${text}</span>`;
+}
+
 // One exam, the logged-in student's view: each coding problem with its repo
 // ("去解題") link + score. Reached from /me's exam list.
-export function examPage(lang: Lang, assignmentId: string, rows: GradeRow[], boardOpen = false): string {
+export function examPage(
+  lang: Lang, assignmentId: string, rows: GradeRow[], boardOpen = false,
+  window: ExamWindow | null = null,
+): string {
   const t = T[lang];
   const title = rows.find((r) => r.assignment_title)?.assignment_title || assignmentId;
   const boardLink = boardOpen
@@ -923,6 +966,7 @@ export function examPage(lang: Lang, assignmentId: string, rows: GradeRow[], boa
 ${langToggle(`/me/exam/${encodeURIComponent(assignmentId)}`, lang)}
 <p style="font-size:.9em"><a href="/me">← ${t.acct_heading}</a></p>
 <h1>${h(title)}</h1>
+${examWindowBanner(t, window)}
 <p class="muted text-small">${t.exam_intro}</p>
 ${boardLink}
 <table class="mobile-card-table" border="1" cellpadding="6" cellspacing="0">
@@ -944,7 +988,11 @@ export interface AnonBoard {
   max_total: number;
   rows: { rank: number; student: string; you: boolean; total: number; cells: Record<string, number | null> }[];
 }
-export function studentScoreboardPage(lang: Lang, assignmentId: string, title: string, board: AnonBoard): string {
+export function studentScoreboardPage(
+  lang: Lang, assignmentId: string, title: string, board: AnonBoard,
+  window: ExamWindow | null = null,
+): string {
+  const t = T[lang];
   const thP = board.problems
     .map((p) => `<th>${h(p.problem_id)}<br><span class="muted text-small">${p.max_score ?? "?"}</span></th>`)
     .join("");
@@ -967,6 +1015,7 @@ export function studentScoreboardPage(lang: Lang, assignmentId: string, title: s
 <body style="font-family:system-ui;max-width:900px;margin:2rem auto;padding:0 1rem;line-height:1.6">
 <p style="font-size:.9em"><a href="/me/exam/${encodeURIComponent(assignmentId)}">← ${h(title)}</a></p>
 <h1>📊 計分板 / Scoreboard</h1>
+${examWindowBanner(t, window)}
 ${body}
 <p class="muted text-small">只顯示名次與分數,學號已遮罩;不含測資或他人 repo。 / Rank + score only; ids masked; no test data.</p>
 </body></html>`;

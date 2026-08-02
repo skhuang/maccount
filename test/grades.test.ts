@@ -3,6 +3,7 @@ import { env, applyD1Migrations } from "cloudflare:test";
 import {
   upsertGrades, listGradesFor, listGradesForStudentAssignment,
   setAssignmentVisibility, listHiddenAssignments, listGradesForAssignmentAllCourses,
+  setAssignmentWindow, setScoreboardVisible, getAssignmentMeta, listAssignmentWindows,
 } from "../src/db/grades";
 
 beforeAll(async () => {
@@ -127,5 +128,90 @@ describe("listGradesForAssignmentAllCourses", () => {
   it("returns [] for an unknown assignment", async () => {
     await upsertGrades(env.DB, [g({ assignment_id: "ds2026-lab3" })]);
     expect(await listGradesForAssignmentAllCourses(env.DB, "nope")).toEqual([]);
+  });
+});
+
+// The exam window (考試期間) pushed by dsjudge, kept on the assignment-level side
+// table so a grade upsert can never disturb it and an unbounded window can be
+// cleared. Read back by /me/exam/<id> + its student scoreboard.
+describe("assignment window", () => {
+  beforeEach(async () => {
+    await env.DB.prepare("DELETE FROM assignment_visibility").run();
+  });
+  const A = "ds2026-lab9";
+  const OPEN = "2026-07-29T13:40:00+08:00";
+  const DUE = "2026-07-29T16:30:00+08:00";
+
+  it("stores and reads back both bounds", async () => {
+    await setAssignmentWindow(env.DB, "ds-2026", A, OPEN, DUE, "t1");
+    const meta = await getAssignmentMeta(env.DB, "ds-2026", A);
+    expect(meta).toMatchObject({ open_at: OPEN, due_at: DUE, scoreboard_visible: false });
+  });
+
+  it("no row → window unknown, board closed (not an error)", async () => {
+    expect(await getAssignmentMeta(env.DB, "ds-2026", "never-pushed")).toEqual({
+      scoreboard_visible: false, open_at: null, due_at: null,
+    });
+  });
+
+  it("extending the deadline overwrites in place", async () => {
+    await setAssignmentWindow(env.DB, "ds-2026", A, OPEN, DUE, "t1");
+    await setAssignmentWindow(env.DB, "ds-2026", A, OPEN, "2026-07-29T17:00:00+08:00", "t2");
+    expect((await getAssignmentMeta(env.DB, "ds-2026", A)).due_at).toBe("2026-07-29T17:00:00+08:00");
+  });
+
+  it("null clears a bound (an unbounded window is a real state)", async () => {
+    await setAssignmentWindow(env.DB, "ds-2026", A, OPEN, DUE, "t1");
+    await setAssignmentWindow(env.DB, "ds-2026", A, null, null, "t2");
+    const meta = await getAssignmentMeta(env.DB, "ds-2026", A);
+    expect(meta.open_at).toBeNull();
+    expect(meta.due_at).toBeNull();
+  });
+
+  it("window and the visibility switches share a row without clobbering", async () => {
+    await setAssignmentVisibility(env.DB, "ds-2026", A, true, "t1");
+    await setScoreboardVisible(env.DB, "ds-2026", A, true, "t2");
+    await setAssignmentWindow(env.DB, "ds-2026", A, OPEN, DUE, "t3");
+    const meta = await getAssignmentMeta(env.DB, "ds-2026", A);
+    expect(meta).toMatchObject({ scoreboard_visible: true, open_at: OPEN, due_at: DUE });
+    expect(await listHiddenAssignments(env.DB, "ds-2026")).toEqual([A]);  // hidden survived
+  });
+
+  it("a grade upsert never disturbs the window", async () => {
+    await setAssignmentWindow(env.DB, "ds-2026", A, OPEN, DUE, "t1");
+    await upsertGrades(env.DB, [g({ assignment_id: A, verdict: "AC" })]);
+    expect((await getAssignmentMeta(env.DB, "ds-2026", A)).due_at).toBe(DUE);
+  });
+
+  it("is scoped per course offering", async () => {
+    await setAssignmentWindow(env.DB, "ds-2026", A, OPEN, DUE, "t1");
+    expect((await getAssignmentMeta(env.DB, "ds-2027", A)).due_at).toBeNull();
+  });
+});
+
+// Bulk read for the /me dashboard's exam list — one query for every course
+// shown, instead of one per exam.
+describe("listAssignmentWindows", () => {
+  beforeEach(async () => {
+    await env.DB.prepare("DELETE FROM assignment_visibility").run();
+  });
+
+  it("returns the windows for the requested courses only", async () => {
+    await setAssignmentWindow(env.DB, "ds-2026", "lab9", "o1", "d1", "t");
+    await setAssignmentWindow(env.DB, "ds-2026", "mid", null, "d2", "t");
+    await setAssignmentWindow(env.DB, "ds-2027", "lab9", "o3", "d3", "t");
+    const rows = await listAssignmentWindows(env.DB, ["ds-2026"]);
+    expect(rows.map((r) => [r.assignment_id, r.due_at]).sort()).toEqual([["lab9", "d1"], ["mid", "d2"]]);
+  });
+
+  it("skips rows that carry no window (visibility-only rows)", async () => {
+    await setAssignmentVisibility(env.DB, "ds-2026", "hidden-only", true, "t");
+    await setAssignmentWindow(env.DB, "ds-2026", "lab9", null, "d1", "t");
+    const rows = await listAssignmentWindows(env.DB, ["ds-2026"]);
+    expect(rows.map((r) => r.assignment_id)).toEqual(["lab9"]);
+  });
+
+  it("no courses → no query, empty result", async () => {
+    expect(await listAssignmentWindows(env.DB, [])).toEqual([]);
   });
 });
