@@ -2264,3 +2264,63 @@ describe("GET /api/scoreboard", () => {
     expect(Object.keys(body.rows[0]).sort()).toEqual(["rank", "student_id", "total"]);
   });
 });
+
+// The exam window pushed by dsjudge, on the shared assignment-level endpoint.
+describe("/api/assignment-visibility — exam window", () => {
+  const A = "ds2026-lab9";
+  const OPEN = "2026-07-29T13:40:00+08:00";
+  const DUE = "2026-07-29T16:30:00+08:00";
+  const push = (body: unknown, token = "ingest-secret") =>
+    call("/api/assignment-visibility", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    });
+  const readRow = () =>
+    env.DB.prepare("SELECT * FROM assignment_visibility WHERE assignment_id = ?").bind(A)
+      .first<{ course_id: string; hidden: number; scoreboard_visible: number; open_at: string | null; due_at: string | null }>();
+
+  beforeEach(async () => {
+    await env.DB.prepare("DELETE FROM assignment_visibility").run();
+  });
+
+  it("rejects a wrong token and writes nothing", async () => {
+    expect((await push({ assignment_id: A, open_at: OPEN, due_at: DUE }, "nope")).status).toBe(401);
+    expect(await readRow()).toBeNull();
+  });
+
+  it("stores the window and echoes it back", async () => {
+    const res = await push({ course_id: "ds-2026", assignment_id: A, open_at: OPEN, due_at: DUE });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, assignment_id: A, open_at: OPEN, due_at: DUE });
+    expect(await readRow()).toMatchObject({ course_id: "ds-2026", open_at: OPEN, due_at: DUE });
+  });
+
+  it("defaults course_id to DEFAULT_COURSE_ID", async () => {
+    await push({ assignment_id: A, open_at: OPEN, due_at: DUE });
+    expect((await readRow())!.course_id).toBe("ds-2026");
+  });
+
+  it("an explicit null clears a bound", async () => {
+    await push({ assignment_id: A, open_at: OPEN, due_at: DUE });
+    await push({ assignment_id: A, open_at: null, due_at: null });
+    expect(await readRow()).toMatchObject({ open_at: null, due_at: null });
+  });
+
+  it("a body without window keys leaves the stored window alone", async () => {
+    await push({ assignment_id: A, open_at: OPEN, due_at: DUE });
+    await push({ assignment_id: A, hidden: true });     // an unrelated toggle
+    expect(await readRow()).toMatchObject({ hidden: 1, open_at: OPEN, due_at: DUE });
+  });
+
+  it("a window push leaves the visibility switches alone", async () => {
+    await push({ assignment_id: A, hidden: true });
+    await push({ assignment_id: A, scoreboard_visible: true });
+    await push({ assignment_id: A, open_at: OPEN, due_at: DUE });
+    expect(await readRow()).toMatchObject({ hidden: 1, scoreboard_visible: 1, due_at: DUE });
+  });
+
+  it("still requires assignment_id", async () => {
+    expect((await push({ open_at: OPEN })).status).toBe(400);
+  });
+});

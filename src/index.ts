@@ -44,7 +44,8 @@ import {
 import {
   upsertGrades, listGradesFor, listGradesForProblem, listGradesForStudentAssignment, GradeInput,
   setAssignmentVisibility, listGradesForAssignment, listAssignmentsForCourse,
-  setScoreboardVisible, isScoreboardVisible, listGradesForAssignmentAllCourses,
+  setScoreboardVisible, getAssignmentMeta, setAssignmentWindow,
+  listGradesForAssignmentAllCourses,
 } from "./db/grades";
 import { buildScoreboard, scoreboardCsv } from "./scoreboard";
 import {
@@ -570,8 +571,8 @@ async function meExam(req: Request, env: Env, url: URL, assignmentId: string): P
   const lang = pickLang(url, req.headers.get("Cookie"));
   const rows = await listGradesForStudentAssignment(env.DB, s.nycu!.id, assignmentId);
   if (rows.length === 0) return new Response("Not found", { status: 404 });
-  const boardOpen = await isScoreboardVisible(env.DB, rows[0].course_id, assignmentId);
-  return new Response(examPage(lang, assignmentId, rows, boardOpen), {
+  const meta = await getAssignmentMeta(env.DB, rows[0].course_id, assignmentId);
+  return new Response(examPage(lang, assignmentId, rows, meta.scoreboard_visible, meta), {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
   });
 }
@@ -589,7 +590,8 @@ async function meExamScoreboard(req: Request, env: Env, url: URL, assignmentId: 
   const mine = await listGradesForStudentAssignment(env.DB, me, assignmentId);
   if (mine.length === 0) return new Response("Not found", { status: 404 });
   const courseId = mine[0].course_id;
-  if (!(await isScoreboardVisible(env.DB, courseId, assignmentId))) {
+  const meta = await getAssignmentMeta(env.DB, courseId, assignmentId);
+  if (!meta.scoreboard_visible) {
     return new Response("Scoreboard not open", { status: 404 });
   }
   const board = buildScoreboard(await listGradesForAssignment(env.DB, courseId, assignmentId));
@@ -605,7 +607,7 @@ async function meExamScoreboard(req: Request, env: Env, url: URL, assignmentId: 
       cells: Object.fromEntries(board.problems.map((p) => [p.problem_id, r.cells[p.problem_id]?.score ?? null])),
     })),
   };
-  return new Response(studentScoreboardPage(lang, assignmentId, title, anon), {
+  return new Response(studentScoreboardPage(lang, assignmentId, title, anon, meta), {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
   });
 }
@@ -794,10 +796,14 @@ async function gradesIngest(req: Request, env: Env): Promise<Response> {
   });
 }
 
-// Hide/show an assignment on the student dashboard (/me). Same Bearer token as
-// /api/grades/ingest. Body: {course_id?, assignment_id, hidden}. course_id falls
-// back to the default course. Hidden assignments vanish from the student views
-// (dashboard + /me/exam) without touching any grades; flip hidden:false to show.
+// Assignment-level state pushed by dsjudge. Same Bearer token as
+// /api/grades/ingest. Body: {course_id?, assignment_id, hidden?,
+// scoreboard_visible?, open_at?, due_at?}. course_id falls back to the default
+// course. Each field is independent and only applied when PRESENT, so dsjudge
+// can push one switch without clobbering the others. Hidden assignments vanish
+// from the student views (dashboard + /me/exam) without touching any grades;
+// flip hidden:false to show. open_at/due_at are the exam window (考試期間), shown
+// on /me/exam/<id> + its scoreboard; an explicit null clears that bound.
 async function assignmentVisibility(req: Request, env: Env): Promise<Response> {
   if (!bearerOk(req, env)) return new Response("Unauthorized", { status: 401 });
   const x = (await req.json().catch(() => null)) as Record<string, unknown> | null;
@@ -819,6 +825,17 @@ async function assignmentVisibility(req: Request, env: Env): Promise<Response> {
     const vis = truthy(x.scoreboard_visible);
     await setScoreboardVisible(env.DB, course_id, x.assignment_id, vis, now);
     out.scoreboard_visible = vis;
+  }
+  // Exam window. Written as a pair (dsjudge always pushes both bounds together
+  // from one manifest window), so either key present sets both; a missing/empty
+  // bound is stored as NULL = unbounded, which is a real state to represent.
+  if ("open_at" in x || "due_at" in x) {
+    const iso = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+    const open_at = iso(x.open_at);
+    const due_at = iso(x.due_at);
+    await setAssignmentWindow(env.DB, course_id, x.assignment_id, open_at, due_at, now);
+    out.open_at = open_at;
+    out.due_at = due_at;
   }
   return new Response(JSON.stringify(out), { headers: { "Content-Type": "application/json" } });
 }

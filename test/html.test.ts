@@ -5,6 +5,8 @@ import {
   bindingsPage,
   coursePrejoinPage,
   dashboardPage,
+  examPage,
+  studentScoreboardPage,
   orgMembersPage,
   privacyPage,
   termsPage,
@@ -460,5 +462,70 @@ describe("adminHomePage (course picker)", () => {
     });
     expect(html).not.toContain("<b>x</b>");
     expect(html).toContain("&lt;b&gt;x&lt;/b&gt;");
+  });
+});
+
+// ── exam window (考試期間) on the student exam page + its scoreboard ──────────
+// The window is a dsjudge snapshot on assignment_visibility; both student pages
+// render it so a student always sees when the exam opens and closes.
+describe("exam window banner", () => {
+  const gradeRow = (over: Partial<GradeRow> = {}): GradeRow => ({
+    course_id: "ds-2026",
+    student_id: "314561004",
+    problem_id: "trie-prefix",
+    verdict: "AC",
+    score: 20,
+    max_score: 20,
+    updated_at: "2026-07-29T14:00:00.000Z",
+    repo: "nycu/ds2026-lab9-trie-prefix-octo",
+    assignment_id: "ds2026-lab9",
+    assignment_type: "exam",
+    assignment_title: "Lab9",
+    points: 20,
+    ...over,
+  });
+  const WINDOW = { open_at: "2026-07-29T13:40:00+08:00", due_at: "2026-07-29T16:30:00+08:00" };
+  const board = {
+    problems: [{ problem_id: "trie-prefix", max_score: 20 }],
+    max_total: 20,
+    rows: [{ rank: 1, student: "***561004", you: true, total: 20, cells: { "trie-prefix": 20 } }],
+  };
+
+  it("exam page shows both bounds in Asia/Taipei", () => {
+    const html = examPage("zh", "ds2026-lab9", [gradeRow()], false, WINDOW);
+    expect(html).toContain("考試期間");
+    expect(html).toContain("2026/07/29 13:40");
+    expect(html).toContain("2026/07/29 16:30");
+  });
+
+  it("scoreboard shows the same window", () => {
+    const html = studentScoreboardPage("zh", "ds2026-lab9", "Lab9", board, WINDOW);
+    expect(html).toContain("考試期間");
+    expect(html).toContain("2026/07/29 16:30");
+  });
+
+  it("marks an exam whose deadline has passed as ended", () => {
+    const html = examPage("zh", "ds2026-lab9", [gradeRow()], false, WINDOW);
+    expect(html).toContain("已結束");           // now is well past 2026-07-29
+  });
+
+  it("a half-set window renders the unset bound as 未設定, not a bogus date", () => {
+    const html = examPage("zh", "ds2026-lab9", [gradeRow()], false,
+      { open_at: null, due_at: "2026-07-29T16:30:00+08:00" });
+    expect(html).toContain("未設定");
+    expect(html).toContain("2026/07/29 16:30");
+  });
+
+  it("no window pushed (or a lab) → no banner at all", () => {
+    expect(examPage("zh", "ds2026-lab9", [gradeRow()], false, null)).not.toContain("考試期間");
+    expect(examPage("zh", "ds2026-lab9", [gradeRow()], false,
+      { open_at: null, due_at: null })).not.toContain("考試期間");
+    expect(studentScoreboardPage("zh", "ds2026-lab9", "Lab9", board)).not.toContain("考試期間");
+  });
+
+  it("English page uses the English labels", () => {
+    const html = examPage("en", "ds2026-lab9", [gradeRow()], false, WINDOW);
+    expect(html).toContain("Exam window");
+    expect(html).toContain("Opens");
   });
 });

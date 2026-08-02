@@ -128,6 +128,11 @@ export interface Strings {
   exam_go_solve: string;
   exam_no_repo: string;
   exam_intro: string;
+  exam_window: string;
+  exam_window_open: string;
+  exam_window_due: string;
+  exam_window_unset: string;
+  exam_ended: string;
   course_settings: string;
   course_status: string;
   course_save: string;
@@ -413,6 +418,11 @@ export const T: Record<Lang, Strings> = {
     exam_go_solve: "去解題",
     exam_no_repo: "repo 尚未建立",
     exam_intro: "點各題的「去解題」開啟你的 repo，clone 後 git push 即由 OJ 評分；概念題在 Moodle 測驗作答。",
+    exam_window: "考試期間",
+    exam_window_open: "開始",
+    exam_window_due: "截止",
+    exam_window_unset: "未設定",
+    exam_ended: "已結束",
     course_settings: "課程設定",
     course_status: "狀態",
     course_save: "儲存課程設定",
@@ -700,6 +710,11 @@ export const T: Record<Lang, Strings> = {
     exam_go_solve: "go solve",
     exam_no_repo: "repo not created yet",
     exam_intro: "Open your repo via each problem's “go solve”, clone, and git push — the OJ grades it; concept questions are in the Moodle quiz.",
+    exam_window: "Exam window",
+    exam_window_open: "Opens",
+    exam_window_due: "Due",
+    exam_window_unset: "not set",
+    exam_ended: "ended",
     course_settings: "Course settings",
     course_status: "Status",
     course_save: "Save course settings",

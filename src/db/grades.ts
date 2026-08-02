@@ -192,14 +192,46 @@ export async function setScoreboardVisible(
     .run();
 }
 
-export async function isScoreboardVisible(
+// The exam window (考試期間) as pushed by dsjudge. Assignment-level, on the same
+// row: the window belongs to the assignment, not to a (student, problem) pair,
+// and keeping it off `grades` means an unbounded window can be CLEARED (the
+// grade upsert's COALESCE could not). ISO8601 strings; null = bound unset.
+// A dsjudge snapshot — it changes only when dsjudge pushes.
+export async function setAssignmentWindow(
   db: D1Database, course_id: string, assignment_id: string,
-): Promise<boolean> {
+  open_at: string | null, due_at: string | null, updated_at: string,
+): Promise<void> {
+  await db
+    .prepare(
+      "INSERT INTO assignment_visibility (course_id, assignment_id, hidden, open_at, due_at, updated_at)" +
+      " VALUES (?, ?, 0, ?, ?, ?)" +
+      " ON CONFLICT(course_id, assignment_id) DO UPDATE SET open_at = ?, due_at = ?, updated_at = ?")
+    .bind(course_id, assignment_id, open_at, due_at, updated_at, open_at, due_at, updated_at)
+    .run();
+}
+
+export interface AssignmentMeta {
+  scoreboard_visible: boolean;
+  open_at: string | null;
+  due_at: string | null;
+}
+
+// Assignment-level state for the student views in one read: is the board open,
+// and when does the exam run. No row → board closed, window unknown.
+export async function getAssignmentMeta(
+  db: D1Database, course_id: string, assignment_id: string,
+): Promise<AssignmentMeta> {
   const row = await db
-    .prepare("SELECT scoreboard_visible FROM assignment_visibility WHERE course_id = ? AND assignment_id = ?")
+    .prepare(
+      "SELECT scoreboard_visible, open_at, due_at FROM assignment_visibility" +
+      " WHERE course_id = ? AND assignment_id = ?")
     .bind(course_id, assignment_id)
-    .first<{ scoreboard_visible: number }>();
-  return !!row && row.scoreboard_visible === 1;
+    .first<{ scoreboard_visible: number; open_at: string | null; due_at: string | null }>();
+  return {
+    scoreboard_visible: !!row && row.scoreboard_visible === 1,
+    open_at: row?.open_at ?? null,
+    due_at: row?.due_at ?? null,
+  };
 }
 
 // Hidden assignment ids for a course (for a staff overview).
