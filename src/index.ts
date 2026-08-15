@@ -41,7 +41,7 @@ import {
   GithubConflictError,
   GoogleConflictError,
 } from "./db/bindings";
-import { allowedReturn, mintAppToken } from "./app_sso";
+import { allowedReturn, allowedOrigin, mintAppToken, verifyAppToken } from "./app_sso";
 import {
   upsertGrades, listGradesFor, listGradesForProblem, listGradesForStudentAssignment, GradeInput,
   setAssignmentVisibility, listGradesForAssignment, listAssignmentsForCourse,
@@ -85,6 +85,8 @@ export default {
       if (p === "/auth/google/login") return await startOAuthLogin(req, env, url, "google");
       if (p === "/auth/google/callback") return await googleCallback(req, env, url);
       if (p === "/auth/app/start") return await startApp(req, env, url);
+      if (p === "/api/app/verify" && req.method === "OPTIONS") return appVerifyPreflight(req, env);
+      if (p === "/api/app/verify" && req.method === "POST") return await verifyApp(req, env);
       if (p === "/privacy" && req.method === "GET") return publicPage(privacyPage(pickLang(url, req.headers.get("Cookie"))));
       if (p === "/terms" && req.method === "GET") return publicPage(termsPage(pickLang(url, req.headers.get("Cookie"))));
       if (p === "/logout") return logout(env);
@@ -283,6 +285,37 @@ export async function postLoginDestination(
 ): Promise<Response | null> {
   if (!app_return || !allowedReturn(env, app_return.app, app_return.return)) return null;
   return await appTokenRedirect(env, nycu_id, app_return.app, app_return.return);
+}
+
+// POST /api/app/verify (+ OPTIONS preflight): the only CORS-enabled endpoint.
+// A relying app (e.g. dsvisual) posts the `mtoken` it received from
+// /auth/app/start and gets back identity-only `{student_id, providers}`.
+// CORS headers are set only when Origin matches an allowlisted app's
+// return-prefix origin (`allowedOrigin`); non-allowlisted origins get none.
+function corsHeaders(env: Env, req: Request): Headers {
+  const h = new Headers();
+  const origin = req.headers.get("Origin") || "";
+  if (allowedOrigin(env, origin)) {
+    h.set("Access-Control-Allow-Origin", origin);
+    h.set("Vary", "Origin");
+    h.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    h.set("Access-Control-Allow-Headers", "Content-Type");
+  }
+  return h;
+}
+
+function appVerifyPreflight(req: Request, env: Env): Response {
+  return new Response(null, { status: 204, headers: corsHeaders(env, req) });
+}
+
+async function verifyApp(req: Request, env: Env): Promise<Response> {
+  const headers = corsHeaders(env, req);
+  let token = "";
+  try { token = String(((await req.json()) as any)?.token || ""); } catch { /* empty */ }
+  const claims = await verifyAppToken(env, token);
+  if (!claims) return new Response(JSON.stringify({ error: "invalid_token" }), { status: 401, headers });
+  headers.set("Content-Type", "application/json");
+  return new Response(JSON.stringify({ student_id: claims.sub, providers: claims.providers }), { status: 200, headers });
 }
 
 function redirectDone(env: Env, status: string, reason?: string): Response {
