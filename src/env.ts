@@ -47,6 +47,10 @@ export interface Env {
   // fully course-scoped (Phase 1b/2): the non-course-scoped /admin and grade
   // ingests without an explicit course_id fall back to this. wrangler.toml [vars].
   DEFAULT_COURSE_ID: string;
+  // Relying-app SSO (B1). APP_ALLOWLIST in [vars] (non-secret): "app_id=return_prefix" pairs, ';'-separated.
+  APP_ALLOWLIST: string;
+  // APP_TOKEN_SECRET via `wrangler secret put APP_TOKEN_SECRET` (separate from SESSION_SECRET).
+  APP_TOKEN_SECRET: string;
 }
 
 export function nycuConfig(env: Env): NycuConfig {

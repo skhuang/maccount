@@ -37,6 +37,8 @@ const testEnv: Env = {
   ORG_INVITE_TOKEN: "org-tok",
   STAFF_TEAM: "", // sync off by default; sync tests override with "staff"
   DEFAULT_COURSE_ID: "ds-2026",
+  APP_ALLOWLIST: "dsvisual=https://skhuang.github.io/dsvisual",
+  APP_TOKEN_SECRET: "app-token-secret",
 };
 
 beforeAll(async () => {
