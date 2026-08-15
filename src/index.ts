@@ -41,6 +41,7 @@ import {
   GithubConflictError,
   GoogleConflictError,
 } from "./db/bindings";
+import { allowedReturn, mintAppToken } from "./app_sso";
 import {
   upsertGrades, listGradesFor, listGradesForProblem, listGradesForStudentAssignment, GradeInput,
   setAssignmentVisibility, listGradesForAssignment, listAssignmentsForCourse,
@@ -83,6 +84,7 @@ export default {
       if (p === "/auth/google/start") return await startGoogle(req, env, url);
       if (p === "/auth/google/login") return await startOAuthLogin(req, env, url, "google");
       if (p === "/auth/google/callback") return await googleCallback(req, env, url);
+      if (p === "/auth/app/start") return await startApp(req, env, url);
       if (p === "/privacy" && req.method === "GET") return publicPage(privacyPage(pickLang(url, req.headers.get("Cookie"))));
       if (p === "/terms" && req.method === "GET") return publicPage(termsPage(pickLang(url, req.headers.get("Cookie"))));
       if (p === "/logout") return logout(env);
@@ -228,6 +230,42 @@ async function startOAuthLogin(
           { offline: false },
         );
   return redirect(authUrl, cookies);
+}
+
+// ── relying-app SSO (B1): GET /auth/app/start?app=&return= ────────────────
+async function providersFor(env: Env, nycu_id: string): Promise<{ github: boolean; google: boolean }> {
+  const b = await getBinding(env.DB, nycu_id);
+  return { github: !!b?.github_id, google: !!b?.google_sub };
+}
+
+async function appTokenRedirect(env: Env, nycu_id: string, app: string, ret: string): Promise<Response> {
+  const providers = await providersFor(env, nycu_id);
+  const token = await mintAppToken(env, { sub: nycu_id, providers, aud: app });
+  const sep = ret.includes("#") ? "&" : "#";
+  // Build the 302 with an explicit Location header (NOT Response.redirect, which
+  // can normalize/strip the URL fragment we deliver the token in).
+  return new Response(null, { status: 302,
+    headers: new Headers({ Location: `${ret}${sep}mtoken=${encodeURIComponent(token)}` }) });
+}
+
+// Single entry point for a relying app (e.g. dsvisual) to obtain a maccount
+// identity token: allowlist-validate `app`/`return`, then either mint+redirect
+// (already logged in) or stash `app_return` and send through NYCU login first.
+async function startApp(req: Request, env: Env, url: URL): Promise<Response> {
+  const app = url.searchParams.get("app") || "";
+  const ret = url.searchParams.get("return") || "";
+  if (!allowedReturn(env, app, ret)) return new Response("bad app/return", { status: 400 });
+  const cookie = readCookie(req);
+  const session = cookie ? await verifySession(cookie, env.SESSION_SECRET, Date.now()) : null;
+  if (session?.nycu?.id) {
+    return await appTokenRedirect(env, session.nycu.id, app, ret);
+  }
+  // not logged in: stash app_return in a pre-login session and send to NYCU login
+  const pre: SessionData = { exp: Date.now() + TTL_MS, app_return: { app, return: ret } };
+  const token = await signSession(pre, env.SESSION_SECRET);
+  const headers = new Headers({ Location: "/auth/nycu/start" });
+  headers.append("Set-Cookie", setCookie(token));
+  return new Response(null, { status: 302, headers });
 }
 
 function redirectDone(env: Env, status: string, reason?: string): Response {

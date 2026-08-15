@@ -6,6 +6,7 @@ export interface SessionData {
   googleMode?: "bind" | "login"; // which Google OAuth client minted the code
   next?: string; // post-login redirect target (validated relative path, e.g. /me/<course>)
   nycu?: { id: string; name: string }; // present once logged in; admin is derived via isAdmin()
+  app_return?: { app: string; return: string }; // relying-app SSO: where to send the identity token after login
 }
 
 export const SESSION_COOKIE = "maccount_session";
