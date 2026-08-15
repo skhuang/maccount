@@ -41,6 +41,7 @@ import {
   GithubConflictError,
   GoogleConflictError,
 } from "./db/bindings";
+import { allowedReturn, allowedOrigin, mintAppToken, verifyAppToken } from "./app_sso";
 import {
   upsertGrades, listGradesFor, listGradesForProblem, listGradesForStudentAssignment, GradeInput,
   setAssignmentVisibility, listGradesForAssignment, listAssignmentsForCourse,
@@ -84,6 +85,9 @@ export default {
       if (p === "/auth/google/start") return await startGoogle(req, env, url);
       if (p === "/auth/google/login") return await startOAuthLogin(req, env, url, "google");
       if (p === "/auth/google/callback") return await googleCallback(req, env, url);
+      if (p === "/auth/app/start") return await startApp(req, env, url);
+      if (p === "/api/app/verify" && req.method === "OPTIONS") return appVerifyPreflight(req, env);
+      if (p === "/api/app/verify" && req.method === "POST") return await verifyApp(req, env);
       if (p === "/privacy" && req.method === "GET") return publicPage(privacyPage(pickLang(url, req.headers.get("Cookie"))));
       if (p === "/terms" && req.method === "GET") return publicPage(termsPage(pickLang(url, req.headers.get("Cookie"))));
       if (p === "/logout") return logout(env);
@@ -155,6 +159,11 @@ async function startNycu(req: Request, env: Env, url: URL): Promise<Response> {
   // /me/<course_id> before logging in) through the OAuth flow.
   const next = safeNext(url.searchParams.get("next"));
   if (next) session.next = next;
+  // Carry a pending relying-app SSO return (stashed by /auth/app/start in a
+  // pre-login session) through the NYCU leg — otherwise nycuCallback's
+  // postLoginDestination never fires and the app never gets its token.
+  const prev = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
+  if (prev?.app_return) session.app_return = prev.app_return;
   const token = await signSession(session, env.SESSION_SECRET);
   const redirectUri = `${env.PUBLIC_BASE_URL}/auth/nycu/callback`;
   // Carry a language choice from the static landing page through the OAuth flow.
@@ -183,6 +192,8 @@ async function nycuCallback(req: Request, env: Env, url: URL): Promise<Response>
   // Logged in. Admin-ness is derived from ADMIN_IDS at each admin request — no
   // separate login. Land on the intended page (validated) or the dashboard.
   const loggedIn: SessionData = { exp: Date.now() + TTL_MS, nycu: user };
+  const appDest = await postLoginDestination(env, user.id, session.app_return);
+  if (appDest) return appDest;
   const dest = safeNext(session.next) ?? "/me";
   return redirect(dest, setCookie(await signSession(loggedIn, env.SESSION_SECRET)));
 }
@@ -215,6 +226,10 @@ async function startOAuthLogin(
     provider === "github"
       ? { exp: Date.now() + TTL_MS, gstate: state }
       : { exp: Date.now() + TTL_MS, gostate: state, googleMode: "login" };
+  // Carry a pending relying-app SSO return through this alternate-login leg too
+  // (see startNycu) — so github/google login also returns to the app.
+  const prev = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
+  if (prev?.app_return) session.app_return = prev.app_return;
   const cookies = [setCookie(await signSession(session, env.SESSION_SECRET))];
   const lang = url.searchParams.get("lang");
   if (lang === "en" || lang === "zh") cookies.push(langCookie(lang));
@@ -229,6 +244,88 @@ async function startOAuthLogin(
           { offline: false },
         );
   return redirect(authUrl, cookies);
+}
+
+// ── relying-app SSO (B1): GET /auth/app/start?app=&return= ────────────────
+async function providersFor(env: Env, nycu_id: string): Promise<{ github: boolean; google: boolean }> {
+  const b = await getBinding(env.DB, nycu_id);
+  return { github: !!b?.github_id, google: !!b?.google_sub };
+}
+
+async function appTokenRedirect(env: Env, nycu_id: string, app: string, ret: string): Promise<Response> {
+  const providers = await providersFor(env, nycu_id);
+  const token = await mintAppToken(env, { sub: nycu_id, providers, aud: app });
+  const sep = ret.includes("#") ? "&" : "#";
+  // Build the 302 with an explicit Location header (NOT Response.redirect, which
+  // can normalize/strip the URL fragment we deliver the token in).
+  return new Response(null, { status: 302,
+    headers: new Headers({ Location: `${ret}${sep}mtoken=${encodeURIComponent(token)}` }) });
+}
+
+// Single entry point for a relying app (e.g. dsvisual) to obtain a maccount
+// identity token: allowlist-validate `app`/`return`, then either mint+redirect
+// (already logged in) or stash `app_return` and send through NYCU login first.
+async function startApp(req: Request, env: Env, url: URL): Promise<Response> {
+  const app = url.searchParams.get("app") || "";
+  const ret = url.searchParams.get("return") || "";
+  if (!allowedReturn(env, app, ret)) return new Response("bad app/return", { status: 400 });
+  const cookie = readCookie(req);
+  const session = cookie ? await verifySession(cookie, env.SESSION_SECRET, Date.now()) : null;
+  if (session?.nycu?.id) {
+    return await appTokenRedirect(env, session.nycu.id, app, ret);
+  }
+  // not logged in: stash app_return in a pre-login session and send to NYCU login
+  const pre: SessionData = { exp: Date.now() + TTL_MS, app_return: { app, return: ret } };
+  const token = await signSession(pre, env.SESSION_SECRET);
+  const headers = new Headers({ Location: "/auth/nycu/start" });
+  headers.append("Set-Cookie", setCookie(token));
+  return new Response(null, { status: 302, headers });
+}
+
+// After a successful login, if the pre-login session carried an `app_return`
+// (stashed by /auth/app/start), send the user back to the relying app with an
+// identity token instead of the normal /me destination. Re-validates
+// `allowedReturn` (anti-tamper: the session is client-held, signed but not
+// re-checked against the current allowlist) — returns null when absent/invalid
+// so callers fall through to their existing redirect.
+export async function postLoginDestination(
+  env: Env,
+  nycu_id: string,
+  app_return: { app: string; return: string } | undefined,
+): Promise<Response | null> {
+  if (!app_return || !allowedReturn(env, app_return.app, app_return.return)) return null;
+  return await appTokenRedirect(env, nycu_id, app_return.app, app_return.return);
+}
+
+// POST /api/app/verify (+ OPTIONS preflight): the only CORS-enabled endpoint.
+// A relying app (e.g. dsvisual) posts the `mtoken` it received from
+// /auth/app/start and gets back identity-only `{student_id, providers}`.
+// CORS headers are set only when Origin matches an allowlisted app's
+// return-prefix origin (`allowedOrigin`); non-allowlisted origins get none.
+function corsHeaders(env: Env, req: Request): Headers {
+  const h = new Headers();
+  const origin = req.headers.get("Origin") || "";
+  if (allowedOrigin(env, origin)) {
+    h.set("Access-Control-Allow-Origin", origin);
+    h.set("Vary", "Origin");
+    h.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    h.set("Access-Control-Allow-Headers", "Content-Type");
+  }
+  return h;
+}
+
+function appVerifyPreflight(req: Request, env: Env): Response {
+  return new Response(null, { status: 204, headers: corsHeaders(env, req) });
+}
+
+async function verifyApp(req: Request, env: Env): Promise<Response> {
+  const headers = corsHeaders(env, req);
+  let token = "";
+  try { token = String(((await req.json()) as any)?.token || ""); } catch { /* empty */ }
+  const claims = await verifyAppToken(env, token);
+  if (!claims) return new Response(JSON.stringify({ error: "invalid_token" }), { status: 401, headers });
+  headers.set("Content-Type", "application/json");
+  return new Response(JSON.stringify({ student_id: claims.sub, providers: claims.providers }), { status: 200, headers });
 }
 
 function redirectDone(env: Env, status: string, reason?: string): Response {
@@ -261,6 +358,8 @@ async function githubCallback(req: Request, env: Env, url: URL): Promise<Respons
   if (!session.nycu) {
     const b = await getBindingByGithubId(env.DB, gh.id);
     if (!b) return redirectDone(env, "err", "github_not_bound");
+    const appDest = await postLoginDestination(env, b.nycu_id, session.app_return);
+    if (appDest) return appDest;
     return redirect(
       "/me",
       setCookie(await signSession(
@@ -390,6 +489,8 @@ async function googleCallback(req: Request, env: Env, url: URL): Promise<Respons
         scope: tokens.scope,
         now,
       });
+      const appDestNew = await postLoginDestination(env, ids[0], session.app_return);
+      if (appDestNew) return appDestNew;
       return redirect(
         "/me",
         setCookie(await signSession(
@@ -398,6 +499,8 @@ async function googleCallback(req: Request, env: Env, url: URL): Promise<Respons
         )),
       );
     }
+    const appDest = await postLoginDestination(env, b.nycu_id, session.app_return);
+    if (appDest) return appDest;
     return redirect(
       "/me",
       setCookie(await signSession(
