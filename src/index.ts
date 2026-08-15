@@ -184,6 +184,8 @@ async function nycuCallback(req: Request, env: Env, url: URL): Promise<Response>
   // Logged in. Admin-ness is derived from ADMIN_IDS at each admin request — no
   // separate login. Land on the intended page (validated) or the dashboard.
   const loggedIn: SessionData = { exp: Date.now() + TTL_MS, nycu: user };
+  const appDest = await postLoginDestination(env, user.id, session.app_return);
+  if (appDest) return appDest;
   const dest = safeNext(session.next) ?? "/me";
   return redirect(dest, setCookie(await signSession(loggedIn, env.SESSION_SECRET)));
 }
@@ -268,6 +270,21 @@ async function startApp(req: Request, env: Env, url: URL): Promise<Response> {
   return new Response(null, { status: 302, headers });
 }
 
+// After a successful login, if the pre-login session carried an `app_return`
+// (stashed by /auth/app/start), send the user back to the relying app with an
+// identity token instead of the normal /me destination. Re-validates
+// `allowedReturn` (anti-tamper: the session is client-held, signed but not
+// re-checked against the current allowlist) — returns null when absent/invalid
+// so callers fall through to their existing redirect.
+export async function postLoginDestination(
+  env: Env,
+  nycu_id: string,
+  app_return: { app: string; return: string } | undefined,
+): Promise<Response | null> {
+  if (!app_return || !allowedReturn(env, app_return.app, app_return.return)) return null;
+  return await appTokenRedirect(env, nycu_id, app_return.app, app_return.return);
+}
+
 function redirectDone(env: Env, status: string, reason?: string): Response {
   const u = new URL(env.FRONTEND_DONE_URL);
   u.searchParams.set("status", status);
@@ -298,6 +315,8 @@ async function githubCallback(req: Request, env: Env, url: URL): Promise<Respons
   if (!session.nycu) {
     const b = await getBindingByGithubId(env.DB, gh.id);
     if (!b) return redirectDone(env, "err", "github_not_bound");
+    const appDest = await postLoginDestination(env, b.nycu_id, session.app_return);
+    if (appDest) return appDest;
     return redirect(
       "/me",
       setCookie(await signSession(
@@ -427,6 +446,8 @@ async function googleCallback(req: Request, env: Env, url: URL): Promise<Respons
         scope: tokens.scope,
         now,
       });
+      const appDestNew = await postLoginDestination(env, ids[0], session.app_return);
+      if (appDestNew) return appDestNew;
       return redirect(
         "/me",
         setCookie(await signSession(
@@ -435,6 +456,8 @@ async function googleCallback(req: Request, env: Env, url: URL): Promise<Respons
         )),
       );
     }
+    const appDest = await postLoginDestination(env, b.nycu_id, session.app_return);
+    if (appDest) return appDest;
     return redirect(
       "/me",
       setCookie(await signSession(
