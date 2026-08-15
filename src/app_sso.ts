@@ -34,7 +34,8 @@ export function appAllowlist(env: Env): Map<string, string> {
 
 export function allowedReturn(env: Env, app: string, ret: string): boolean {
   const prefix = appAllowlist(env).get(app);
-  return !!prefix && typeof ret === "string" && ret.startsWith(prefix);
+  if (!prefix || typeof ret !== "string") return false;
+  return ret === prefix || ret.startsWith(prefix.endsWith("/") ? prefix : prefix + "/");
 }
 
 export function allowedOrigin(env: Env, origin: string): boolean {

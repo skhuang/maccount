@@ -158,6 +158,11 @@ async function startNycu(req: Request, env: Env, url: URL): Promise<Response> {
   // /me/<course_id> before logging in) through the OAuth flow.
   const next = safeNext(url.searchParams.get("next"));
   if (next) session.next = next;
+  // Carry a pending relying-app SSO return (stashed by /auth/app/start in a
+  // pre-login session) through the NYCU leg — otherwise nycuCallback's
+  // postLoginDestination never fires and the app never gets its token.
+  const prev = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
+  if (prev?.app_return) session.app_return = prev.app_return;
   const token = await signSession(session, env.SESSION_SECRET);
   const redirectUri = `${env.PUBLIC_BASE_URL}/auth/nycu/callback`;
   // Carry a language choice from the static landing page through the OAuth flow.
@@ -220,6 +225,10 @@ async function startOAuthLogin(
     provider === "github"
       ? { exp: Date.now() + TTL_MS, gstate: state }
       : { exp: Date.now() + TTL_MS, gostate: state, googleMode: "login" };
+  // Carry a pending relying-app SSO return through this alternate-login leg too
+  // (see startNycu) — so github/google login also returns to the app.
+  const prev = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
+  if (prev?.app_return) session.app_return = prev.app_return;
   const cookies = [setCookie(await signSession(session, env.SESSION_SECRET))];
   const lang = url.searchParams.get("lang");
   if (lang === "en" || lang === "zh") cookies.push(langCookie(lang));

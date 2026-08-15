@@ -9,6 +9,13 @@ describe("app_sso helpers", () => {
     expect(allowedReturn(env, "dsvisual", "https://evil.example/x")).toBe(false);
     expect(allowedReturn(env, "unknown", "https://skhuang.github.io/dsvisual")).toBe(false);
   });
+  it("allowedReturn requires an exact match or a '/' boundary (not just a string prefix)", () => {
+    // A sibling path that merely starts with the same characters must NOT match.
+    expect(allowedReturn(env, "dsvisual", "https://skhuang.github.io/dsvisual-evil/x")).toBe(false);
+    // The exact prefix, and any path under it, still match.
+    expect(allowedReturn(env, "dsvisual", "https://skhuang.github.io/dsvisual")).toBe(true);
+    expect(allowedReturn(env, "dsvisual", "https://skhuang.github.io/dsvisual/index.html")).toBe(true);
+  });
   it("allowedOrigin matches an allowlisted return prefix's origin", () => {
     expect(allowedOrigin(env, "https://skhuang.github.io")).toBe(true);
     expect(allowedOrigin(env, "https://evil.example")).toBe(false);
