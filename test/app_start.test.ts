@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { env, applyD1Migrations } from "cloudflare:test";
 import worker from "../src/index";
 import { verifyAppToken } from "../src/app_sso";
+import { verifySession } from "../src/session";
 import { makeEnv, loggedInCookie } from "./helpers_app_sso";
 
 beforeAll(async () => {
@@ -26,12 +27,20 @@ describe("/auth/app/start", () => {
     const tok = decodeURIComponent(loc.split("#mtoken=")[1]);
     expect(await verifyAppToken(env, tok)).toMatchObject({ sub: "S123", aud: "dsvisual" });
   });
-  it("not logged in -> 302 to /auth/nycu/start and stashes app_return", async () => {
+  it("not logged in -> renders the login chooser and stashes app_return", async () => {
     const env = await makeEnv();
     const r = await worker.fetch(new Request(
-      "https://x/auth/app/start?app=dsvisual&return=https://skhuang.github.io/dsvisual/", ), env);
-    expect(r.status).toBe(302);
-    expect(r.headers.get("Location")!).toContain("/auth/nycu/start");
-    expect(r.headers.get("Set-Cookie")!).toContain("maccount_session");
+      "https://x/auth/app/start?app=dsvisual&return=https://skhuang.github.io/dsvisual/"), env);
+    expect(r.status).toBe(200);
+    const body = await r.text();
+    expect(body).toContain('href="/auth/nycu/start');
+    expect(body).toContain('href="/auth/github/login');
+    expect(body).toContain('href="/auth/google/login');
+    const sc = r.headers.get("Set-Cookie")!;
+    expect(sc).toContain("maccount_session");
+    // the stashed pre-login session carries app_return
+    const m = sc.match(/maccount_session=([^;]+)/)!;
+    const s = await verifySession(m[1], env.SESSION_SECRET, Date.now());
+    expect(s?.app_return).toMatchObject({ app: "dsvisual" });
   });
 });

@@ -263,6 +263,12 @@ export interface Strings {
   classroom_msg_noid: string;
   classroom_msg_nodrive: string;
   classroom_msg_tokenerror: string;
+  appLoginTitle: string;
+  appLoginSubtitle: string; // "{app}" placeholder
+  appLoginNycu: string;
+  appLoginGithub: string;
+  appLoginGoogle: string;
+  appLoginNote: string;
 }
 
 export const T: Record<Lang, Strings> = {
@@ -557,6 +563,12 @@ export const T: Record<Lang, Strings> = {
     classroom_msg_noid: "尚未設定 Google Classroom ID（請先於上方設定區填入）。",
     classroom_msg_nodrive: "尚未連結你的 Google（完整權限）。請先點「連結我的 Google Drive」並授權。",
     classroom_msg_tokenerror: "無法取得 Google 存取權杖（請重新連結 Drive）。",
+    appLoginTitle: "登入 maccount",
+    appLoginSubtitle: "登入以繼續使用 {app}",
+    appLoginNycu: "以 NYCU 帳號登入",
+    appLoginGithub: "用 GitHub 登入",
+    appLoginGoogle: "用 Google 登入",
+    appLoginNote: "GitHub / Google 需為已在 maccount 綁定過的帳號。",
   },
   en: {
     acct_title: "My Account",
@@ -849,6 +861,12 @@ export const T: Record<Lang, Strings> = {
     classroom_msg_noid: "No Google Classroom ID set (add one in “Course settings” first).",
     classroom_msg_nodrive: "Your Google (full access) isn't connected. Click “Connect my Google Drive” and authorize first.",
     classroom_msg_tokenerror: "Couldn't get a Google access token (please reconnect Drive).",
+    appLoginTitle: "Sign in to maccount",
+    appLoginSubtitle: "Sign in to continue to {app}",
+    appLoginNycu: "Sign in with NYCU",
+    appLoginGithub: "Sign in with GitHub",
+    appLoginGoogle: "Sign in with Google",
+    appLoginNote: "GitHub / Google must be an account already linked in maccount.",
   },
 };
 
