@@ -69,6 +69,7 @@ import {
   privacyPage, termsPage, scoreboardPage, provisionPage, studentScoreboardPage,
 } from "./html";
 import { pickLang, langCookie } from "./i18n";
+import { appLoginChooserPage } from "./ui/app_login";
 
 const TTL_MS = 15 * 60 * 1000;
 
@@ -274,12 +275,17 @@ async function startApp(req: Request, env: Env, url: URL): Promise<Response> {
   if (session?.nycu?.id) {
     return await appTokenRedirect(env, session.nycu.id, app, ret);
   }
-  // not logged in: stash app_return in a pre-login session and send to NYCU login
+  // not logged in: stash app_return in a pre-login session, then show the
+  // login-method chooser (NYCU / GitHub / Google). The chooser's buttons hit
+  // same-origin login routes, so this cookie (and its app_return) rides along
+  // and every callback returns to the app with an #mtoken.
   const pre: SessionData = { exp: Date.now() + TTL_MS, app_return: { app, return: ret } };
   const token = await signSession(pre, env.SESSION_SECRET);
-  const headers = new Headers({ Location: "/auth/nycu/start" });
+  const lang = pickLang(url, req.headers.get("Cookie"));
+  const headers = new Headers({ "Content-Type": "text/html; charset=utf-8" });
   headers.append("Set-Cookie", setCookie(token));
-  return new Response(null, { status: 302, headers });
+  headers.append("Set-Cookie", langCookie(lang));
+  return new Response(appLoginChooserPage(lang, app), { status: 200, headers });
 }
 
 // After a successful login, if the pre-login session carried an `app_return`
