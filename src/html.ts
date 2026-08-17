@@ -11,7 +11,7 @@ export { fmtTime } from "./ui/components";
 
 // Shared, dependency-free UI foundation for every Worker-rendered page. Keep
 // this inline so authenticated pages do not depend on a separate static host.
-const UI_CSS = `
+export const UI_CSS = `
 :root{color-scheme:light;--bg:#f4f7f6;--surface:#fff;--surface-soft:#f8faf9;--text:#17211d;--muted:#5f6f67;--line:#dbe4df;--brand:#087f5b;--brand-hover:#066b4c;--danger:#c92a2a;--danger-soft:#fff0f0;--success-soft:#eaf8f1;--warning-soft:#fff8db;--radius:12px;--shadow:0 12px 32px rgba(20,45,34,.08);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 *{box-sizing:border-box}
 html{min-height:100%;background:var(--bg)}
