@@ -183,7 +183,7 @@ async function nycuCallback(req: Request, env: Env, url: URL): Promise<Response>
   const oauthError = url.searchParams.get("error");
   if (oauthError) return redirectDone(env, "err", `nycu_${oauthError}`);
   if (!session || !session.nstate || session.nstate !== state || !code) {
-    return new Response("Invalid NYCU callback", { status: 400 });
+    return recoverLogin(env, session);
   }
   const cfg = nycuConfig(env);
   const redirectUri = `${env.PUBLIC_BASE_URL}/auth/nycu/callback`;
@@ -341,6 +341,23 @@ function redirectDone(env: Env, status: string, reason?: string): Response {
   return redirect(u.toString(), clearCookie());
 }
 
+// A benign callback-state mismatch (a stale or auto-initiated authorize, a lost
+// state cookie, a double-submit, or Google silent `prompt=none` sign-in) should
+// not dead-end at a 400. We never complete a login on a mismatched state, so
+// CSRF protection is intact — this only replaces the raw 400 with a friendly
+// path. If the (possibly stale) session still knows where the user was headed,
+// bounce back to /auth/app/start to restart with a fresh state (the chooser is
+// a 200, so there is no auto-redirect loop); otherwise go to the done page.
+function recoverLogin(env: Env, session: SessionData | null): Response {
+  const ar = session?.app_return;
+  if (ar && allowedReturn(env, ar.app, ar.return)) {
+    return redirect(
+      `/auth/app/start?app=${encodeURIComponent(ar.app)}&return=${encodeURIComponent(ar.return)}`,
+    );
+  }
+  return redirectDone(env, "err", "login_retry");
+}
+
 async function githubCallback(req: Request, env: Env, url: URL): Promise<Response> {
   const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
   const code = url.searchParams.get("code");
@@ -349,7 +366,7 @@ async function githubCallback(req: Request, env: Env, url: URL): Promise<Respons
   const oauthError = url.searchParams.get("error");
   if (oauthError) return redirectDone(env, "err", `github_${oauthError}`);
   if (!session || !session.gstate || session.gstate !== state || !code) {
-    return new Response("Invalid GitHub callback", { status: 400 });
+    return recoverLogin(env, session);
   }
   const accessToken = await exchangeGithubCode({
     clientId: env.GITHUB_CLIENT_ID,
@@ -460,7 +477,7 @@ async function googleCallback(req: Request, env: Env, url: URL): Promise<Respons
   const oauthError = url.searchParams.get("error");
   if (oauthError) return redirectDone(env, "err", `google_${oauthError}`);
   if (!session || !session.gostate || session.gostate !== state || !code) {
-    return new Response("Invalid Google callback", { status: 400 });
+    return recoverLogin(env, session);
   }
   const client = googleClient(env, session.googleMode === "login" && !session.nycu ? "login" : "bind");
   const tokens = await exchangeGoogleCode({

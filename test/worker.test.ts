@@ -239,7 +239,10 @@ describe("/auth/github/callback (bind happy path)", () => {
       SECRET,
     );
     const res = await call("/auth/github/callback?code=abc&state=WRONG", { headers: cookie(session) });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe(
+      "https://skhuang.github.io/maccount/done.html?status=err&reason=login_retry",
+    );
   });
 });
 
@@ -457,7 +460,10 @@ describe("/auth/google/callback (bind happy path)", () => {
       SECRET,
     );
     const res = await call("/auth/google/callback?code=abc&state=WRONG", { headers: cookie(session) });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe(
+      "https://skhuang.github.io/maccount/done.html?status=err&reason=login_retry",
+    );
   });
 });
 
@@ -526,7 +532,10 @@ describe("sign in with GitHub / Google (login via an existing binding)", () => {
   it("GitHub login rejects a state mismatch", async () => {
     const session = await signSession({ exp: Date.now() + 60000, gstate: "GS" }, SECRET);
     const res = await call("/auth/github/callback?code=abc&state=WRONG", { headers: cookie(session) });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe(
+      "https://skhuang.github.io/maccount/done.html?status=err&reason=login_retry",
+    );
   });
 
   it("Google login resolves the binding and logs in as that NYCU account", async () => {
