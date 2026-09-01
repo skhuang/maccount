@@ -29,6 +29,7 @@ import { encryptSecret, decryptSecret } from "./crypto";
 import {
   upsertBinding,
   upsertGoogleBinding,
+  upsertManualGoogleEmail,
   getGoogleTokenRow,
   listBindings,
   deleteBinding,
@@ -118,6 +119,7 @@ export default {
       if (p === "/admin/github.csv" && req.method === "GET") return await adminGithubCsv(req, env);
       if (p === "/admin/bindings" && req.method === "GET") return await adminBindings(req, env, url);
       if (p === "/admin/courses" && req.method === "POST") return await courseUpsert(req, env);
+      if (p === "/admin/manual-bind" && req.method === "POST") return await adminManualBind(req, env);
       const om = p.match(/^\/admin\/org\/([A-Za-z0-9_.-]+)$/);
       if (om && req.method === "GET") return await adminOrgView(req, env, url, om[1]);
       const cm = p.match(/^\/c\/([A-Za-z0-9_-]+)\/admin(\/[A-Za-z0-9._/-]*)?$/);
@@ -498,6 +500,38 @@ async function googleCallback(req: Request, env: Env, url: URL): Promise<Respons
   if (!session.nycu) {
     const b = await getBindingByGoogleSub(env.DB, g.sub);
     if (!b) {
+      // Admin-created manual binding: match the verified email to a pre-registered
+      // binding whose google_sub is still empty. The admin explicitly authorized
+      // this exact email, so NO domain restriction applies here. First login
+      // claims the sub so subsequent logins use the stable google_sub.
+      const manual = await getBindingByGoogleEmail(env.DB, g.email);
+      if (manual) {
+        if (manual.google_sub && manual.google_sub !== g.sub) {
+          return redirectDone(env, "err", "google_email_taken");
+        }
+        if (!manual.google_sub) {
+          const now = new Date(Date.now()).toISOString();
+          await upsertGoogleBinding(env.DB, {
+            nycu_id: manual.nycu_id,
+            nycu_name: manual.nycu_name ?? manual.nycu_id,
+            google_sub: g.sub,
+            google_email: g.email,
+            refresh_token: null,
+            scope: tokens.scope,
+            now,
+          });
+        }
+        const dest = await postLoginDestination(env, manual.nycu_id, session.app_return);
+        if (dest) return dest;
+        return redirect(
+          "/me",
+          setCookie(await signSession(
+            { exp: Date.now() + TTL_MS, nycu: { id: manual.nycu_id, name: manual.nycu_name ?? manual.nycu_id } },
+            env.SESSION_SECRET,
+          )),
+        );
+      }
+      // Moodle enrollment email fallback (domain-gated).
       if (!isAllowedEnrollmentLoginEmail(g.email)) return redirectDone(env, "err", "google_not_bound");
       const ids = await studentIdsForMoodleEmail(env.DB, g.email);
       if (ids.length === 0) return redirectDone(env, "err", "google_not_bound");
@@ -1031,9 +1065,15 @@ async function adminHome(req: Request, env: Env, url: URL): Promise<Response> {
     courses = courses.filter((c) => mine.has(c.course_id));
   }
   const orgs = await effectiveOrgs(env);
-  return new Response(adminHomePage(lang, courses, { isOwner, orgs }), {
-    headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
-  });
+  return new Response(
+    adminHomePage(lang, courses, {
+      isOwner,
+      orgs,
+      manual: url.searchParams.get("manual"),
+      manualReason: url.searchParams.get("reason"),
+    }),
+    { headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) } },
+  );
 }
 
 // GET /admin/bindings — the global binding registry (all bound students),
@@ -1074,6 +1114,34 @@ async function adminOrgView(req: Request, env: Env, url: URL, org: string): Prom
 }
 
 // POST /admin/courses — owner creates/updates a course-offering.
+// Owner-only manual binding: assign a 學號 to a Google email for a student with
+// no NYCU account and no Moodle-imported email. The student then signs in with
+// that Google account (first login claims the sub). Independent of enrollment.
+async function adminManualBind(req: Request, env: Env): Promise<Response> {
+  const s = await requireAdmin(req, env);
+  if (s instanceof Response) return s;
+  const form = await req.formData();
+  const studentId = String(form.get("student_id") ?? "").trim();
+  const email = String(form.get("google_email") ?? "").trim();
+  const name = String(form.get("name") ?? "").trim();
+  if (!studentId || !email || !email.includes("@")) {
+    return redirect("/admin?manual=err&reason=input");
+  }
+  const now = new Date(Date.now()).toISOString();
+  try {
+    await upsertManualGoogleEmail(env.DB, {
+      nycu_id: studentId,
+      nycu_name: name || studentId,
+      google_email: email,
+      now,
+    });
+  } catch (e) {
+    if (e instanceof GoogleConflictError) return redirect("/admin?manual=err&reason=email_taken");
+    throw e;
+  }
+  return redirect("/admin?manual=ok");
+}
+
 async function courseUpsert(req: Request, env: Env): Promise<Response> {
   const s = await requireAdmin(req, env);
   if (s instanceof Response) return s;

@@ -484,6 +484,23 @@ describe("adminHomePage (course picker)", () => {
     expect(html).not.toContain("<b>x</b>");
     expect(html).toContain("&lt;b&gt;x&lt;/b&gt;");
   });
+
+  it("shows the manual-binding form to owners only", () => {
+    const owner = adminHomePage("zh", courses, { isOwner: true });
+    expect(owner).toContain('action="/admin/manual-bind"');
+    expect(owner).toContain('name="student_id"');
+    expect(owner).toContain('name="google_email"');
+    expect(owner).toContain("手動綁定學生（無 NYCU／無 Moodle）");
+    const staff = adminHomePage("zh", courses, { isOwner: false });
+    expect(staff).not.toContain('action="/admin/manual-bind"');
+  });
+
+  it("renders the manual-binding result notice", () => {
+    expect(adminHomePage("zh", courses, { isOwner: true, manual: "ok" })).toContain("已建立手動綁定。");
+    expect(
+      adminHomePage("zh", courses, { isOwner: true, manual: "err", manualReason: "email_taken" }),
+    ).toContain("這個 Google email 已綁定其他學號。");
+  });
 });
 
 // ── exam window (考試期間) on the student exam page + its scoreboard ──────────

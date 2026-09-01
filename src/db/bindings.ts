@@ -93,6 +93,36 @@ export async function upsertGoogleBinding(db: D1Database, b: GoogleUpsertInput):
     .run();
 }
 
+// Admin-created manual binding: map a 學號 to a Google email BEFORE the student
+// has ever signed in (google_sub still empty). The student's first Google login
+// then claims the sub. Guards against assigning an email already bound to a
+// different NYCU account (which would make email login ambiguous). Touches only
+// nycu_name + google_email, so it never clobbers an existing GitHub/Google-sub
+// binding on the same row.
+export async function upsertManualGoogleEmail(
+  db: D1Database,
+  b: { nycu_id: string; nycu_name: string; google_email: string; now: string },
+): Promise<void> {
+  const existing = await db
+    .prepare(
+      "SELECT nycu_id FROM bindings WHERE google_email IS NOT NULL AND lower(google_email) = lower(?)",
+    )
+    .bind(b.google_email)
+    .first<{ nycu_id: string }>();
+  if (existing && existing.nycu_id !== b.nycu_id) {
+    throw new GoogleConflictError(existing.nycu_id);
+  }
+  await db
+    .prepare(
+      `INSERT INTO bindings (nycu_id, nycu_name, google_email, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?4)
+       ON CONFLICT(nycu_id) DO UPDATE SET
+         nycu_name = ?2, google_email = ?3, updated_at = ?4`,
+    )
+    .bind(b.nycu_id, b.nycu_name, b.google_email, b.now)
+    .run();
+}
+
 export interface GoogleTokenRow {
   google_refresh_token: string | null; // encrypted
   google_scope: string | null;

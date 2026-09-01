@@ -646,6 +646,45 @@ describe("sign in with GitHub / Google (login via an existing binding)", () => {
       "https://skhuang.github.io/maccount/done.html?status=err&reason=google_email_ambiguous",
     );
   });
+
+  it("admin manual binding lets a non-gmail Google account log in (domain bypass) and claims the sub", async () => {
+    // @corp.edu is a domain the Moodle fallback rejects; the manual binding
+    // (admin-authorized exact email) must still let this student in.
+    await env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, google_email, created_at, updated_at) VALUES ('0857001','外校生','ext@corp.edu','t','t')",
+    ).run();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("oauth2.googleapis.com/token"))
+        return new Response(JSON.stringify({ access_token: "t", scope: "openid email" }), { headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ sub: "extsub", email: "ext@corp.edu" }), { headers: { "Content-Type": "application/json" } });
+    }));
+    const session = await signSession({ exp: Date.now() + 60000, gostate: "GO", googleMode: "login" }, SECRET);
+    const res = await call("/auth/google/callback?code=abc&state=GO", { headers: cookie(session) });
+    expect(res.headers.get("Location")).toBe("/me");
+    const me = await call("/me", { headers: cookie(sessionToken(res)) });
+    expect(await me.text()).toContain("0857001");
+    // first login claimed the stable google_sub for subsequent logins
+    const row = await env.DB.prepare("SELECT google_sub FROM bindings WHERE nycu_id='0857001'").first();
+    expect(row).toMatchObject({ google_sub: "extsub" });
+  });
+
+  it("rejects login when a manually-bound email is already claimed by a different Google account", async () => {
+    await env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, google_sub, google_email, created_at, updated_at) VALUES ('0857002','某生','subA','shared@corp.edu','t','t')",
+    ).run();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("oauth2.googleapis.com/token"))
+        return new Response(JSON.stringify({ access_token: "t" }), { headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ sub: "subB", email: "shared@corp.edu" }), { headers: { "Content-Type": "application/json" } });
+    }));
+    const session = await signSession({ exp: Date.now() + 60000, gostate: "GO", googleMode: "login" }, SECRET);
+    const res = await call("/auth/google/callback?code=abc&state=GO", { headers: cookie(session) });
+    expect(res.headers.get("Location")).toBe(
+      "https://skhuang.github.io/maccount/done.html?status=err&reason=google_email_taken",
+    );
+  });
 });
 
 describe("/admin auth gate", () => {
@@ -706,6 +745,51 @@ describe("/admin auth gate", () => {
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("/auth/nycu/start");
     expect(await listBindings(env.DB)).toHaveLength(1);
+  });
+});
+
+describe("admin manual binding (學號 + Google email)", () => {
+  const owner = () => signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "Admin" } }, SECRET);
+  const post = (body: Record<string, string>, sess?: string) =>
+    call("/admin/manual-bind", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...(sess ? cookie(sess) : {}) },
+      body: new URLSearchParams(body).toString(),
+    });
+
+  it("owner creates a manual (學號 + email) binding with no sub", async () => {
+    const res = await post({ student_id: "0857001", google_email: "ext@corp.edu", name: "外校生" }, await owner());
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/admin?manual=ok");
+    const row = await env.DB
+      .prepare("SELECT nycu_id, nycu_name, google_email, google_sub FROM bindings WHERE nycu_id='0857001'")
+      .first();
+    expect(row).toMatchObject({ nycu_id: "0857001", nycu_name: "外校生", google_email: "ext@corp.edu", google_sub: null });
+  });
+
+  it("rejects a duplicate email bound to another student", async () => {
+    await post({ student_id: "0857001", google_email: "dup@corp.edu" }, await owner());
+    const res = await post({ student_id: "0857002", google_email: "dup@corp.edu" }, await owner());
+    expect(res.headers.get("Location")).toBe("/admin?manual=err&reason=email_taken");
+    expect(await listBindings(env.DB)).toHaveLength(1);
+  });
+
+  it("rejects missing / invalid input", async () => {
+    const res = await post({ student_id: "", google_email: "notanemail" }, await owner());
+    expect(res.headers.get("Location")).toBe("/admin?manual=err&reason=input");
+  });
+
+  it("forbids a logged-in non-owner (403)", async () => {
+    const sess = await signSession({ exp: Date.now() + 60000, nycu: { id: "0856001", name: "王" } }, SECRET);
+    const res = await post({ student_id: "0857003", google_email: "x@corp.edu" }, sess);
+    expect(res.status).toBe(403);
+  });
+
+  it("redirects an anonymous request to login and does not create", async () => {
+    const res = await post({ student_id: "0857004", google_email: "y@corp.edu" });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
+    expect(await listBindings(env.DB)).toHaveLength(0);
   });
 });
 

@@ -147,9 +147,34 @@ interface CourseLite {
 export function adminHomePage(
   lang: Lang,
   courses: CourseLite[],
-  opts: { isOwner: boolean; orgs?: string[] } = { isOwner: false },
+  opts: {
+    isOwner: boolean;
+    orgs?: string[];
+    manual?: string | null;
+    manualReason?: string | null;
+  } = { isOwner: false },
 ): string {
   const t = T[lang];
+  // Owner-only manual binding (學號 + Google email) for students with no NYCU /
+  // no Moodle email. Independent of enrollment.
+  const manualNotice =
+    opts.manual === "ok"
+      ? `<p style="color:#087f5b">${t.manual_bind_ok}</p>`
+      : opts.manual === "err"
+        ? `<p style="color:#c92a2a">${opts.manualReason === "email_taken" ? t.manual_bind_err_taken : t.manual_bind_err_input}</p>`
+        : "";
+  const manualBindForm = opts.isOwner
+    ? `<details class="admin-disclosure"><summary>${t.manual_bind_heading}</summary><div class="admin-disclosure__body">
+<p class="muted text-small">${t.manual_bind_note}</p>
+${manualNotice}
+<form method="post" action="/admin/manual-bind" class="form-stack" style="max-width:440px">
+  <label>${t.student_id}<input name="student_id" required autocomplete="off"></label>
+  <label>Google email<input name="google_email" type="email" required autocomplete="off"></label>
+  <label>${t.manual_bind_name}<input name="name" autocomplete="off"></label>
+  <button type="submit">${t.manual_bind_submit}</button>
+</form>
+</div></details>`
+    : "";
   // Query bindings by GitHub org — for students who bound but aren't enrolled
   // in any course yet (so the per-course views don't show them).
   const orgs = opts.orgs ?? [];
@@ -204,6 +229,7 @@ export function adminHomePage(
 <p class="identity__meta">${t.course_count.replace("{n}", String(courses.length))}</p>
 ${items}
 ${createForm}
+${manualBindForm}
 ${ownerExports}
 ${bindingsSection}
 ${legalFooter(t)}

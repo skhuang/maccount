@@ -9,6 +9,8 @@ import {
   getBinding,
   getBindingByGithubId,
   getBindingByGoogleSub,
+  getBindingByGoogleEmail,
+  upsertManualGoogleEmail,
   orgBindingView,
   GithubConflictError,
   GoogleConflictError,
@@ -134,6 +136,61 @@ describe("google binding", () => {
     const rows = await listBindings(env.DB);
     expect(JSON.stringify(rows)).not.toContain("enc-blob");
     expect(toCsv(rows)).not.toContain("enc-blob");
+  });
+});
+
+describe("manual google-email binding (admin-created, no sub yet)", () => {
+  const m = {
+    nycu_id: "0856777",
+    nycu_name: "陳同學",
+    google_email: "chen@somewhere.edu",
+    now: "2026-06-16T00:00:00.000Z",
+  };
+
+  it("creates a row with google_email and no google_sub / github", async () => {
+    await upsertManualGoogleEmail(env.DB, m);
+    const b = await getBindingByGoogleEmail(env.DB, "chen@somewhere.edu");
+    expect(b?.nycu_id).toBe("0856777");
+    expect(b?.google_email).toBe("chen@somewhere.edu");
+    expect(b?.google_sub).toBeNull();
+    expect(b?.github_id).toBeNull();
+  });
+
+  it("matches the email case-insensitively", async () => {
+    await upsertManualGoogleEmail(env.DB, m);
+    const b = await getBindingByGoogleEmail(env.DB, "CHEN@Somewhere.edu");
+    expect(b?.nycu_id).toBe("0856777");
+  });
+
+  it("updates email/name on re-entry for the same student", async () => {
+    await upsertManualGoogleEmail(env.DB, m);
+    await upsertManualGoogleEmail(env.DB, {
+      ...m,
+      nycu_name: "陳大文",
+      google_email: "chen2@somewhere.edu",
+      now: "2026-06-17T00:00:00.000Z",
+    });
+    expect(await getBindingByGoogleEmail(env.DB, "chen@somewhere.edu")).toBeNull();
+    const b = await getBindingByGoogleEmail(env.DB, "chen2@somewhere.edu");
+    expect(b?.nycu_name).toBe("陳大文");
+  });
+
+  it("throws GoogleConflictError when the email is bound to another student", async () => {
+    await upsertManualGoogleEmail(env.DB, m);
+    await expect(
+      upsertManualGoogleEmail(env.DB, { ...m, nycu_id: "0856888", nycu_name: "別人" }),
+    ).rejects.toBeInstanceOf(GoogleConflictError);
+  });
+
+  it("does not clobber an existing github binding", async () => {
+    await upsertBinding(env.DB, {
+      nycu_id: "0856777", nycu_name: "陳同學", github_id: 555, github_login: "chen", now: m.now,
+    });
+    await upsertManualGoogleEmail(env.DB, m);
+    const b = await getBinding(env.DB, "0856777");
+    expect(b?.github_login).toBe("chen"); // github preserved
+    expect(b?.google_email).toBe("chen@somewhere.edu");
+    expect(b?.google_sub).toBeNull();
   });
 });
 

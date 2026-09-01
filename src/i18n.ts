@@ -116,6 +116,13 @@ export interface Strings {
   meet_join: string;
   bindings_query_heading: string;
   bindings_all_link: string;
+  manual_bind_heading: string;
+  manual_bind_note: string;
+  manual_bind_name: string;
+  manual_bind_submit: string;
+  manual_bind_ok: string;
+  manual_bind_err_input: string;
+  manual_bind_err_taken: string;
   bindings_query_note: string;
   org_status_col: string;
   org_status_member: string;
@@ -412,6 +419,14 @@ export const T: Record<Lang, Strings> = {
     meet_join: "加入 Google Meet",
     bindings_query_heading: "查詢綁定（依 GitHub org）",
     bindings_all_link: "所有綁定",
+    manual_bind_heading: "手動綁定學生（無 NYCU／無 Moodle）",
+    manual_bind_note:
+      "直接指定學號與 Google email，該生即可用此 Google 帳號登入（首次登入自動認領，不限網域）。此為登入用途；成績仍需另將學號加入課程選課名單。",
+    manual_bind_name: "姓名（選填）",
+    manual_bind_submit: "建立綁定",
+    manual_bind_ok: "已建立手動綁定。",
+    manual_bind_err_input: "請輸入學號與有效的 Google email。",
+    manual_bind_err_taken: "這個 Google email 已綁定其他學號。",
     bindings_query_note: "學生綁定 GitHub 後、還沒選課時，可由此查；點 org 可即時比對誰已加入該 org。",
     org_status_col: "org 狀態",
     org_status_member: "已加入",
@@ -710,6 +725,14 @@ export const T: Record<Lang, Strings> = {
     meet_join: "Join Google Meet",
     bindings_query_heading: "Query bindings (by GitHub org)",
     bindings_all_link: "All bindings",
+    manual_bind_heading: "Manual student binding (no NYCU / no Moodle)",
+    manual_bind_note:
+      "Assign a student ID to a Google email; the student can then sign in with that Google account (first login claims it, any domain). This is for login only — add the student ID to a course roster for grades.",
+    manual_bind_name: "Name (optional)",
+    manual_bind_submit: "Create binding",
+    manual_bind_ok: "Manual binding created.",
+    manual_bind_err_input: "Enter a student ID and a valid Google email.",
+    manual_bind_err_taken: "This Google email is already bound to another student.",
     bindings_query_note: "For students who bound GitHub but aren't enrolled yet; click an org to cross-check who has joined it.",
     org_status_col: "org status",
     org_status_member: "member",
