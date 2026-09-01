@@ -303,6 +303,15 @@ describe("bindingsPage source column + owner management", () => {
     expect(bindingsPage("zh", brows, [], { isOwner: true, notice: "ok" })).toContain("已更新綁定。");
     expect(bindingsPage("zh", brows, [], { isOwner: true, notice: "deleted" })).toContain("已刪除綁定。");
   });
+
+  it("surfaces the Google email in a mobile-only details cell (hidden columns reachable on phones)", () => {
+    const html = bindingsPage("zh", brows);
+    expect(html).toContain('<th class="mobile-only">詳細資料</th>');
+    expect(html).toContain('<td class="mobile-only"><details class="mobile-row-details">');
+    // the email lives in the mobile details block (the plain column is hidden ≤640px)
+    const cell = html.slice(html.indexOf('<td class="mobile-only">'));
+    expect(cell).toContain("ext@corp.edu");
+  });
 });
 
 describe("admin list tools", () => {
@@ -527,8 +536,14 @@ describe("adminHomePage (course picker)", () => {
     expect(staff).not.toContain('action="/admin/manual-bind"');
   });
 
-  it("renders the manual-binding result notice", () => {
-    expect(adminHomePage("zh", courses, { isOwner: true, manual: "ok" })).toContain("已建立手動綁定。");
+  it("renders the manual-binding result notice OUTSIDE the collapsed form disclosure", () => {
+    const okHtml = adminHomePage("zh", courses, { isOwner: true, manual: "ok" });
+    expect(okHtml).toContain("已建立手動綁定。");
+    // the success notice must appear before the manual-bind <details> so it's
+    // visible without expanding the disclosure (the bug we're fixing)
+    expect(okHtml.indexOf("已建立手動綁定。")).toBeLessThan(okHtml.indexOf("手動綁定學生（無 NYCU"));
+    // and the disclosure auto-opens after an action so the form context shows
+    expect(okHtml).toContain('<details class="admin-disclosure" open>');
     expect(
       adminHomePage("zh", courses, { isOwner: true, manual: "err", manualReason: "email_taken" }),
     ).toContain("這個 Google email 已綁定其他學號。");

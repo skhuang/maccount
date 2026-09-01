@@ -164,9 +164,8 @@ export function adminHomePage(
         ? `<p style="color:#c92a2a">${opts.manualReason === "email_taken" ? t.manual_bind_err_taken : t.manual_bind_err_input}</p>`
         : "";
   const manualBindForm = opts.isOwner
-    ? `<details class="admin-disclosure"><summary>${t.manual_bind_heading}</summary><div class="admin-disclosure__body">
+    ? `<details class="admin-disclosure"${opts.manual ? " open" : ""}><summary>${t.manual_bind_heading}</summary><div class="admin-disclosure__body">
 <p class="muted text-small">${t.manual_bind_note}</p>
-${manualNotice}
 <form method="post" action="/admin/manual-bind" class="form-stack" style="max-width:440px">
   <label>${t.student_id}<input name="student_id" required autocomplete="off"></label>
   <label>Google email<input name="google_email" type="email" required autocomplete="off"></label>
@@ -227,6 +226,7 @@ ${manualNotice}
 <header class="topbar"><div>${langToggle("/admin", lang)}</div><div class="topbar__actions"><a href="/me">${t.acct_heading}</a><a href="/logout">${t.logout}</a></div></header>
 <h1>${t.admin_courses_heading}</h1>
 <p class="identity__meta">${t.course_count.replace("{n}", String(courses.length))}</p>
+${manualNotice}
 ${items}
 ${createForm}
 ${manualBindForm}
@@ -265,7 +265,7 @@ export function bindingsPage(
   const trs = rows
     .map(
       (r) => `<tr data-row><td>${h(r.nycu_id)}</td><td>${h(r.nycu_name)}</td>
-  <td>${h(r.github_login)}</td><td class="mobile-secondary">${h(r.github_id)}</td><td class="mobile-secondary">${h(r.google_email)}</td><td class="mobile-secondary">${h(srcLabel(r.source))}</td><td class="mobile-secondary">${h(fmtTime(r.updated_at))}</td>${isOwner ? actions(r) : ""}</tr>`,
+  <td>${h(r.github_login)}</td><td class="mobile-secondary">${h(r.github_id)}</td><td class="mobile-secondary">${h(r.google_email)}</td><td class="mobile-secondary">${h(srcLabel(r.source))}</td><td class="mobile-secondary">${h(fmtTime(r.updated_at))}</td><td class="mobile-only"><details class="mobile-row-details"><summary>${lang === "en" ? "Full details" : "查看完整資料"}</summary><dl><dt>${t.th_github_id}</dt><dd>${h(r.github_id) || "-"}</dd><dt>Google</dt><dd>${h(r.google_email) || "-"}</dd><dt>${t.source_label}</dt><dd>${h(srcLabel(r.source))}</dd><dt>${t.th_updated}</dt><dd>${h(fmtTime(r.updated_at)) || "-"}</dd></dl></details></td>${isOwner ? actions(r) : ""}</tr>`,
     )
     .join("\n");
   const orgLinks = orgs
@@ -279,7 +279,7 @@ export function bindingsPage(
         : opts.notice === "err"
           ? `<p style="color:#c92a2a">${opts.noticeReason === "email_taken" ? t.manual_bind_err_taken : t.manual_bind_err_input}</p>`
           : "";
-  const cols = isOwner ? 8 : 7;
+  const cols = isOwner ? 9 : 8; // +1 for the mobile-only details column
   return `${documentStart(lang, t.admin_title, UI_CSS)}
 <body style="font-family:system-ui;max-width:900px;margin:2rem auto;padding:0 1rem">
 ${langToggle("/admin/bindings", lang)}
@@ -289,7 +289,7 @@ ${notice}
 ${orgs.length ? `<p>${t.bindings_query_heading}：${orgLinks}</p>` : ""}
 ${rows.length ? tableTools(t, "bindings-table", rows.length) : ""}
 <table id="bindings-table" class="mobile-compact" border="1" cellpadding="6" cellspacing="0">
-<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("GitHub", 2)}${sortableTh(t.th_github_id, 3, "number", "mobile-secondary")}<th>Google</th>${sortableTh(t.source_label, 5, "text", "mobile-secondary")}${sortableTh(t.th_updated, 6, "text", "mobile-secondary")}${isOwner ? `<th>${t.actions_label}</th>` : ""}</tr></thead>
+<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("GitHub", 2)}${sortableTh(t.th_github_id, 3, "number", "mobile-secondary")}<th>Google</th>${sortableTh(t.source_label, 5, "text", "mobile-secondary")}${sortableTh(t.th_updated, 6, "text", "mobile-secondary")}<th class="mobile-only">${lang === "en" ? "Details" : "詳細資料"}</th>${isOwner ? `<th>${t.actions_label}</th>` : ""}</tr></thead>
 <tbody>
 ${trs || `<tr><td colspan="${cols}" class="empty-cell">${t.no_bindings}</td></tr>`}
 </tbody></table>
