@@ -109,6 +109,7 @@ export default {
         return await assignmentVisibility(req, env);
       if (p === "/api/roster" && req.method === "GET") return await apiRoster(req, env);
       if (p === "/api/courses" && req.method === "GET") return await apiCourses(req, env, url);
+      if (p === "/api/enrolled" && req.method === "GET") return await apiEnrolled(req, env, url);
       if (p === "/api/resolve-google" && req.method === "GET")
         return await apiResolveGoogle(req, env, url);
       if (p === "/api/resolve-github" && req.method === "GET")
@@ -859,6 +860,27 @@ async function apiCourses(req: Request, env: Env, url: URL): Promise<Response> {
   const nameById = new Map((await listCourses(env.DB)).map((c) => [c.course_id, c.name]));
   const courses = ids.map((id) => ({ course_id: id, name: nameById.get(id) ?? id }));
   return json({ student_id: studentId, courses }, 200);
+}
+
+// GET /api/enrolled?course_id= — full enrolled roster for a course (token auth),
+// INCLUDING google-only students (github_login null), so dsjudge can build
+// non-program assignments for students without a repo. Only the four fields
+// below are returned (no Moodle email / github_id) to limit PII exposure.
+async function apiEnrolled(req: Request, env: Env, url: URL): Promise<Response> {
+  if (!bearerOk(req, env)) return new Response("Unauthorized", { status: 401 });
+  const json = (body: unknown, status: number) =>
+    new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  const courseId = url.searchParams.get("course_id");
+  if (!courseId) return json({ error: "need course_id" }, 400);
+  if (!(await getCourse(env.DB, courseId))) return json({ error: "course not found" }, 404);
+  const rows = await listEnrolledWithBinding(env.DB, courseId);
+  const students = rows.map((s) => ({
+    student_id: s.student_id,
+    name: s.name,
+    github_login: s.github_login,
+    google_email: s.google_email,
+  }));
+  return json({ course_id: courseId, students }, 200);
 }
 
 // Resolve a bound Google account -> 學號 (token-auth). Used by oj-exam's
