@@ -273,6 +273,38 @@ describe("adminPage", () => {
   });
 });
 
+describe("bindingsPage source column + owner management", () => {
+  const brows: BindingRow[] = [
+    {
+      nycu_id: "0857001", nycu_name: "外校生", github_id: null as unknown as number,
+      github_login: null, google_sub: null, google_email: "ext@corp.edu",
+      source: "manual", created_at: "t", updated_at: "t",
+    },
+  ];
+
+  it("shows the source column with a localized label", () => {
+    const html = bindingsPage("zh", brows);
+    expect(html).toContain("方式"); // column header
+    expect(html).toContain("手動"); // manual source label
+  });
+
+  it("shows edit + delete actions only to owners", () => {
+    const owner = bindingsPage("zh", brows, [], { isOwner: true });
+    expect(owner).toContain('action="/admin/bindings/delete"');
+    expect(owner).toContain('action="/admin/bindings/edit"');
+    expect(owner).toContain('name="google_email"');
+    expect(owner).toContain('name="nycu_id" value="0857001"');
+    const staff = bindingsPage("zh", brows, [], { isOwner: false });
+    expect(staff).not.toContain("/admin/bindings/delete");
+    expect(staff).not.toContain("/admin/bindings/edit");
+  });
+
+  it("renders the management result notice", () => {
+    expect(bindingsPage("zh", brows, [], { isOwner: true, notice: "ok" })).toContain("已更新綁定。");
+    expect(bindingsPage("zh", brows, [], { isOwner: true, notice: "deleted" })).toContain("已刪除綁定。");
+  });
+});
+
 describe("admin list tools", () => {
   it("adds client-side search to the global bindings list", () => {
     const html = bindingsPage("en", rows);

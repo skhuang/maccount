@@ -6,6 +6,8 @@ export interface BindingRow {
   // Optional: present once the student also binds a Google account.
   google_sub?: string | null;
   google_email?: string | null;
+  // How the row was first provisioned: "nycu" | "moodle" | "manual" | null.
+  source?: string | null;
   created_at: string;
   updated_at: string;
 }

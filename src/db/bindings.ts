@@ -19,11 +19,14 @@ export interface UpsertInput {
   nycu_name: string;
   github_id: number;
   github_login: string;
+  // Provisioning method, set only when the row is first created (COALESCE keeps
+  // the original on later updates).
+  source?: string | null;
   now: string;
 }
 
 const BINDING_COLS =
-  "nycu_id, nycu_name, github_id, github_login, google_sub, google_email, created_at, updated_at";
+  "nycu_id, nycu_name, github_id, github_login, google_sub, google_email, source, created_at, updated_at";
 
 export async function upsertBinding(db: D1Database, b: UpsertInput): Promise<void> {
   // Best-effort conflict guard for the common (sequential) case. Two concurrent
@@ -38,12 +41,14 @@ export async function upsertBinding(db: D1Database, b: UpsertInput): Promise<voi
   }
   await db
     .prepare(
-      `INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, created_at, updated_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?5)
+      `INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, source, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?6, ?5, ?5)
        ON CONFLICT(nycu_id) DO UPDATE SET
-         nycu_name = ?2, github_id = ?3, github_login = ?4, updated_at = ?5`,
+         nycu_name = ?2, github_id = ?3, github_login = ?4,
+         source = COALESCE(bindings.source, ?6),
+         updated_at = ?5`,
     )
-    .bind(b.nycu_id, b.nycu_name, b.github_id, b.github_login, b.now)
+    .bind(b.nycu_id, b.nycu_name, b.github_id, b.github_login, b.now, b.source ?? null)
     .run();
 }
 
@@ -60,6 +65,7 @@ export interface GoogleUpsertInput {
   // time → keep any existing stored token rather than wiping it.
   refresh_token?: string | null;
   scope?: string | null;
+  source?: string | null;
   now: string;
 }
 
@@ -80,16 +86,17 @@ export async function upsertGoogleBinding(db: D1Database, b: GoogleUpsertInput):
     .prepare(
       `INSERT INTO bindings
          (nycu_id, nycu_name, google_sub, google_email,
-          google_refresh_token, google_scope, google_token_updated_at, created_at, updated_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
+          google_refresh_token, google_scope, google_token_updated_at, source, created_at, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?9, ?8, ?8)
        ON CONFLICT(nycu_id) DO UPDATE SET
          nycu_name = ?2, google_sub = ?3, google_email = ?4,
          google_refresh_token = COALESCE(?5, google_refresh_token),
          google_scope = COALESCE(?6, google_scope),
          google_token_updated_at = COALESCE(?7, google_token_updated_at),
+         source = COALESCE(bindings.source, ?9),
          updated_at = ?8`,
     )
-    .bind(b.nycu_id, b.nycu_name, b.google_sub, b.google_email, refresh, scope, tokenAt, b.now)
+    .bind(b.nycu_id, b.nycu_name, b.google_sub, b.google_email, refresh, scope, tokenAt, b.now, b.source ?? null)
     .run();
 }
 
@@ -114,13 +121,61 @@ export async function upsertManualGoogleEmail(
   }
   await db
     .prepare(
-      `INSERT INTO bindings (nycu_id, nycu_name, google_email, created_at, updated_at)
-       VALUES (?1, ?2, ?3, ?4, ?4)
+      `INSERT INTO bindings (nycu_id, nycu_name, google_email, source, created_at, updated_at)
+       VALUES (?1, ?2, ?3, 'manual', ?4, ?4)
        ON CONFLICT(nycu_id) DO UPDATE SET
-         nycu_name = ?2, google_email = ?3, updated_at = ?4`,
+         nycu_name = ?2, google_email = ?3,
+         source = COALESCE(bindings.source, 'manual'),
+         updated_at = ?4`,
     )
     .bind(b.nycu_id, b.nycu_name, b.google_email, b.now)
     .run();
+}
+
+// Admin edit of a binding's contact fields (name + Google email). If the email
+// changes, the claimed google_sub + stored Google token are cleared so the new
+// address must be re-claimed on next Google login (keeps the binding pointing at
+// the right identity). Guards against an email already bound to another student.
+// nycu_id (the key) and GitHub fields are not editable here.
+export async function updateBindingContact(
+  db: D1Database,
+  b: { nycu_id: string; nycu_name: string; google_email: string; now: string },
+): Promise<void> {
+  const cur = await db
+    .prepare("SELECT google_email FROM bindings WHERE nycu_id = ?")
+    .bind(b.nycu_id)
+    .first<{ google_email: string | null }>();
+  if (!cur) return; // nothing to edit
+  const newEmail = b.google_email.trim();
+  if (newEmail) {
+    const other = await db
+      .prepare(
+        "SELECT nycu_id FROM bindings WHERE google_email IS NOT NULL AND lower(google_email) = lower(?) AND nycu_id <> ?",
+      )
+      .bind(newEmail, b.nycu_id)
+      .first<{ nycu_id: string }>();
+    if (other) throw new GoogleConflictError(other.nycu_id);
+  }
+  const name = b.nycu_name.trim() || b.nycu_id;
+  const emailChanged = (cur.google_email ?? "").toLowerCase() !== newEmail.toLowerCase();
+  if (emailChanged) {
+    await db
+      .prepare(
+        `UPDATE bindings SET
+           nycu_name = ?2, google_email = ?3,
+           google_sub = NULL, google_refresh_token = NULL,
+           google_scope = NULL, google_token_updated_at = NULL,
+           updated_at = ?4
+         WHERE nycu_id = ?1`,
+      )
+      .bind(b.nycu_id, name, newEmail || null, b.now)
+      .run();
+  } else {
+    await db
+      .prepare("UPDATE bindings SET nycu_name = ?2, updated_at = ?3 WHERE nycu_id = ?1")
+      .bind(b.nycu_id, name, b.now)
+      .run();
+  }
 }
 
 export interface GoogleTokenRow {

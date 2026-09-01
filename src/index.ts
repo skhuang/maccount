@@ -30,6 +30,7 @@ import {
   upsertBinding,
   upsertGoogleBinding,
   upsertManualGoogleEmail,
+  updateBindingContact,
   getGoogleTokenRow,
   listBindings,
   deleteBinding,
@@ -118,6 +119,8 @@ export default {
       if (p === "/admin" && req.method === "GET") return await adminHome(req, env, url);
       if (p === "/admin/github.csv" && req.method === "GET") return await adminGithubCsv(req, env);
       if (p === "/admin/bindings" && req.method === "GET") return await adminBindings(req, env, url);
+      if (p === "/admin/bindings/edit" && req.method === "POST") return await adminBindingEdit(req, env);
+      if (p === "/admin/bindings/delete" && req.method === "POST") return await adminBindingDelete(req, env);
       if (p === "/admin/courses" && req.method === "POST") return await courseUpsert(req, env);
       if (p === "/admin/manual-bind" && req.method === "POST") return await adminManualBind(req, env);
       const om = p.match(/^\/admin\/org\/([A-Za-z0-9_.-]+)$/);
@@ -402,6 +405,7 @@ async function githubCallback(req: Request, env: Env, url: URL): Promise<Respons
       nycu_name: session.nycu.name,
       github_id: gh.id,
       github_login: gh.login,
+      source: "nycu",
       now,
     });
   } catch (e) {
@@ -518,6 +522,7 @@ async function googleCallback(req: Request, env: Env, url: URL): Promise<Respons
             google_email: g.email,
             refresh_token: null,
             scope: tokens.scope,
+            source: "manual",
             now,
           });
         }
@@ -544,6 +549,7 @@ async function googleCallback(req: Request, env: Env, url: URL): Promise<Respons
         google_email: g.email,
         refresh_token: null,
         scope: tokens.scope,
+        source: "moodle",
         now,
       });
       const appDestNew = await postLoginDestination(env, ids[0], session.app_return);
@@ -582,6 +588,7 @@ async function googleCallback(req: Request, env: Env, url: URL): Promise<Respons
       google_email: g.email,
       refresh_token: refreshEnc,
       scope: tokens.scope,
+      source: "nycu",
       now,
     });
   } catch (e) {
@@ -1082,10 +1089,47 @@ async function adminBindings(req: Request, env: Env, url: URL): Promise<Response
   const s = await requireStaff(req, env);
   if (s instanceof Response) return s;
   const lang = pickLang(url, req.headers.get("Cookie"));
+  const isOwner = isAdmin(env, s.nycu!.id);
   const [rows, orgs] = await Promise.all([listBindings(env.DB), effectiveOrgs(env)]);
-  return new Response(bindingsPage(lang, rows, orgs), {
-    headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
-  });
+  return new Response(
+    bindingsPage(lang, rows, orgs, {
+      isOwner,
+      notice: url.searchParams.get("b"),
+      noticeReason: url.searchParams.get("reason"),
+    }),
+    { headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) } },
+  );
+}
+
+// Owner-only edit of a binding's name + Google email (see updateBindingContact).
+async function adminBindingEdit(req: Request, env: Env): Promise<Response> {
+  const s = await requireAdmin(req, env);
+  if (s instanceof Response) return s;
+  const form = await req.formData();
+  const nycuId = String(form.get("nycu_id") ?? "").trim();
+  if (!nycuId) return redirect("/admin/bindings?b=err&reason=input");
+  try {
+    await updateBindingContact(env.DB, {
+      nycu_id: nycuId,
+      nycu_name: String(form.get("nycu_name") ?? "").trim(),
+      google_email: String(form.get("google_email") ?? "").trim(),
+      now: new Date(Date.now()).toISOString(),
+    });
+  } catch (e) {
+    if (e instanceof GoogleConflictError) return redirect("/admin/bindings?b=err&reason=email_taken");
+    throw e;
+  }
+  return redirect("/admin/bindings?b=ok");
+}
+
+// Owner-only delete of an entire binding row (both providers). Destructive.
+async function adminBindingDelete(req: Request, env: Env): Promise<Response> {
+  const s = await requireAdmin(req, env);
+  if (s instanceof Response) return s;
+  const form = await req.formData();
+  const nycuId = String(form.get("nycu_id") ?? "").trim();
+  if (nycuId) await deleteBinding(env.DB, nycuId);
+  return redirect("/admin/bindings?b=deleted");
 }
 
 // GET /admin/org/<org> — query bindings by GitHub org: live-fetch the org's

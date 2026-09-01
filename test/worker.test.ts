@@ -793,6 +793,68 @@ describe("admin manual binding (學號 + Google email)", () => {
   });
 });
 
+describe("admin binding management (owner edit/delete on /admin/bindings)", () => {
+  const owner = () => signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "Admin" } }, SECRET);
+  const seed = () =>
+    env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, google_sub, google_email, source, created_at, updated_at) VALUES ('0857001','外校生','claimed','ext@corp.edu','manual','t','t')",
+    ).run();
+  const post = (path: string, body: Record<string, string>, sess?: string) =>
+    call(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...(sess ? cookie(sess) : {}) },
+      body: new URLSearchParams(body).toString(),
+    });
+
+  it("owner edits the name and keeps google_sub", async () => {
+    await seed();
+    const res = await post("/admin/bindings/edit", { nycu_id: "0857001", nycu_name: "外校生2", google_email: "ext@corp.edu" }, await owner());
+    expect(res.headers.get("Location")).toBe("/admin/bindings?b=ok");
+    const row = await env.DB.prepare("SELECT nycu_name, google_sub FROM bindings WHERE nycu_id='0857001'").first();
+    expect(row).toMatchObject({ nycu_name: "外校生2", google_sub: "claimed" });
+  });
+
+  it("owner edits the email → clears google_sub for re-claim", async () => {
+    await seed();
+    const res = await post("/admin/bindings/edit", { nycu_id: "0857001", nycu_name: "外校生", google_email: "new@corp.edu" }, await owner());
+    expect(res.headers.get("Location")).toBe("/admin/bindings?b=ok");
+    const row = await env.DB.prepare("SELECT google_email, google_sub FROM bindings WHERE nycu_id='0857001'").first();
+    expect(row).toMatchObject({ google_email: "new@corp.edu", google_sub: null });
+  });
+
+  it("rejects edit to an email already bound to another student", async () => {
+    await seed();
+    await env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, google_email, source, created_at, updated_at) VALUES ('0857002','taken@corp.edu','manual','t','t')",
+    ).run();
+    const res = await post("/admin/bindings/edit", { nycu_id: "0857001", nycu_name: "外校生", google_email: "taken@corp.edu" }, await owner());
+    expect(res.headers.get("Location")).toBe("/admin/bindings?b=err&reason=email_taken");
+  });
+
+  it("owner deletes a binding", async () => {
+    await seed();
+    const res = await post("/admin/bindings/delete", { nycu_id: "0857001" }, await owner());
+    expect(res.headers.get("Location")).toBe("/admin/bindings?b=deleted");
+    expect(await listBindings(env.DB)).toHaveLength(0);
+  });
+
+  it("forbids edit/delete to a logged-in non-owner (403) and does not mutate", async () => {
+    await seed();
+    const sess = await signSession({ exp: Date.now() + 60000, nycu: { id: "0856001", name: "王" } }, SECRET);
+    expect((await post("/admin/bindings/edit", { nycu_id: "0857001", nycu_name: "x", google_email: "ext@corp.edu" }, sess)).status).toBe(403);
+    expect((await post("/admin/bindings/delete", { nycu_id: "0857001" }, sess)).status).toBe(403);
+    expect(await listBindings(env.DB)).toHaveLength(1);
+  });
+
+  it("redirects an anonymous delete to login without mutating", async () => {
+    await seed();
+    const res = await post("/admin/bindings/delete", { nycu_id: "0857001" });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
+    expect(await listBindings(env.DB)).toHaveLength(1);
+  });
+});
+
 describe("staff/TA management", () => {
   const staffSession = () =>
     signSession({ exp: Date.now() + 60000, nycu: { id: "ta01", name: "助教" } }, SECRET);

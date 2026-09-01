@@ -11,6 +11,7 @@ import {
   getBindingByGoogleSub,
   getBindingByGoogleEmail,
   upsertManualGoogleEmail,
+  updateBindingContact,
   orgBindingView,
   GithubConflictError,
   GoogleConflictError,
@@ -191,6 +192,82 @@ describe("manual google-email binding (admin-created, no sub yet)", () => {
     expect(b?.github_login).toBe("chen"); // github preserved
     expect(b?.google_email).toBe("chen@somewhere.edu");
     expect(b?.google_sub).toBeNull();
+  });
+});
+
+describe("binding source marker", () => {
+  it("records the source on insert and keeps the first one on later updates", async () => {
+    await upsertBinding(env.DB, { ...base, source: "nycu" });
+    expect((await getBinding(env.DB, base.nycu_id))?.source).toBe("nycu");
+    // a later Google bind on the same row must not overwrite the original source
+    await upsertGoogleBinding(env.DB, {
+      nycu_id: base.nycu_id, nycu_name: base.nycu_name, google_sub: "s1",
+      google_email: "a@gmail.com", source: "moodle", now: base.now,
+    });
+    expect((await getBinding(env.DB, base.nycu_id))?.source).toBe("nycu");
+  });
+
+  it("upsertGoogleBinding sets moodle on a fresh row", async () => {
+    await upsertGoogleBinding(env.DB, {
+      nycu_id: "0856009", nycu_name: "0856009", google_sub: "s9",
+      google_email: "s9@gmail.com", source: "moodle", now: base.now,
+    });
+    expect((await getBinding(env.DB, "0856009"))?.source).toBe("moodle");
+  });
+
+  it("upsertManualGoogleEmail marks the row manual (and a login claim preserves it)", async () => {
+    await upsertManualGoogleEmail(env.DB, {
+      nycu_id: "0857001", nycu_name: "外校生", google_email: "ext@corp.edu", now: base.now,
+    });
+    expect((await getBinding(env.DB, "0857001"))?.source).toBe("manual");
+    // first Google login claims the sub via upsertGoogleBinding — source stays manual
+    await upsertGoogleBinding(env.DB, {
+      nycu_id: "0857001", nycu_name: "外校生", google_sub: "extsub",
+      google_email: "ext@corp.edu", source: "moodle", now: base.now,
+    });
+    const b = await getBinding(env.DB, "0857001");
+    expect(b?.source).toBe("manual");
+    expect(b?.google_sub).toBe("extsub");
+  });
+});
+
+describe("updateBindingContact", () => {
+  const seed = async () =>
+    upsertGoogleBinding(env.DB, {
+      nycu_id: "0856001", nycu_name: "王小明", google_sub: "sub1",
+      google_email: "old@gmail.com", source: "nycu", now: "2026-06-16T00:00:00.000Z",
+    });
+
+  it("updates the name only and preserves google_sub", async () => {
+    await seed();
+    await updateBindingContact(env.DB, {
+      nycu_id: "0856001", nycu_name: "王大文", google_email: "old@gmail.com", now: "2026-06-17T00:00:00.000Z",
+    });
+    const b = await getBinding(env.DB, "0856001");
+    expect(b?.nycu_name).toBe("王大文");
+    expect(b?.google_sub).toBe("sub1"); // unchanged
+  });
+
+  it("clears google_sub when the email changes (re-claim on next login)", async () => {
+    await seed();
+    await updateBindingContact(env.DB, {
+      nycu_id: "0856001", nycu_name: "王小明", google_email: "new@gmail.com", now: "2026-06-17T00:00:00.000Z",
+    });
+    const b = await getBinding(env.DB, "0856001");
+    expect(b?.google_email).toBe("new@gmail.com");
+    expect(b?.google_sub).toBeNull();
+  });
+
+  it("rejects an email already bound to another student", async () => {
+    await seed();
+    await upsertManualGoogleEmail(env.DB, {
+      nycu_id: "0856002", nycu_name: "李", google_email: "taken@gmail.com", now: "t",
+    });
+    await expect(
+      updateBindingContact(env.DB, {
+        nycu_id: "0856001", nycu_name: "王小明", google_email: "taken@gmail.com", now: "t",
+      }),
+    ).rejects.toBeInstanceOf(GoogleConflictError);
   });
 });
 

@@ -239,28 +239,59 @@ ${uiEnhancements(t)}
 
 // All bindings (the global registry), independent of course/enrollment — the
 // pre-enrollment catch-all. orgs link to the per-org join view.
-export function bindingsPage(lang: Lang, rows: BindingRow[], orgs: string[] = []): string {
+export function bindingsPage(
+  lang: Lang,
+  rows: BindingRow[],
+  orgs: string[] = [],
+  opts: { isOwner?: boolean; notice?: string | null; noticeReason?: string | null } = {},
+): string {
   const t = T[lang];
+  const isOwner = !!opts.isOwner;
+  const srcLabel = (s: string | null | undefined) =>
+    s === "manual" ? t.source_manual : s === "nycu" ? "NYCU" : s === "moodle" ? "Moodle" : t.source_unknown;
+  // confirm() text is a static i18n string (no user data) → safe in inline JS.
+  const actions = (r: BindingRow) => `<td>
+  <form method="post" action="/admin/bindings/delete" onsubmit="return confirm('${t.confirm_delete}')" style="display:inline">
+    <input type="hidden" name="nycu_id" value="${h(r.nycu_id)}"><button type="submit">${t.delete}</button>
+  </form>
+  <details><summary>${t.forms_edit}</summary>
+  <form method="post" action="/admin/bindings/edit" class="form-stack" style="max-width:320px;margin-top:.4rem">
+    <input type="hidden" name="nycu_id" value="${h(r.nycu_id)}">
+    <label>${t.th_name}<input name="nycu_name" value="${h(r.nycu_name)}"></label>
+    <label>Google email<input name="google_email" type="email" value="${h(r.google_email)}"></label>
+    <button type="submit">${t.save}</button>
+  </form></details>
+</td>`;
   const trs = rows
     .map(
       (r) => `<tr data-row><td>${h(r.nycu_id)}</td><td>${h(r.nycu_name)}</td>
-  <td>${h(r.github_login)}</td><td class="mobile-secondary">${h(r.github_id)}</td><td class="mobile-secondary">${h(r.google_email)}</td><td class="mobile-secondary">${h(fmtTime(r.updated_at))}</td></tr>`,
+  <td>${h(r.github_login)}</td><td class="mobile-secondary">${h(r.github_id)}</td><td class="mobile-secondary">${h(r.google_email)}</td><td class="mobile-secondary">${h(srcLabel(r.source))}</td><td class="mobile-secondary">${h(fmtTime(r.updated_at))}</td>${isOwner ? actions(r) : ""}</tr>`,
     )
     .join("\n");
   const orgLinks = orgs
     .map((o) => `<a href="/admin/org/${encodeURIComponent(o)}">${h(o)}</a>`)
     .join("　");
+  const notice =
+    opts.notice === "ok"
+      ? `<p style="color:#087f5b">${t.bindings_edit_ok}</p>`
+      : opts.notice === "deleted"
+        ? `<p style="color:#087f5b">${t.bindings_deleted}</p>`
+        : opts.notice === "err"
+          ? `<p style="color:#c92a2a">${opts.noticeReason === "email_taken" ? t.manual_bind_err_taken : t.manual_bind_err_input}</p>`
+          : "";
+  const cols = isOwner ? 8 : 7;
   return `${documentStart(lang, t.admin_title, UI_CSS)}
 <body style="font-family:system-ui;max-width:900px;margin:2rem auto;padding:0 1rem">
 ${langToggle("/admin/bindings", lang)}
 <p style="font-size:.9em"><a href="/admin">← ${t.admin_courses_heading}</a></p>
 <h1>${t.bindings_all_link}（${rows.length}）</h1>
+${notice}
 ${orgs.length ? `<p>${t.bindings_query_heading}：${orgLinks}</p>` : ""}
 ${rows.length ? tableTools(t, "bindings-table", rows.length) : ""}
 <table id="bindings-table" class="mobile-compact" border="1" cellpadding="6" cellspacing="0">
-<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("GitHub", 2)}${sortableTh(t.th_github_id, 3, "number", "mobile-secondary")}<th>Google</th>${sortableTh(t.th_updated, 5, "text", "mobile-secondary")}</tr></thead>
+<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("GitHub", 2)}${sortableTh(t.th_github_id, 3, "number", "mobile-secondary")}<th>Google</th>${sortableTh(t.source_label, 5, "text", "mobile-secondary")}${sortableTh(t.th_updated, 6, "text", "mobile-secondary")}${isOwner ? `<th>${t.actions_label}</th>` : ""}</tr></thead>
 <tbody>
-${trs || `<tr><td colspan="6" class="empty-cell">${t.no_bindings}</td></tr>`}
+${trs || `<tr><td colspan="${cols}" class="empty-cell">${t.no_bindings}</td></tr>`}
 </tbody></table>
 ${legalFooter(t)}
 ${uiEnhancements(t)}

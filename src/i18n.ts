@@ -123,6 +123,13 @@ export interface Strings {
   manual_bind_ok: string;
   manual_bind_err_input: string;
   manual_bind_err_taken: string;
+  source_label: string;
+  source_manual: string;
+  source_unknown: string;
+  actions_label: string;
+  save: string;
+  bindings_edit_ok: string;
+  bindings_deleted: string;
   bindings_query_note: string;
   org_status_col: string;
   org_status_member: string;
@@ -427,6 +434,13 @@ export const T: Record<Lang, Strings> = {
     manual_bind_ok: "已建立手動綁定。",
     manual_bind_err_input: "請輸入學號與有效的 Google email。",
     manual_bind_err_taken: "這個 Google email 已綁定其他學號。",
+    source_label: "方式",
+    source_manual: "手動",
+    source_unknown: "未知",
+    actions_label: "操作",
+    save: "儲存",
+    bindings_edit_ok: "已更新綁定。",
+    bindings_deleted: "已刪除綁定。",
     bindings_query_note: "學生綁定 GitHub 後、還沒選課時，可由此查；點 org 可即時比對誰已加入該 org。",
     org_status_col: "org 狀態",
     org_status_member: "已加入",
@@ -733,6 +747,13 @@ export const T: Record<Lang, Strings> = {
     manual_bind_ok: "Manual binding created.",
     manual_bind_err_input: "Enter a student ID and a valid Google email.",
     manual_bind_err_taken: "This Google email is already bound to another student.",
+    source_label: "Method",
+    source_manual: "Manual",
+    source_unknown: "Unknown",
+    actions_label: "Actions",
+    save: "Save",
+    bindings_edit_ok: "Binding updated.",
+    bindings_deleted: "Binding deleted.",
     bindings_query_note: "For students who bound GitHub but aren't enrolled yet; click an org to cross-check who has joined it.",
     org_status_col: "org status",
     org_status_member: "member",
