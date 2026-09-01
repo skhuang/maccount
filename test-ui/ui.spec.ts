@@ -112,7 +112,7 @@ test("admin tables search, filter, sort, and show an empty result", async ({ pag
   await expect(page.locator("#course-bindings-table tbody tr[data-row]").first().locator("td").first()).toHaveText("a01");
   await expect(page.locator('#course-bindings-table th[data-sort-column="0"]')).toHaveAttribute("aria-sort", "ascending");
 
-  await page.locator("#enrollment summary").click();
+  await page.locator("#enrollment > details > summary").click();
   await page.locator('[data-table-id="enrollment-table"] [data-table-status]').selectOption("missing");
   await expect(page.locator("#enrollment-table tbody tr[data-row]:visible")).toHaveCount(1);
   await expect(page.locator("#enrollment-table tbody tr[data-row]:visible")).toContainText("a01");
@@ -246,7 +246,7 @@ test("student dashboard prioritizes course progress and deadlines", async ({ pag
     { "ds-2026/midterm": { open_at: "2026-10-01T01:00:00Z", due_at: "2026-10-01T03:00:00Z" } },
   ));
   await expect(page.locator(".account-grid")).toHaveClass(/account-grid--complete/);
-  await expect(page.locator(".course-card__head > .badge")).toHaveText("1 / 2");
+  await expect(page.locator(".course-card__head-status .badge").last()).toHaveText("1 / 2");
   await expect(page.locator(".course-card__meta")).toContainText("截止");
   await expect(page.locator(".course-card__section-title")).toContainText(["作業", "考試"]);
 });
@@ -258,6 +258,12 @@ test("admin tables hide secondary columns on mobile without horizontal overflow"
   await expect(table.locator("th").filter({ hasText: "GitHub id" })).toBeHidden();
   await expect(table.locator("th").filter({ hasText: "NYCU id" })).toBeVisible();
   await expect(table.locator("tbody tr[data-row]").first()).toContainText("z99");
+  const details = table.locator("tbody tr[data-row]").first().locator(".mobile-row-details");
+  await expect(details).toBeVisible();
+  await expect(details.locator("dd").first()).toBeHidden();
+  await details.locator("summary").click();
+  await expect(details).toContainText("zoe@example.com");
+  await expect(details.locator("dd").first()).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 });

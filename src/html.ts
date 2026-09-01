@@ -60,17 +60,17 @@ body>p[style*="#fff3cd"]{background:var(--warning-soft)!important;border-color:#
 .with-help{display:inline-flex;align-items:center;gap:.4rem;flex-wrap:wrap}.help-hint{position:relative;display:inline-flex;align-items:center;margin-left:.35rem;vertical-align:middle}.help-hint__button{width:1.35rem;min-width:1.35rem;height:1.35rem;min-height:1.35rem;padding:0;border:1px solid #aac0b6;border-radius:999px;background:#fff;color:var(--brand);font-size:.82rem;font-weight:800;line-height:1}.help-hint__button:hover{background:var(--surface-soft);color:var(--brand-hover)}.help-hint__button[aria-expanded=true]{border-color:var(--brand);background:var(--brand);color:#fff}.help-hint__panel{position:absolute;right:0;top:calc(100% + .45rem);z-index:6;width:min(18rem,80vw);padding:.65rem .75rem;border:1px solid var(--line);border-radius:10px;background:#17211d;color:#fff;box-shadow:0 12px 32px rgba(20,45,34,.18);font-size:.85rem;font-weight:500;line-height:1.5;letter-spacing:0;white-space:normal}.help-hint__panel::before{content:"";position:absolute;top:-.4rem;right:.45rem;border:.4rem solid transparent;border-top:0;border-bottom-color:#17211d}
 .alert{padding:.8rem 1rem;border:1px solid var(--line);border-radius:9px}.alert--success{border-color:#b8e4ce;background:var(--success-soft)}.alert--warning{border-color:#eedc93;background:var(--warning-soft)}.alert--danger{border-color:#f1b6b6;background:var(--danger-soft)}
 .confirm-dialog{width:min(32rem,calc(100% - 2rem));padding:0;border:1px solid var(--line);border-radius:14px;background:#fff;color:var(--text);box-shadow:0 24px 70px rgba(20,45,34,.24)}.confirm-dialog::backdrop{background:rgba(14,25,20,.56)}.confirm-dialog__body{padding:1.35rem}.confirm-dialog h2{margin:0 0 .65rem;padding:0;border:0}.confirm-dialog p{margin:.5rem 0 1.25rem;color:var(--muted)}.confirm-dialog__actions{display:flex;justify-content:flex-end;gap:.65rem}.button--danger{background:var(--danger)}.button--danger:hover{background:#a61e1e}
-.course-list{display:grid;gap:1rem}.course-card{padding:1.1rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.course-card__head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:.85rem}.course-card__head h3{margin:0}.course-card__meta{margin:.2rem 0 0;color:var(--muted);font-size:.84rem}.course-card__section{margin-top:1rem;padding-top:.85rem;border-top:1px solid var(--line)}.course-card__section-title{margin:0 0 .45rem;font-size:.92rem;font-weight:750}.course-card>p:last-child{margin-bottom:0}.course-card table{margin-top:.45rem}
+.course-list{display:grid;gap:1rem}.course-card{padding:1.1rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.course-card__head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:.85rem}.course-card__head h3{margin:0}.course-card__head-status{display:grid;justify-items:end;gap:.35rem}.course-card__meta{margin:.2rem 0 0;color:var(--muted);font-size:.84rem}.course-card__section{margin-top:1rem;padding-top:.85rem;border-top:1px solid var(--line)}.course-card__section-title{margin:0 0 .45rem;font-size:.92rem;font-weight:750}.course-card>p:last-child{margin-bottom:0}.course-card table{margin-top:.45rem}
 .section-nav{position:sticky;top:0;z-index:2;display:flex;gap:.5rem;margin:0 -1rem 1.25rem;padding:.7rem 1rem;overflow-x:auto;border-block:1px solid var(--line);background:rgba(255,255,255,.96);box-shadow:0 5px 16px rgba(20,45,34,.05);white-space:nowrap}.section-nav a{padding:.3rem .55rem;border-radius:6px;text-decoration:none;font-size:.88rem;font-weight:650}.section-nav a:hover{background:var(--surface-soft)}
 .stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem;margin:1rem 0 1.5rem}.stat{padding:.85rem;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}.stat__value{display:block;font-size:1.45rem;font-weight:750;line-height:1.2}.stat__label{display:block;margin-top:.25rem;color:var(--muted);font-size:.82rem}
 .course-summary{margin:.25rem 0 1rem}.course-summary .stat{padding:.7rem}.course-summary .stat__value{font-size:1.1rem}.course-summary progress{display:block;width:100%;height:.45rem;margin-top:.45rem;accent-color:var(--brand)}
 .admin-sections{display:grid;gap:1rem}.admin-section{scroll-margin-top:5rem;padding:1.2rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.admin-section>h2:first-child{margin:0 0 .75rem;padding:0;border:0}.admin-section+.admin-section{margin-top:0}.admin-section form:last-child{margin-bottom:0}
 .admin-group{display:grid;gap:1rem}.admin-group__title{margin:1.25rem 0 0;padding:0;border:0;color:var(--muted);font-size:.88rem;letter-spacing:.06em;text-transform:uppercase}.admin-group-disclosure{margin:0;border:1px solid var(--line);background:#fff}.admin-group-disclosure>summary{padding:1rem 1.2rem}.admin-group-disclosure__body{display:grid;gap:1rem;padding:0 1rem 1rem}.admin-group-disclosure .admin-section{background:var(--surface-soft)}.export-menu{display:inline-block;margin:.25rem .5rem .75rem 0;background:#fff}.export-menu>summary{padding:.45rem .7rem;color:var(--brand);font-size:.9rem}.export-menu__links{display:grid;gap:.45rem;padding:0 .8rem .8rem}
-.lang-toggle{display:inline-flex;align-items:center;gap:.5rem;color:var(--muted);font-size:.9rem}.lang-toggle [aria-current="true"]{padding:.2rem .45rem;border-radius:6px;background:var(--surface-soft);color:var(--text);font-weight:700}.empty-state{margin:.8rem 0;padding:1rem;border:1px dashed #b9c7c0;border-radius:10px;background:var(--surface-soft);color:var(--muted);text-align:center;list-style:none}.empty-cell{padding:1.4rem!important;color:var(--muted);text-align:center}.inline-actions{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap}.text-danger{color:var(--danger)}.muted{color:var(--muted)}.text-small{font-size:.9em}
+.lang-toggle{display:inline-flex;align-items:center;gap:.5rem;color:var(--muted);font-size:.9rem}.lang-toggle [aria-current="true"]{padding:.2rem .45rem;border-radius:6px;background:var(--surface-soft);color:var(--text);font-weight:700}.empty-state{margin:.8rem 0;padding:1rem;border:1px dashed #b9c7c0;border-radius:10px;background:var(--surface-soft);color:var(--muted);text-align:center;list-style:none}.empty-cell{padding:1.4rem!important;color:var(--muted);text-align:center}.inline-actions{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap}.text-danger{color:var(--danger)}.muted{color:var(--muted)}.text-small{font-size:.9em}.mobile-only{display:none}
 .table-tools{display:grid;grid-template-columns:minmax(220px,1fr) minmax(160px,auto) auto;align-items:end;gap:.75rem;margin:.85rem 0}.table-tools label{font-size:.82rem}.table-tools input,.table-tools select{margin-top:.25rem}.table-count{align-self:center;margin:1.35rem 0 0;color:var(--muted);font-size:.85rem;white-space:nowrap}.copy-field{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin:.75rem 0}.button--secondary{min-height:34px;padding:.4rem .7rem;border-color:var(--line);background:#fff;color:var(--brand);font-size:.85rem}.button--secondary:hover{border-color:#9db2a7;background:var(--surface-soft);color:var(--brand-hover)}tr[hidden]{display:none}
 .sort-button{display:flex;width:100%;min-height:0;padding:0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;text-align:left}.sort-button:hover{background:transparent;color:var(--brand)}.sort-icon{margin-left:.4rem;color:var(--muted)}.course-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin:1rem 0}.course-admin-card{display:flex;min-height:150px;flex-direction:column;padding:1.1rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.course-admin-card--archived{background:var(--surface-soft)}.course-admin-card__head{display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem}.course-admin-card h2{margin:0;padding:0;border:0;font-size:1.1rem}.course-admin-card__meta{margin:.45rem 0 1rem;color:var(--muted);font-size:.88rem}.course-admin-card__action{margin:auto 0 0}.admin-disclosure{margin:1.5rem 0;background:#fff}.admin-disclosure>summary{font-size:1.05rem}.admin-disclosure__body{padding:0 1rem 1rem}.email-list{display:grid;gap:.45rem;margin:.8rem 0;padding:0;list-style:none}.email-list li{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.5rem .65rem;border:1px solid var(--line);border-radius:8px;background:#fff}.email-list code{overflow-wrap:anywhere}.copy-list{display:grid;gap:.6rem;margin:1rem 0}.copy-list textarea{min-height:9rem;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88rem;line-height:1.45;white-space:pre}.utility-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}.utility-card{padding:1rem;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}.utility-card p{margin:.35rem 0 0;color:var(--muted);font-size:.86rem}
 @media(max-width:760px){.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:640px){html{background:var(--surface)}body{width:100%;margin:0!important;padding:1.15rem!important;border:0;border-radius:0;box-shadow:none}h1{margin-top:.75rem}h2{margin-top:1.75rem}th,td{padding:.6rem!important}button{width:100%}.help-hint__button{width:1.45rem;min-width:1.45rem}.help-hint__panel{right:auto;left:50%;transform:translateX(-50%);width:min(18rem,calc(100vw - 2rem))}.help-hint__panel::before{right:auto;left:50%;transform:translateX(-50%)}td button,li button,.button--secondary,.sort-button{width:auto}form[style*="display:inline"]{display:inline!important}.topbar{align-items:flex-start}.topbar__actions{justify-content:flex-end}.account-grid{grid-template-columns:1fr}.section-nav{margin-inline:-1.15rem;padding-inline:1.15rem}.admin-section{padding:1rem}.course-card{padding:1rem}.table-tools{grid-template-columns:1fr}.table-count{margin:0}.copy-field{align-items:stretch}.copy-field code{flex:1;overflow-wrap:anywhere}.course-grid,.utility-grid{grid-template-columns:1fr}.mobile-compact{display:table;table-layout:auto;overflow:visible;white-space:normal}.mobile-compact th,.mobile-compact td{overflow-wrap:anywhere}.mobile-compact .mobile-secondary,.mobile-compact th:nth-child(5){display:none}.mobile-card-table{overflow:visible;white-space:normal}.mobile-card-table thead{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}.mobile-card-table tbody,.mobile-card-table tr,.mobile-card-table td{display:block;width:100%}.mobile-card-table tr{margin-bottom:.75rem;overflow:hidden;border:1px solid var(--line);border-radius:10px;background:#fff}.mobile-card-table td{display:grid;grid-template-columns:minmax(6.5rem,40%) minmax(0,1fr);gap:.75rem;border:0;border-bottom:1px solid var(--line);white-space:normal;overflow-wrap:anywhere}.mobile-card-table td:last-child{border-bottom:0}.mobile-card-table td::before{content:attr(data-label);color:var(--muted);font-size:.82rem;font-weight:700}.mobile-card-table tbody tr:nth-child(even),.mobile-card-table tbody tr:hover{background:#fff}}
+@media(max-width:640px){html{background:var(--surface)}body{width:100%;margin:0!important;padding:1.15rem!important;border:0;border-radius:0;box-shadow:none}h1{margin-top:.75rem}h2{margin-top:1.75rem}th,td{padding:.6rem!important}button{width:100%}.help-hint__button{width:1.45rem;min-width:1.45rem}.help-hint__panel{right:auto;left:50%;transform:translateX(-50%);width:min(18rem,calc(100vw - 2rem))}.help-hint__panel::before{right:auto;left:50%;transform:translateX(-50%)}td button,li button,.button--secondary,.sort-button{width:auto}form[style*="display:inline"]{display:inline!important}.topbar{align-items:flex-start}.topbar__actions{justify-content:flex-end}.account-grid{grid-template-columns:1fr}.section-nav{margin-inline:-1.15rem;padding-inline:1.15rem}.admin-section{padding:1rem}.course-card{padding:1rem}.table-tools{grid-template-columns:1fr}.table-count{margin:0}.copy-field{align-items:stretch}.copy-field code{flex:1;overflow-wrap:anywhere}.course-grid,.utility-grid{grid-template-columns:1fr}.mobile-compact{display:table;table-layout:auto;overflow:visible;white-space:normal}.mobile-compact th,.mobile-compact td{overflow-wrap:anywhere}.mobile-compact .mobile-secondary,.mobile-compact th:nth-child(5){display:none}.mobile-compact .mobile-only{display:table-cell}.mobile-row-details{margin:0;border:0;background:transparent}.mobile-row-details summary{padding:.25rem 0;color:var(--brand);font-size:.85rem}.mobile-row-details dl{display:grid;grid-template-columns:auto 1fr;gap:.25rem .65rem;margin:.4rem 0 0}.mobile-row-details dt{color:var(--muted);font-size:.8rem;font-weight:700}.mobile-row-details dd{margin:0;overflow-wrap:anywhere}.course-card__head{gap:.5rem}.course-card__head-status{min-width:max-content}.mobile-card-table{overflow:visible;white-space:normal}.mobile-card-table thead{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}.mobile-card-table tbody,.mobile-card-table tr,.mobile-card-table td{display:block;width:100%}.mobile-card-table tr{margin-bottom:.75rem;overflow:hidden;border:1px solid var(--line);border-radius:10px;background:#fff}.mobile-card-table td{display:grid;grid-template-columns:minmax(6.5rem,40%) minmax(0,1fr);gap:.75rem;border:0;border-bottom:1px solid var(--line);white-space:normal;overflow-wrap:anywhere}.mobile-card-table td:last-child{border-bottom:0}.mobile-card-table td::before{content:attr(data-label);color:var(--muted);font-size:.82rem;font-weight:700}.mobile-card-table tbody tr:nth-child(even),.mobile-card-table tbody tr:hover{background:#fff}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 `;
 
@@ -308,6 +308,34 @@ interface FormLite {
   pre_enroll?: number;     // 1 = shown to not-yet-enrolled students on /me/<course_id>
 }
 
+export interface DeadlineStatus {
+  dueAt: string;
+  tone: "danger" | "warning" | "neutral";
+  label: string;
+  additional: number;
+}
+
+// Pick the deadline a student should act on: the nearest upcoming deadline,
+// otherwise the most recently ended one. Labels are intentionally short so
+// they remain scannable in a narrow course-card header.
+export function courseDeadlineStatus(lang: Lang, dueDates: string[], now = Date.now()): DeadlineStatus | null {
+  const valid = dueDates
+    .filter((date) => Number.isFinite(Date.parse(date)))
+    .sort((a, b) => Date.parse(a) - Date.parse(b));
+  if (!valid.length) return null;
+  const upcoming = valid.filter((date) => Date.parse(date) >= now);
+  const dueAt = upcoming[0] ?? valid.at(-1)!;
+  const remaining = Date.parse(dueAt) - now;
+  const ended = remaining < 0;
+  const urgent = !ended && remaining <= 24 * 60 * 60 * 1000;
+  return {
+    dueAt,
+    tone: ended ? "neutral" : urgent ? "danger" : "warning",
+    label: lang === "en" ? (ended ? "Ended" : urgent ? "Due soon" : "Upcoming") : ended ? "已結束" : urgent ? "即將截止" : "即將到來",
+    additional: Math.max(0, (upcoming.length || 1) - 1),
+  };
+}
+
 // Only render a clickable link for an http(s) URL; otherwise show plain text.
 // Defense-in-depth on top of the http(s) check at insert time.
 function linkOrText(url: string, label: string): string {
@@ -364,7 +392,10 @@ export function adminPage(
   <td>${h(r.nycu_id)}</td><td>${h(r.nycu_name)}</td>
   <td>${h(r.github_login)}</td><td class="mobile-secondary">${h(r.github_id)}</td>
   <td class="mobile-secondary">${h(r.google_email)}</td>
-  <td class="mobile-secondary">${h(fmtTime(r.updated_at))}</td>${
+  <td class="mobile-secondary">${h(fmtTime(r.updated_at))}</td>
+  <td class="mobile-only"><details class="mobile-row-details"><summary>${lang === "en" ? "Full details" : "查看完整資料"}</summary><dl>
+    <dt>GitHub id</dt><dd>${h(r.github_id)}</dd><dt>Google</dt><dd>${h(r.google_email) || "-"}</dd><dt>${t.th_updated}</dt><dd>${h(fmtTime(r.updated_at))}</dd>
+  </dl></details></td>${
     isOwner
       ? `
   <td><form method="post" action="${base}/delete" ${confirmAttrs(
@@ -413,13 +444,15 @@ export function adminPage(
         const displayName = e.name || e.nycu_name || "";
         return `<tr data-row data-status="${e.github_login && e.google_email ? "complete" : "missing"}"><td>${h(e.student_id)}</td><td>${
           displayName ? h(displayName) : ""
-        }</td><td>${
+        }</td><td class="mobile-secondary">${
         e.email ? h(e.email) : ""
       }</td><td>${
         e.github_login ? h(e.github_login) : `<span class="badge badge--danger">${t.enroll_unbound}</span>`
-      }</td><td>${
+      }</td><td class="mobile-secondary">${
         e.google_email ? h(e.google_email) : `<span class="badge badge--danger">${t.enroll_unbound}</span>`
-      }</td></tr>`;
+      }</td><td class="mobile-only"><details class="mobile-row-details"><summary>${lang === "en" ? "Full details" : "查看完整資料"}</summary><dl>
+        <dt>Moodle email</dt><dd>${h(e.email) || "-"}</dd><dt>Google</dt><dd>${h(e.google_email) || "-"}</dd>
+      </dl></details></td></tr>`;
       },
     )
     .join("\n");
@@ -442,7 +475,7 @@ export function adminPage(
 <details><summary>${t.enroll_show_list}</summary>
 ${tableTools(t, "enrollment-table", enrolled.length, [{ value: "missing", label: t.table_filter_unbound }])}
 <table id="enrollment-table" class="mobile-compact" border="1" cellpadding="6" cellspacing="0">
-<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("Moodle email", 2)}${sortableTh("GitHub", 3)}<th>Google</th></tr></thead>
+<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("Moodle email", 2, "text", "mobile-secondary")}${sortableTh("GitHub", 3)}<th class="mobile-secondary">Google</th><th class="mobile-only">${lang === "en" ? "Details" : "詳細資料"}</th></tr></thead>
 <tbody>${enrolledRows}</tbody></table></details>`
       : ""
   }
@@ -719,9 +752,9 @@ ${exportMenu}
 <p><a href="${base}/scoreboard">📊 記分板 / Scoreboard</a>　|　<a href="${base}/provision">🚀 Provisioning 遙控</a></p>
 ${rows.length ? tableTools(t, "course-bindings-table", rows.length) : ""}
 <table id="course-bindings-table" class="mobile-compact" border="1" cellpadding="6" cellspacing="0">
-<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("GitHub", 2)}${sortableTh(t.th_github_id, 3, "number", "mobile-secondary")}<th>Google</th>${sortableTh(t.th_updated, 5, "text", "mobile-secondary")}${isOwner ? `<th>${t.th_actions}</th>` : ""}</tr></thead>
+<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("GitHub", 2)}${sortableTh(t.th_github_id, 3, "number", "mobile-secondary")}<th class="mobile-secondary">Google</th>${sortableTh(t.th_updated, 5, "text", "mobile-secondary")}<th class="mobile-only">${lang === "en" ? "Details" : "詳細資料"}</th>${isOwner ? `<th>${t.th_actions}</th>` : ""}</tr></thead>
 <tbody>
-${trs || `<tr><td colspan="${isOwner ? "7" : "6"}" class="empty-cell">${t.no_bindings}</td></tr>`}
+${trs || `<tr><td colspan="${isOwner ? "8" : "7"}" class="empty-cell">${t.no_bindings}</td></tr>`}
 </tbody></table></section>
 ${enrollSection}
 ${studentsTeamSection}
@@ -883,8 +916,8 @@ ${courseTable(labRows)}</section>`
             .map((g) => examWindows[`${g.course_id}/${g.assignment_id}`]?.due_at)
             .filter((v): v is string => Boolean(v))
             .sort((a, b) => Date.parse(a) - Date.parse(b));
-          const priorityDue = dueDates.find((date) => Date.parse(date) >= Date.now()) ?? dueDates.at(-1);
-          const courseMeta = priorityDue ? `${t.exam_window_due} ${h(fmtTime(priorityDue))}` : "";
+          const deadline = courseDeadlineStatus(lang, dueDates);
+          const courseMeta = deadline ? `${t.exam_window_due} ${h(fmtTime(deadline.dueAt))}${deadline.additional ? ` · +${deadline.additional}` : ""}` : "";
           const parts: string[] = [];
           const meet = meetByCourse[cid];
           if (meet) parts.push(`<p>${linkOrText(meet, t.meet_join)}</p>`);
@@ -892,7 +925,7 @@ ${courseTable(labRows)}</section>`
           const fhtml = formsFor(cid);
           if (fhtml) parts.push(fhtml);
           const inner = parts.length ? parts.join("") : `<p class="empty-state">${t.course_no_data}</p>`;
-          return `<article class="course-card"><header class="course-card__head"><div><h3>${h(courseName(cid))}${rs.length ? helpHint(t.help_grade_summary, t.help_label) : ""}</h3>${courseMeta ? `<p class="course-card__meta">${courseMeta}</p>` : ""}</div>${rs.length ? `<span class="badge badge--${completed === rs.length ? "success" : "warning"}">${completed} / ${rs.length}</span>` : ""}</header>\n${inner}</article>`;
+          return `<article class="course-card"><header class="course-card__head"><div><h3>${h(courseName(cid))}${rs.length ? helpHint(t.help_grade_summary, t.help_label) : ""}</h3>${courseMeta ? `<p class="course-card__meta">${courseMeta}</p>` : ""}</div><div class="course-card__head-status">${deadline ? `<span class="badge badge--${deadline.tone}">${deadline.label}</span>` : ""}${rs.length ? `<span class="badge badge--${completed === rs.length ? "success" : "warning"}">${completed} / ${rs.length}</span>` : ""}</div></header>\n${inner}</article>`;
         })
         .join("\n")}</div>`
     : `<p class="empty-state">${t.no_grades}</p>`;

@@ -3,6 +3,7 @@ import {
   adminPage,
   adminHomePage,
   bindingsPage,
+  courseDeadlineStatus,
   coursePrejoinPage,
   dashboardPage,
   examPage,
@@ -100,7 +101,7 @@ describe("adminPage", () => {
 
   it("shows the Google column with the bound email", () => {
     const html = adminPage("zh", course, [{ ...rows[0], google_email: "octo@gmail.com" }]);
-    expect(html).toContain("<th>Google</th>");
+    expect(html).toContain('<th class="mobile-secondary">Google</th>');
     expect(html).toContain("octo@gmail.com");
   });
 
@@ -174,7 +175,7 @@ describe("adminPage", () => {
         { student_id: "b02", name: "Bob", github_login: null, google_email: null },
       ],
     });
-    expect(html).toContain("<th>Google</th>");
+    expect(html).toContain('<th class="mobile-secondary">Google</th>');
     expect(html).toContain("Alice");
     expect(html).toContain("a01@gmail.com"); // a01's bound Google
     expect(html).toContain("未綁定"); // b02 unbound (github + google)
@@ -357,6 +358,26 @@ describe("dashboardPage", () => {
     );
     expect(html).toContain('class="badge badge--warning">&lt;pending&gt;</span>');
     expect(html).not.toContain("<pending>");
+  });
+});
+
+describe("courseDeadlineStatus", () => {
+  const now = Date.parse("2026-09-01T00:00:00Z");
+
+  it("prioritizes the nearest upcoming deadline and counts additional work", () => {
+    expect(courseDeadlineStatus("zh", ["2026-09-03T00:00:00Z", "2026-09-01T12:00:00Z"], now)).toEqual({
+      dueAt: "2026-09-01T12:00:00Z", tone: "danger", label: "即將截止", additional: 1,
+    });
+  });
+
+  it("falls back to the most recently ended deadline", () => {
+    expect(courseDeadlineStatus("en", ["2026-08-01T00:00:00Z", "2026-08-31T00:00:00Z"], now)).toEqual({
+      dueAt: "2026-08-31T00:00:00Z", tone: "neutral", label: "Ended", additional: 0,
+    });
+  });
+
+  it("ignores invalid dates", () => {
+    expect(courseDeadlineStatus("zh", ["invalid"], now)).toBeNull();
   });
 });
 
