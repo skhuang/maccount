@@ -1238,6 +1238,26 @@ describe("course edit + enrollment", () => {
     expect((await get("")).status).toBe(400);                       // missing param
   });
 
+  it("resolve-google falls back to email when the google_sub is unclaimed (manual binding)", async () => {
+    // manual binding: has google_email, google_sub still NULL
+    await env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, google_email, source, created_at, updated_at) VALUES ('AT9337','黃測試','ext@corp.edu','manual','t','t')",
+    ).run();
+    const get = (qs: string) =>
+      call(`/api/resolve-google?${qs}`, { headers: { Authorization: "Bearer ingest-secret" } });
+
+    // dsjudge sends its own OAuth sub (never stored here) + the verified email:
+    // sub misses, email resolves.
+    const r = await get("sub=dsjudge-sub-xyz&email=ext@corp.edu");
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({ student_id: "AT9337" });
+
+    // neither matches → 404 {null}
+    const none = await get("sub=dsjudge-sub-xyz&email=nobody@corp.edu");
+    expect(none.status).toBe(404);
+    expect(await none.json()).toEqual({ student_id: null });
+  });
+
   it("token API resolve-github maps a bound GitHub account → 學號", async () => {
     await env.DB.prepare(
       "INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, created_at, updated_at) VALUES ('0856002','李小華',424242,'HuaLee','t','t')",

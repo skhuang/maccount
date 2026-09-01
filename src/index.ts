@@ -861,9 +861,13 @@ async function apiResolveGoogle(req: Request, env: Env, url: URL): Promise<Respo
       headers: { "Content-Type": "application/json" },
     });
   if (!sub && !email) return json({ error: "need sub or email" }, 400);
-  const row = sub
-    ? await getBindingByGoogleSub(env.DB, sub)
-    : await getBindingByGoogleEmail(env.DB, email!);
+  // Prefer the stable google_sub; fall back to email so google-only students
+  // (manual bindings whose sub is not yet claimed) still resolve. Email match =
+  // the caller verified control of the address via its own Google OAuth (same
+  // trust boundary as maccount's manual-binding login).
+  const row =
+    (sub ? await getBindingByGoogleSub(env.DB, sub) : null) ??
+    (email ? await getBindingByGoogleEmail(env.DB, email) : null);
   if (!row) return json({ student_id: null }, 404);
   return json({ student_id: row.nycu_id }, 200);
 }
