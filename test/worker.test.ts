@@ -2199,6 +2199,36 @@ describe("/api/roster (token-auth pull for the OJ roster-sync timer)", () => {
   });
 });
 
+describe("GET /api/courses (token API: a student's courses)", () => {
+  const get = (qs: string, tok = "ingest-secret") =>
+    call(`/api/courses?${qs}`, { headers: { Authorization: `Bearer ${tok}` } });
+
+  it("lists the courses a student is enrolled in, with names", async () => {
+    await env.DB.batch([
+      env.DB.prepare("INSERT OR IGNORE INTO courses (course_id, name, status, created_at) VALUES ('mk-2026','行銷 2026','active','t')"),
+      env.DB.prepare("INSERT OR IGNORE INTO courses (course_id, name, status, created_at) VALUES ('ds-2026','資料結構 2026','active','t')"),
+      env.DB.prepare("INSERT INTO enrollments (course_id, student_id, role, created_at) VALUES ('mk-2026','AT9337','student','t')"),
+    ]);
+    const r = await get("student_id=AT9337");
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({
+      student_id: "AT9337",
+      courses: [{ course_id: "mk-2026", name: "行銷 2026" }],
+    });
+  });
+
+  it("returns an empty list for a student with no enrollment", async () => {
+    const r = await get("student_id=ghost");
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({ student_id: "ghost", courses: [] });
+  });
+
+  it("requires the token and the student_id param", async () => {
+    expect((await call("/api/courses?student_id=AT9337")).status).toBe(401);
+    expect((await get("")).status).toBe(400);
+  });
+});
+
 describe("GET /api/roster?course_id= (per-course, token)", () => {
   const NOW = "2026-06-30T00:00:00.000Z";
   const get = (q = "") =>

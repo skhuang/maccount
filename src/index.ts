@@ -108,6 +108,7 @@ export default {
       if (p === "/api/assignment-visibility" && req.method === "POST")
         return await assignmentVisibility(req, env);
       if (p === "/api/roster" && req.method === "GET") return await apiRoster(req, env);
+      if (p === "/api/courses" && req.method === "GET") return await apiCourses(req, env, url);
       if (p === "/api/resolve-google" && req.method === "GET")
         return await apiResolveGoogle(req, env, url);
       if (p === "/api/resolve-github" && req.method === "GET")
@@ -843,6 +844,21 @@ async function apiRoster(req: Request, env: Env): Promise<Response> {
   return new Response(toRosterCsv(rows), {
     headers: { "Content-Type": "text/csv; charset=utf-8" },
   });
+}
+
+// GET /api/courses?student_id= — the courses a student is enrolled in (token
+// auth). Lets dsjudge list courses for a google-only student it resolved by
+// email. Unknown/never-enrolled student → empty list (200), not 404.
+async function apiCourses(req: Request, env: Env, url: URL): Promise<Response> {
+  if (!bearerOk(req, env)) return new Response("Unauthorized", { status: 401 });
+  const json = (body: unknown, status: number) =>
+    new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  const studentId = url.searchParams.get("student_id");
+  if (!studentId) return json({ error: "need student_id" }, 400);
+  const ids = await coursesForStudent(env.DB, studentId);
+  const nameById = new Map((await listCourses(env.DB)).map((c) => [c.course_id, c.name]));
+  const courses = ids.map((id) => ({ course_id: id, name: nameById.get(id) ?? id }));
+  return json({ student_id: studentId, courses }, 200);
 }
 
 // Resolve a bound Google account -> 學號 (token-auth). Used by oj-exam's
