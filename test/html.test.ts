@@ -322,7 +322,7 @@ describe("dashboardPage", () => {
       { "ds-2026": "資料結構 2026" },
       [{ course_id: "ds-2026", name: "資料結構 2026" }],
     );
-    expect(html).toContain('class="account-grid"');
+    expect(html).toContain('class="account-grid account-grid--complete"');
     expect(html).toContain('class="course-card"');
     expect(html).toContain('class="mobile-card-table"');
     expect(html).toContain('data-label="題目"');
