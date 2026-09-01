@@ -6,44 +6,63 @@
 <link rel="stylesheet" href="./ui.css" />
 <body>
   <nav class="lang-switch" aria-label="Language"><a href="#" id="lang-zh">中文</a> · <a href="#" id="lang-en">English</a></nav>
-  <h1 id="t-h1"></h1>
+  <header class="hero">
+    <img class="brand-logo" src="./assets/maccount-logo.svg" alt="" width="64" height="64" />
+    <div>
+      <p class="eyebrow">maccount</p>
+      <h1 id="t-h1"></h1>
+    </div>
+  </header>
   <p id="t-intro"></p>
   <ul>
     <li id="t-li1"></li>
     <li id="t-li2"></li>
     <li id="t-li3"></li>
   </ul>
-  <div class="actions"><a id="start" class="button button--primary"></a></div>
-  <p id="alt-label" class="hint"></p>
-  <div class="actions">
-    <a id="login-github" class="button"></a>
-    <a id="login-google" class="button"></a>
-  </div>
+  <section class="login-panel login-panel--primary" aria-labelledby="first-label">
+    <h2 id="first-label"></h2>
+    <p id="first-note" class="panel-note"></p>
+    <div class="actions"><a id="start" class="button button--primary"></a></div>
+  </section>
+  <section class="login-panel" aria-labelledby="alt-label">
+    <h2 id="alt-label"></h2>
+    <p id="alt-note" class="panel-note"></p>
+    <div class="actions">
+      <a id="login-github" class="button"><span class="provider-mark" aria-hidden="true">GH</span><span data-label></span></a>
+      <a id="login-google" class="button"><span class="provider-mark provider-mark--google" aria-hidden="true">G</span><span data-label></span></a>
+    </div>
+  </section>
   <script>
     // 部署後把這裡換成你的 Worker 網址
     const WORKER_BASE = "https://maccount-api.skhuang.workers.dev";
     const STR = {
       zh: {
         title: "課程帳號 / 成績系統",
-        h1: "課程帳號 / 成績系統",
+        h1: "課程帳號與成績平台",
         intro: "用你的 NYCU 帳號 (id.nycu.edu.tw) 登入。登入後可以：",
         li1: "綁定你的 GitHub 帳號（作業評分用）",
         li2: "查詢你的成績",
         li3: "具管理權限者可使用管理功能",
-        btn: "用 NYCU 帳號登入 →",
-        alt: "已綁定過的人，也可以改用：",
-        btn_github: "用 GitHub 登入",
-        btn_google: "用 Google 登入",
+        first: "第一次使用？",
+        first_note: "請先用 NYCU 帳號登入並完成帳號綁定。",
+        btn: "用 NYCU 帳號登入",
+        alt: "已完成帳號綁定？",
+        alt_note: "可直接使用已綁定的 GitHub 或 Google 帳號返回平台。",
+        btn_github: "使用 GitHub 登入",
+        btn_google: "使用 Google 登入",
       },
       en: {
         title: "Course Account / Grades",
-        h1: "Course Account / Grades",
+        h1: "Course Accounts & Grades",
         intro: "Sign in with your NYCU account (id.nycu.edu.tw). After signing in you can:",
         li1: "Bind your GitHub account (for grading)",
         li2: "Check your grades",
         li3: "Admins can use admin functions",
-        btn: "Sign in with NYCU →",
-        alt: "Already linked? You can also use:",
+        first: "First time here?",
+        first_note: "Sign in with NYCU first to connect your course accounts.",
+        btn: "Sign in with NYCU",
+        alt: "Already connected?",
+        alt_note: "Return with your connected GitHub or Google account.",
         btn_github: "Sign in with GitHub",
         btn_google: "Sign in with Google",
       },
@@ -64,16 +83,19 @@
       document.getElementById("t-li1").textContent = s.li1;
       document.getElementById("t-li2").textContent = s.li2;
       document.getElementById("t-li3").textContent = s.li3;
+      document.getElementById("first-label").textContent = s.first;
+      document.getElementById("first-note").textContent = s.first_note;
       const a = document.getElementById("start");
       a.textContent = s.btn;
       // carry the choice into the Worker so the dashboard matches
       a.href = WORKER_BASE + "/auth/nycu/start?lang=" + lang;
       document.getElementById("alt-label").textContent = s.alt;
+      document.getElementById("alt-note").textContent = s.alt_note;
       const gh = document.getElementById("login-github");
-      gh.textContent = s.btn_github;
+      gh.querySelector("[data-label]").textContent = s.btn_github;
       gh.href = WORKER_BASE + "/auth/github/login?lang=" + lang;
       const gg = document.getElementById("login-google");
-      gg.textContent = s.btn_google;
+      gg.querySelector("[data-label]").textContent = s.btn_google;
       gg.href = WORKER_BASE + "/auth/google/login?lang=" + lang;
     }
     function setLang(l) { localStorage.setItem("lang", l); render(l); }

@@ -28,12 +28,17 @@ body {
   box-shadow: var(--shadow);
 }
 h1 { margin: 0 0 1rem; font-size: clamp(1.8rem, 5vw, 2.45rem); line-height: 1.2; letter-spacing: -0.03em; }
+h2 { margin: 0; font-size: 1.05rem; line-height: 1.35; }
 p { margin: 0.8rem 0; }
 li + li { margin-top: 0.35rem; }
 a { color: var(--brand); text-underline-offset: 3px; }
 a:hover { color: var(--brand-hover); }
 a:focus-visible { outline: 3px solid rgba(8, 127, 91, 0.28); outline-offset: 3px; }
 .lang-switch { margin: 0 0 2rem; text-align: right; font-size: 0.9rem; color: var(--muted); }
+.hero { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem; }
+.hero h1 { margin: 0; }
+.brand-logo { flex: 0 0 auto; width: 64px; height: 64px; }
+.eyebrow { margin: 0 0 0.15rem; color: var(--brand); font-size: 0.82rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
 .lang-switch [aria-current] { padding: 0.2rem 0.45rem; border-radius: 6px; background: var(--surface-soft); color: var(--text); font-weight: 700; text-decoration: none; }
 .actions { display: flex; gap: 0.65rem; flex-wrap: wrap; margin-top: 1.5rem; }
 .button {
@@ -53,6 +58,12 @@ a:focus-visible { outline: 3px solid rgba(8, 127, 91, 0.28); outline-offset: 3px
 .button--primary { border-color: var(--brand); background: var(--brand); color: #fff; }
 .button--primary:hover { border-color: var(--brand-hover); background: var(--brand-hover); color: #fff; }
 .hint { margin: 1.75rem 0 0.4rem; color: var(--muted); font-size: 0.92rem; }
+.login-panel { margin-top: 1rem; padding: 1rem; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); }
+.login-panel--primary { margin-top: 1.5rem; border-color: #a8dac1; background: #f1faf5; }
+.login-panel .actions { margin-top: 0.85rem; }
+.panel-note { margin: 0.3rem 0 0; color: var(--muted); font-size: 0.92rem; }
+.provider-mark { display: inline-grid; width: 1.55rem; height: 1.55rem; margin-right: 0.45rem; place-items: center; border-radius: 50%; background: #24292f; color: #fff; font-size: 0.64rem; font-weight: 800; }
+.provider-mark--google { background: #fff; color: #4285f4; border: 1px solid var(--line); font-size: .9rem; }
 .result { padding: 1rem; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); }
 .result--success { border-color: #a8dac1; background: #eaf8f1; }
 .result--danger { border-color: #efb4b4; background: #fff0f0; }
@@ -62,6 +73,8 @@ a:focus-visible { outline: 3px solid rgba(8, 127, 91, 0.28); outline-offset: 3px
   body { width: 100%; margin: 0; padding: 1.25rem; border: 0; border-radius: 0; box-shadow: none; }
   .actions { display: grid; }
   .button { width: 100%; }
+  .hero { align-items: flex-start; }
+  .brand-logo { width: 52px; height: 52px; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; transition: none !important; }

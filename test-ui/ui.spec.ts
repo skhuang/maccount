@@ -1,10 +1,52 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { readFileSync } from "node:fs";
 import { adminHomePage, adminPage, dashboardPage } from "../src/html";
 import type { BindingRow } from "../src/csv";
 import type { GradeRow } from "../src/db/grades";
 
 const course = { course_id: "ds-2026", name: "資料結構 2026", term: "2026", status: "active" };
+
+const staticHome = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const staticHomeCss = readFileSync(new URL("../ui.css", import.meta.url), "utf8");
+
+test("landing page clearly separates first-time and returning sign-in", async ({ page }) => {
+  await page.route("https://maccount.example.test/**", (route) =>
+    route.request().url().endsWith("ui.css")
+      ? route.fulfill({ contentType: "text/css", body: staticHomeCss })
+      : route.fulfill({ contentType: "text/html", body: staticHome }),
+  );
+  await page.goto("https://maccount.example.test/");
+  await expect(page.locator(".brand-logo")).toBeVisible();
+  await expect(page.locator("#first-label")).toHaveText("第一次使用？");
+  await expect(page.locator("#first-note")).toContainText("先用 NYCU");
+  await expect(page.locator("#alt-label")).toHaveText("已完成帳號綁定？");
+  await expect(page.locator("#start")).toHaveAttribute("href", /\/auth\/nycu\/start\?lang=zh$/);
+  await expect(page.locator("#login-github")).toHaveAttribute("href", /\/auth\/github\/login\?lang=zh$/);
+
+  await page.locator("#lang-en").click();
+  await expect(page.locator("#first-label")).toHaveText("First time here?");
+  await expect(page.locator("#start")).toContainText("Sign in with NYCU");
+});
+
+test("landing page remains accessible and usable on mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route("https://maccount.example.test/**", (route) =>
+    route.request().url().endsWith("ui.css")
+      ? route.fulfill({ contentType: "text/css", body: staticHomeCss })
+      : route.fulfill({ contentType: "text/html", body: staticHome }),
+  );
+  await page.goto("https://maccount.example.test/");
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(results.violations).toEqual([]);
+  const buttonBox = await page.locator(".button").first().boundingBox();
+  const panelBox = await page.locator(".login-panel").first().boundingBox();
+  expect(buttonBox?.width).toBe(panelBox ? panelBox.width - 34 : 0);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
 
 const bindings: BindingRow[] = [
   {
@@ -187,6 +229,28 @@ test("student course card exposes a grade summary", async ({ page }) => {
   expect(overflow).toBeLessThanOrEqual(1);
 });
 
+test("student dashboard prioritizes course progress and deadlines", async ({ page }) => {
+  const exam: GradeRow = {
+    ...grade,
+    problem_id: "exam-stack",
+    verdict: null,
+    score: null,
+    max_score: 100,
+    assignment_id: "midterm",
+    assignment_type: "exam",
+    assignment_title: "期中考",
+  };
+  await page.setContent(dashboardPage(
+    "zh", { id: "a01", name: "Alice" }, { ...bindings[0], github_login: "alice" }, [grade, exam], false, {},
+    [], { "ds-2026": "資料結構 2026" }, [], {}, {},
+    { "ds-2026/midterm": { open_at: "2026-10-01T01:00:00Z", due_at: "2026-10-01T03:00:00Z" } },
+  ));
+  await expect(page.locator(".account-grid")).toHaveClass(/account-grid--complete/);
+  await expect(page.locator(".course-card__head > .badge")).toHaveText("1 / 2");
+  await expect(page.locator(".course-card__meta")).toContainText("截止");
+  await expect(page.locator(".course-card__section-title")).toContainText(["作業", "考試"]);
+});
+
 test("admin tables hide secondary columns on mobile without horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.setContent(adminFixture(), { waitUntil: "load" });
@@ -205,4 +269,22 @@ test("admin course cards collapse to one column on mobile", async ({ page }) => 
   expect(columns).toBe(1);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
+});
+
+test("admin page groups frequent work and collapses low-frequency tools", async ({ page }) => {
+  await page.setContent(adminFixture(), { waitUntil: "load" });
+  await expect(page.locator("#admin-group-students")).toHaveText("學生與帳號");
+  await expect(page.locator("#admin-group-content")).toHaveText("課程內容");
+
+  const services = page.locator(".admin-group-disclosure").filter({ hasText: "外部服務" });
+  await expect(services).not.toHaveAttribute("open", "");
+  await expect(services.locator("#drive")).toBeHidden();
+  await services.locator("summary").click();
+  await expect(services.locator("#drive")).toBeVisible();
+
+  const exportMenu = page.locator(".export-menu");
+  await expect(exportMenu.locator("a").first()).toBeHidden();
+  await exportMenu.locator("summary").click();
+  await expect(exportMenu.locator("a")).toHaveCount(3);
+  await expect(exportMenu.locator("a").first()).toBeVisible();
 });

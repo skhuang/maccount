@@ -55,16 +55,17 @@ body>p[style*="#f8d7da"],body>p[style*="#fee"]{background:var(--danger-soft)!imp
 body>p[style*="#fff3cd"]{background:var(--warning-soft)!important;border-color:#eedc93}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.5rem;color:var(--muted);font-size:.9rem}.topbar p{margin:0!important}.topbar__actions{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
 .identity{margin-bottom:1.25rem}.identity h1{margin-bottom:.25rem}.identity__meta{margin:0;color:var(--muted)}
-.account-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin:1.25rem 0 1.5rem}.status-card{padding:1rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface-soft)}.status-card__head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.55rem}.status-card__title{font-weight:700}.status-card__value{min-height:1.65rem;margin:0 0 .75rem;overflow-wrap:anywhere}.status-card__action{margin:0;font-size:.9rem}
+.account-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin:1.25rem 0 1.5rem}.account-grid--complete{gap:.65rem}.account-grid--complete .status-card{padding:.75rem .85rem}.account-grid--complete .status-card__value{min-height:0;margin:.2rem 0;font-size:.9rem}.account-grid--complete .status-card__action{margin:0;text-align:right;font-size:.8rem}.status-card{padding:1rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface-soft)}.status-card__head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.55rem}.status-card__title{font-weight:700}.status-card__value{min-height:1.65rem;margin:0 0 .75rem;overflow-wrap:anywhere}.status-card__action{margin:0;font-size:.9rem}
 .badge{display:inline-flex;align-items:center;gap:.35rem;padding:.18rem .5rem;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--muted);font-size:.78rem;font-weight:700;line-height:1.3;white-space:nowrap}.badge::before{content:"";width:.45rem;height:.45rem;border-radius:50%;background:currentColor}.badge--success{border-color:#a8dac1;background:var(--success-soft);color:#08734f}.badge--warning{border-color:#ead483;background:var(--warning-soft);color:#8a6500}.badge--danger{border-color:#efb4b4;background:var(--danger-soft);color:var(--danger)}.badge--neutral{color:#647269}
 .with-help{display:inline-flex;align-items:center;gap:.4rem;flex-wrap:wrap}.help-hint{position:relative;display:inline-flex;align-items:center;margin-left:.35rem;vertical-align:middle}.help-hint__button{width:1.35rem;min-width:1.35rem;height:1.35rem;min-height:1.35rem;padding:0;border:1px solid #aac0b6;border-radius:999px;background:#fff;color:var(--brand);font-size:.82rem;font-weight:800;line-height:1}.help-hint__button:hover{background:var(--surface-soft);color:var(--brand-hover)}.help-hint__button[aria-expanded=true]{border-color:var(--brand);background:var(--brand);color:#fff}.help-hint__panel{position:absolute;right:0;top:calc(100% + .45rem);z-index:6;width:min(18rem,80vw);padding:.65rem .75rem;border:1px solid var(--line);border-radius:10px;background:#17211d;color:#fff;box-shadow:0 12px 32px rgba(20,45,34,.18);font-size:.85rem;font-weight:500;line-height:1.5;letter-spacing:0;white-space:normal}.help-hint__panel::before{content:"";position:absolute;top:-.4rem;right:.45rem;border:.4rem solid transparent;border-top:0;border-bottom-color:#17211d}
 .alert{padding:.8rem 1rem;border:1px solid var(--line);border-radius:9px}.alert--success{border-color:#b8e4ce;background:var(--success-soft)}.alert--warning{border-color:#eedc93;background:var(--warning-soft)}.alert--danger{border-color:#f1b6b6;background:var(--danger-soft)}
 .confirm-dialog{width:min(32rem,calc(100% - 2rem));padding:0;border:1px solid var(--line);border-radius:14px;background:#fff;color:var(--text);box-shadow:0 24px 70px rgba(20,45,34,.24)}.confirm-dialog::backdrop{background:rgba(14,25,20,.56)}.confirm-dialog__body{padding:1.35rem}.confirm-dialog h2{margin:0 0 .65rem;padding:0;border:0}.confirm-dialog p{margin:.5rem 0 1.25rem;color:var(--muted)}.confirm-dialog__actions{display:flex;justify-content:flex-end;gap:.65rem}.button--danger{background:var(--danger)}.button--danger:hover{background:#a61e1e}
-.course-list{display:grid;gap:1rem}.course-card{padding:1.1rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.course-card h3{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:0 0 .8rem}.course-card h3::after{content:"";width:.55rem;height:.55rem;border-radius:50%;background:var(--brand)}.course-card>p:last-child{margin-bottom:0}.course-card table{margin-top:.45rem}
+.course-list{display:grid;gap:1rem}.course-card{padding:1.1rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.course-card__head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:.85rem}.course-card__head h3{margin:0}.course-card__meta{margin:.2rem 0 0;color:var(--muted);font-size:.84rem}.course-card__section{margin-top:1rem;padding-top:.85rem;border-top:1px solid var(--line)}.course-card__section-title{margin:0 0 .45rem;font-size:.92rem;font-weight:750}.course-card>p:last-child{margin-bottom:0}.course-card table{margin-top:.45rem}
 .section-nav{position:sticky;top:0;z-index:2;display:flex;gap:.5rem;margin:0 -1rem 1.25rem;padding:.7rem 1rem;overflow-x:auto;border-block:1px solid var(--line);background:rgba(255,255,255,.96);box-shadow:0 5px 16px rgba(20,45,34,.05);white-space:nowrap}.section-nav a{padding:.3rem .55rem;border-radius:6px;text-decoration:none;font-size:.88rem;font-weight:650}.section-nav a:hover{background:var(--surface-soft)}
 .stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem;margin:1rem 0 1.5rem}.stat{padding:.85rem;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}.stat__value{display:block;font-size:1.45rem;font-weight:750;line-height:1.2}.stat__label{display:block;margin-top:.25rem;color:var(--muted);font-size:.82rem}
 .course-summary{margin:.25rem 0 1rem}.course-summary .stat{padding:.7rem}.course-summary .stat__value{font-size:1.1rem}.course-summary progress{display:block;width:100%;height:.45rem;margin-top:.45rem;accent-color:var(--brand)}
 .admin-sections{display:grid;gap:1rem}.admin-section{scroll-margin-top:5rem;padding:1.2rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.admin-section>h2:first-child{margin:0 0 .75rem;padding:0;border:0}.admin-section+.admin-section{margin-top:0}.admin-section form:last-child{margin-bottom:0}
+.admin-group{display:grid;gap:1rem}.admin-group__title{margin:1.25rem 0 0;padding:0;border:0;color:var(--muted);font-size:.88rem;letter-spacing:.06em;text-transform:uppercase}.admin-group-disclosure{margin:0;border:1px solid var(--line);background:#fff}.admin-group-disclosure>summary{padding:1rem 1.2rem}.admin-group-disclosure__body{display:grid;gap:1rem;padding:0 1rem 1rem}.admin-group-disclosure .admin-section{background:var(--surface-soft)}.export-menu{display:inline-block;margin:.25rem .5rem .75rem 0;background:#fff}.export-menu>summary{padding:.45rem .7rem;color:var(--brand);font-size:.9rem}.export-menu__links{display:grid;gap:.45rem;padding:0 .8rem .8rem}
 .lang-toggle{display:inline-flex;align-items:center;gap:.5rem;color:var(--muted);font-size:.9rem}.lang-toggle [aria-current="true"]{padding:.2rem .45rem;border-radius:6px;background:var(--surface-soft);color:var(--text);font-weight:700}.empty-state{margin:.8rem 0;padding:1rem;border:1px dashed #b9c7c0;border-radius:10px;background:var(--surface-soft);color:var(--muted);text-align:center;list-style:none}.empty-cell{padding:1.4rem!important;color:var(--muted);text-align:center}.inline-actions{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap}.text-danger{color:var(--danger)}.muted{color:var(--muted)}.text-small{font-size:.9em}
 .table-tools{display:grid;grid-template-columns:minmax(220px,1fr) minmax(160px,auto) auto;align-items:end;gap:.75rem;margin:.85rem 0}.table-tools label{font-size:.82rem}.table-tools input,.table-tools select{margin-top:.25rem}.table-count{align-self:center;margin:1.35rem 0 0;color:var(--muted);font-size:.85rem;white-space:nowrap}.copy-field{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin:.75rem 0}.button--secondary{min-height:34px;padding:.4rem .7rem;border-color:var(--line);background:#fff;color:var(--brand);font-size:.85rem}.button--secondary:hover{border-color:#9db2a7;background:var(--surface-soft);color:var(--brand-hover)}tr[hidden]{display:none}
 .sort-button{display:flex;width:100%;min-height:0;padding:0;border:0;border-radius:0;background:transparent;color:inherit;font:inherit;text-align:left}.sort-button:hover{background:transparent;color:var(--brand)}.sort-icon{margin-left:.4rem;color:var(--muted)}.course-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin:1rem 0}.course-admin-card{display:flex;min-height:150px;flex-direction:column;padding:1.1rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.course-admin-card--archived{background:var(--surface-soft)}.course-admin-card__head{display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem}.course-admin-card h2{margin:0;padding:0;border:0;font-size:1.1rem}.course-admin-card__meta{margin:.45rem 0 1rem;color:var(--muted);font-size:.88rem}.course-admin-card__action{margin:auto 0 0}.admin-disclosure{margin:1.5rem 0;background:#fff}.admin-disclosure>summary{font-size:1.05rem}.admin-disclosure__body{padding:0 1rem 1rem}.email-list{display:grid;gap:.45rem;margin:.8rem 0;padding:0;list-style:none}.email-list li{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.5rem .65rem;border:1px solid var(--line);border-radius:8px;background:#fff}.email-list code{overflow-wrap:anywhere}.copy-list{display:grid;gap:.6rem;margin:1rem 0}.copy-list textarea{min-height:9rem;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88rem;line-height:1.45;white-space:pre}.utility-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}.utility-card{padding:1rem;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}.utility-card p{margin:.35rem 0 0;color:var(--muted);font-size:.86rem}
@@ -697,6 +698,13 @@ ${
   <div class="stat"><span class="stat__value">${gbound}</span><span class="stat__label">${t.google} ${t.bound}</span></div>
 </div>`;
 
+  const groups = lang === "en"
+    ? { students: "Students & accounts", content: "Course content", services: "External services", settings: "Course administration", open: "Open", exports: "Export data" }
+    : { students: "學生與帳號", content: "課程內容", services: "外部服務", settings: "課程管理", open: "展開", exports: "匯出資料" };
+  const exportMenu = `<details class="export-menu"><summary>${groups.exports}</summary><div class="export-menu__links">
+  <a href="${base}/export.csv">${t.export_full}</a><a href="${base}/roster.csv">${t.export_roster}</a><a href="${base}/github.csv">${t.export_github}</a>
+</div></details>${helpHint(t.help_exports, t.help_label)}`;
+
   return `${documentStart(lang, t.admin_title, UI_CSS)}
 <body style="font-family:system-ui;max-width:900px;margin:2rem auto">
 <header class="topbar"><div>${langToggle(base, lang)}</div><div class="topbar__actions"><a href="/admin">← ${t.admin_courses_heading}</a></div></header>
@@ -704,9 +712,10 @@ ${
 ${stats}
 ${adminNav}
 <div class="admin-sections">
+<div class="admin-group" aria-labelledby="admin-group-students"><h2 class="admin-group__title" id="admin-group-students">${groups.students}</h2>
 <section class="admin-section" id="bindings"><h2 class="with-help">${t.admin_bindings.replace("{n}", String(rows.length))}${helpHint(t.help_bindings, t.help_label)}</h2>
 ${banner}
-<p><a href="${base}/export.csv">${t.export_full}</a>　|　<a href="${base}/roster.csv">${t.export_roster}</a>　|　<a href="${base}/github.csv">${t.export_github}</a>${helpHint(t.help_exports, t.help_label)}</p>
+${exportMenu}
 <p><a href="${base}/scoreboard">📊 記分板 / Scoreboard</a>　|　<a href="${base}/provision">🚀 Provisioning 遙控</a></p>
 ${rows.length ? tableTools(t, "course-bindings-table", rows.length) : ""}
 <table id="course-bindings-table" class="mobile-compact" border="1" cellpadding="6" cellspacing="0">
@@ -716,11 +725,18 @@ ${trs || `<tr><td colspan="${isOwner ? "7" : "6"}" class="empty-cell">${t.no_bin
 </tbody></table></section>
 ${enrollSection}
 ${studentsTeamSection}
-${driveSection}
+</div>
+<div class="admin-group" aria-labelledby="admin-group-content"><h2 class="admin-group__title" id="admin-group-content">${groups.content}</h2>
 ${formsSection}
+</div>
+<details class="admin-group-disclosure"><summary><b>${groups.services}</b> · ${groups.open}</summary><div class="admin-group-disclosure__body">
+${driveSection}
 ${classroomSection}
+</div></details>
+${isOwner ? `<details class="admin-group-disclosure"><summary><b>${groups.settings}</b> · ${groups.open}</summary><div class="admin-group-disclosure__body">` : ""}
 ${staffSection}
 ${settingsSection}
+${isOwner ? `</div></details>` : ""}
 </div>
 ${legalFooter(t)}
 ${uiEnhancements(t)}
@@ -747,7 +763,7 @@ export function dashboardPage(
   examWindows: Record<string, ExamWindow> = {},
 ): string {
   const t = T[lang];
-  const accountCards = `<div class="account-grid" aria-label="${t.acct_heading}">
+  const accountCards = `<div class="account-grid${binding?.github_login && binding?.google_email ? " account-grid--complete" : ""}" aria-label="${t.acct_heading}">
   ${accountStatusCard(t, t.github, binding?.github_login, "/auth/github/start", t.bind_action, t.help_account_binding)}
   ${accountStatusCard(t, t.google, binding?.google_email, "/auth/google/start", t.bind_google_action, t.help_account_binding)}
 </div>`;
@@ -825,14 +841,14 @@ ${renderRows(rs)}
       }
     }
     const labs = labRows.length
-      ? `<p style="margin:.3rem 0 .2rem;font-weight:600">${t.assignments_heading}</p>
-${courseTable(labRows)}`
+      ? `<section class="course-card__section"><h4 class="course-card__section-title">${t.assignments_heading}</h4>
+${courseTable(labRows)}</section>`
       : "";
     const examList = exams.size
-      ? `<p style="margin:.3rem 0 .2rem;font-weight:600">${t.exam_list_heading}</p>
+      ? `<section class="course-card__section"><h4 class="course-card__section-title">${t.exam_list_heading}</h4>
 <ul>${[...exams].map(([aid, e]) =>
           `<li><a href="/me/exam/${encodeURIComponent(aid)}">${h(e.title)} ↗</a>` +
-          `${examWindowInline(t, e.window)}</li>`).join("")}</ul>`
+          `${examWindowInline(t, e.window)}</li>`).join("")}</ul></section>`
       : "";
     return labs + examList;
   };
@@ -854,13 +870,21 @@ ${courseTable(labRows)}`
   const formsFor = (cid: string) => {
     const fs = formsByCourse[cid] ?? [];
     if (!fs.length) return "";
-    return `<p style="margin:.3rem 0 .2rem;font-weight:600">${t.forms_student_heading}</p>
-<ul>${fs.map((f) => `<li>${linkOrText(f.url, f.title)}</li>`).join("")}</ul>`;
+    return `<section class="course-card__section"><h4 class="course-card__section-title">${t.forms_student_heading}</h4>
+<ul>${fs.map((f) => `<li>${linkOrText(f.url, f.title)}</li>`).join("")}</ul></section>`;
   };
   const table = courseOrder.length
     ? `<div class="course-list">${courseOrder
         .map((cid) => {
           const rs = gradesByCourse.get(cid) ?? [];
+          const completed = rs.filter((g) => g.verdict != null || g.score != null).length;
+          const dueDates = rs
+            .filter((g) => g.assignment_type === "exam" && g.assignment_id)
+            .map((g) => examWindows[`${g.course_id}/${g.assignment_id}`]?.due_at)
+            .filter((v): v is string => Boolean(v))
+            .sort((a, b) => Date.parse(a) - Date.parse(b));
+          const priorityDue = dueDates.find((date) => Date.parse(date) >= Date.now()) ?? dueDates.at(-1);
+          const courseMeta = priorityDue ? `${t.exam_window_due} ${h(fmtTime(priorityDue))}` : "";
           const parts: string[] = [];
           const meet = meetByCourse[cid];
           if (meet) parts.push(`<p>${linkOrText(meet, t.meet_join)}</p>`);
@@ -868,7 +892,7 @@ ${courseTable(labRows)}`
           const fhtml = formsFor(cid);
           if (fhtml) parts.push(fhtml);
           const inner = parts.length ? parts.join("") : `<p class="empty-state">${t.course_no_data}</p>`;
-          return `<article class="course-card"><h3>${h(courseName(cid))}${rs.length ? helpHint(t.help_grade_summary, t.help_label) : ""}</h3>\n${inner}</article>`;
+          return `<article class="course-card"><header class="course-card__head"><div><h3>${h(courseName(cid))}${rs.length ? helpHint(t.help_grade_summary, t.help_label) : ""}</h3>${courseMeta ? `<p class="course-card__meta">${courseMeta}</p>` : ""}</div>${rs.length ? `<span class="badge badge--${completed === rs.length ? "success" : "warning"}">${completed} / ${rs.length}</span>` : ""}</header>\n${inner}</article>`;
         })
         .join("\n")}</div>`
     : `<p class="empty-state">${t.no_grades}</p>`;
