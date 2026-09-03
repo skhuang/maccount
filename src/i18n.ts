@@ -20,11 +20,13 @@ export interface Strings {
   student_id: string;
   github: string;
   google: string;
+  line: string;
   bound: string;
   rebind: string;
   not_bound: string;
   bind_action: string;
   bind_google_action: string;
+  bind_line_action: string;
   grades_heading: string;
   my_courses_heading: string;
   course_select_hint: string;
@@ -81,6 +83,7 @@ export interface Strings {
   join_org_link: string;
   flash_bound_ok: string;
   flash_gbound_ok: string;
+  flash_lbound_ok: string;
   flash_error_prefix: string;
   admin_title: string;
   admin_bindings: string; // "{n}" placeholder
@@ -284,6 +287,7 @@ export interface Strings {
   appLoginNycu: string;
   appLoginGithub: string;
   appLoginGoogle: string;
+  appLoginLine: string;
   appLoginNote: string;
   accountLoginSubtitle: string;
 }
@@ -295,11 +299,13 @@ export const T: Record<Lang, Strings> = {
     student_id: "學號",
     github: "GitHub",
     google: "Google",
+    line: "LINE",
     bound: "已綁定",
     rebind: "重新綁定",
     not_bound: "尚未綁定",
     bind_action: "綁定 GitHub →",
     bind_google_action: "綁定 Google →",
+    bind_line_action: "綁定 LINE →",
     grades_heading: "我的成績",
     my_courses_heading: "我的課程",
     course_select_hint: "選擇一門課程以查看作業、考試與進行中的活動。",
@@ -398,6 +404,7 @@ export const T: Record<Lang, Strings> = {
     join_org_link: "接受邀請加入課程組織 →",
     flash_bound_ok: "GitHub 綁定成功。",
     flash_gbound_ok: "Google 綁定成功。",
+    flash_lbound_ok: "LINE 綁定成功。",
     flash_error_prefix: "操作未完成：",
     admin_title: "maccount 管理",
     admin_bindings: "綁定名單 ({n})",
@@ -602,6 +609,7 @@ export const T: Record<Lang, Strings> = {
     appLoginNycu: "以 NYCU 帳號登入",
     appLoginGithub: "用 GitHub 登入",
     appLoginGoogle: "用 Google 登入",
+    appLoginLine: "用 LINE 登入",
     appLoginNote: "GitHub / Google 需為已在 maccount 綁定過的帳號。",
     accountLoginSubtitle: "選擇登入方式以返回你的帳號與課程。",
   },
@@ -611,11 +619,13 @@ export const T: Record<Lang, Strings> = {
     student_id: "Student ID",
     github: "GitHub",
     google: "Google",
+    line: "LINE",
     bound: "Bound",
     rebind: "Re-bind",
     not_bound: "Not bound yet",
     bind_action: "Bind GitHub →",
     bind_google_action: "Bind Google →",
+    bind_line_action: "Bind LINE →",
     grades_heading: "My Grades",
     my_courses_heading: "My Courses",
     course_select_hint: "Choose a course to view assignments, exams, and current activities.",
@@ -714,6 +724,7 @@ export const T: Record<Lang, Strings> = {
     join_org_link: "Accept the invite to join the course org →",
     flash_bound_ok: "GitHub bound successfully.",
     flash_gbound_ok: "Google bound successfully.",
+    flash_lbound_ok: "LINE bound successfully.",
     flash_error_prefix: "Action not completed: ",
     admin_title: "maccount Admin",
     admin_bindings: "Bindings ({n})",
@@ -918,6 +929,7 @@ export const T: Record<Lang, Strings> = {
     appLoginNycu: "Sign in with NYCU",
     appLoginGithub: "Sign in with GitHub",
     appLoginGoogle: "Sign in with Google",
+    appLoginLine: "Sign in with LINE",
     appLoginNote: "GitHub / Google must be an account already linked in maccount.",
     accountLoginSubtitle: "Choose a sign-in method to return to your account and courses.",
   },

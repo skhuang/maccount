@@ -65,9 +65,13 @@ npx wrangler deploy
   - 在 **Enabled APIs** 啟用 **Google Drive API**（檔案分享用）與 **Google Forms API**（從後台直接建立問卷用）。兩者都要啟用在**與此 OAuth client 同一個專案**（建立表單失敗、log 顯示 `Forms API has not been used in project <n>` 多半是啟用錯專案）。
   - OAuth consent screen 設 External。完整 `drive` 為**受限 scope**：自用／少量帳號可加「測試使用者」直接用；要對外大量使用才需送 Google 審查。
   - 綁定流程要求 offline 存取（`access_type=offline`+`prompt=consent`），取得並**加密存下** refresh token。
+- **LINE**（LINE Developers Console → 建立 provider 與 LINE Login channel → Web app）：
+  - **Callback URL：`<worker>/auth/line/callback`**（需完全吻合）。
+  - 將 Channel ID 填入 `LINE_CHANNEL_ID`；Channel secret 以 `wrangler secret put LINE_CHANNEL_SECRET` 設定。
+  - 使用 `openid profile`，登入流程會驗證 state、nonce、PKCE 與 LINE ID token；未事先綁定的 LINE 帳號不會自動建立或合併校務帳號。
 
 ### 4. 設定 vars 與 secrets
-編輯 `wrangler.toml` 的 `[vars]`：`PUBLIC_BASE_URL = "<worker>"`、`FRONTEND_DONE_URL = "https://skhuang.github.io/maccount/done.html"`、`GITHUB_CLIENT_ID`、`GOOGLE_CLIENT_ID`、選填的 `GOOGLE_LOGIN_CLIENT_ID`、`NYCU_CLIENT_ID`、`ADMIN_IDS`（以逗號分隔的 NYCU 帳號）、`APP_ALLOWLIST`（relying-app SSO 白名單,見下）。
+編輯 `wrangler.toml` 的 `[vars]`：`PUBLIC_BASE_URL = "<worker>"`、`FRONTEND_DONE_URL = "https://skhuang.github.io/maccount/done.html"`、`GITHUB_CLIENT_ID`、`GOOGLE_CLIENT_ID`、選填的 `GOOGLE_LOGIN_CLIENT_ID`、`LINE_CHANNEL_ID`、`NYCU_CLIENT_ID`、`ADMIN_IDS`（以逗號分隔的 NYCU 帳號）、`APP_ALLOWLIST`（relying-app SSO 白名單,見下）。
 
 > **`GOOGLE_CLIENT_ID`**：填 Google OAuth client 的完整 Client ID（形如 `<數字>-<雜湊>.apps.googleusercontent.com`）。它**非機密**，放 `[vars]`（committed 模板裡是空字串 placeholder，本機填真實值並維持 `skip-worktree` 不提交，與 `GITHUB_CLIENT_ID`/`NYCU_CLIENT_ID`/`ADMIN_IDS` 同）。對應的 `GOOGLE_CLIENT_SECRET` 與加密金鑰 `GOOGLE_TOKEN_KEY` 走 `wrangler secret put`（見下）。`GOOGLE_SCOPE` 已有預設（`openid email` + `drive.file`），一般不需改。
 
@@ -82,6 +86,7 @@ npx wrangler secret put SESSION_SECRET        # 隨機長字串
 npx wrangler secret put GITHUB_CLIENT_SECRET
 npx wrangler secret put GOOGLE_CLIENT_SECRET
 npx wrangler secret put GOOGLE_LOGIN_CLIENT_SECRET  # 選填；有設定 GOOGLE_LOGIN_CLIENT_ID 才需要
+npx wrangler secret put LINE_CHANNEL_SECRET
 npx wrangler secret put GOOGLE_TOKEN_KEY     # 隨機長字串；用來加密存放 Google refresh token（換金鑰會讓既存 token 失效）
 npx wrangler secret put NYCU_CLIENT_SECRET
 npx wrangler secret put GRADES_INGEST_TOKEN   # 隨機長字串；OJ runner 推成績時帶在 Authorization: Bearer

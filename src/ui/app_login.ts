@@ -7,7 +7,7 @@ import { UI_CSS } from "../html";
 
 // Login-method chooser shown to not-logged-in users hitting the relying-app
 // SSO entry point (/auth/app/start). Each link is a same-origin login route
-// (NYCU / GitHub / Google); the pre-login session cookie stashed by
+// (NYCU / GitHub / Google / LINE); the pre-login session cookie stashed by
 // startApp (carrying app_return) rides along with the browser regardless of
 // which method the user picks, so every callback still returns to the app.
 //
@@ -32,6 +32,7 @@ export function appLoginChooserPage(lang: Lang, appId: string): string {
 ${link(`/auth/nycu/start${q}`, t.appLoginNycu)}
 ${link(`/auth/github/login${q}`, t.appLoginGithub)}
 ${link(`/auth/google/login${q}`, t.appLoginGoogle)}
+${link(`/auth/line/login${q}`, t.appLoginLine)}
 <p class="muted text-small">${h(t.appLoginNote)}</p>
 </body></html>`
   );
@@ -54,6 +55,7 @@ export function accountLoginChooserPage(lang: Lang): string {
 ${link(`/auth/nycu/start?prompt=login&${q}`, t.appLoginNycu, true)}
 ${link(`/auth/github/login?${q}`, t.appLoginGithub)}
 ${link(`/auth/google/login?${q}`, t.appLoginGoogle)}
+${link(`/auth/line/login?${q}`, t.appLoginLine)}
 <p class="muted text-small">${h(t.appLoginNote)}</p>
 </body></html>`
   );

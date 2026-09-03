@@ -4,6 +4,9 @@ export interface SessionData {
   gstate?: string; // CSRF state for the GitHub leg (while binding)
   gostate?: string; // CSRF state for the Google leg (while binding)
   googleMode?: "bind" | "login"; // which Google OAuth client minted the code
+  listate?: string; // CSRF state for LINE Login
+  linonce?: string; // OIDC replay protection for LINE Login
+  liverifier?: string; // PKCE verifier for LINE Login
   next?: string; // post-login redirect target (validated relative path, e.g. /me/<course>)
   nycu?: { id: string; name: string }; // present once logged in; admin is derived via isAdmin()
   app_return?: { app: string; return: string }; // relying-app SSO: where to send the identity token after login

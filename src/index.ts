@@ -18,6 +18,7 @@ import {
   googleAuthorizeUrl, exchangeGoogleCode, fetchGoogleUser, refreshGoogleAccessToken,
   DEFAULT_GOOGLE_SCOPE,
 } from "./oauth/google";
+import { lineAuthorizeUrl, linePkceChallenge, exchangeLineCode, verifyLineIdToken } from "./oauth/line";
 import {
   shareFileWithUser, asDriveRole, scopeHasFullDrive, scopeHasGroupMember,
   parseDriveFileId, STAFF_GOOGLE_SCOPE,
@@ -42,6 +43,9 @@ import {
   orgBindingView,
   GithubConflictError,
   GoogleConflictError,
+  upsertLineBinding,
+  getBindingByLineSub,
+  LineConflictError,
 } from "./db/bindings";
 import { allowedReturn, allowedOrigin, mintAppToken, verifyAppToken } from "./app_sso";
 import {
@@ -88,6 +92,9 @@ export default {
       if (p === "/auth/google/start") return await startGoogle(req, env, url);
       if (p === "/auth/google/login") return await startOAuthLogin(req, env, url, "google");
       if (p === "/auth/google/callback") return await googleCallback(req, env, url);
+      if (p === "/auth/line/start") return await startLine(req, env, url, "bind");
+      if (p === "/auth/line/login") return await startLine(req, env, url, "login");
+      if (p === "/auth/line/callback") return await lineCallback(req, env, url);
       if (p === "/auth/app/start") return await startApp(req, env, url);
       if (p === "/api/app/verify" && req.method === "OPTIONS") return appVerifyPreflight(req, env);
       if (p === "/api/app/verify" && req.method === "POST") return await verifyApp(req, env);
@@ -258,6 +265,72 @@ async function startOAuthLogin(
           { offline: false },
         );
   return redirect(authUrl, cookies);
+}
+
+function lineConfig(env: Env) {
+  const channelId = env.LINE_CHANNEL_ID?.trim();
+  const channelSecret = env.LINE_CHANNEL_SECRET?.trim();
+  if (!channelId || !channelSecret) throw new Error("LINE Login is not configured");
+  return { channelId, channelSecret, redirectUri: `${env.PUBLIC_BASE_URL}/auth/line/callback` };
+}
+
+async function startLine(req: Request, env: Env, url: URL, mode: "bind" | "login"): Promise<Response> {
+  const existing = mode === "bind" ? await requireLogin(req, env) : null;
+  if (existing instanceof Response) return existing;
+  const state = randomState();
+  const nonce = randomState();
+  const verifier = randomState() + randomState();
+  const session: SessionData = {
+    exp: Date.now() + TTL_MS,
+    listate: state,
+    linonce: nonce,
+    liverifier: verifier,
+    ...(existing ? { nycu: existing.nycu } : {}),
+  };
+  const prev = mode === "login" ? await verifySession(readCookie(req), env.SESSION_SECRET, Date.now()) : null;
+  if (prev?.app_return) session.app_return = prev.app_return;
+  const challenge = await linePkceChallenge(verifier);
+  const cookies = [setCookie(await signSession(session, env.SESSION_SECRET))];
+  const lang = url.searchParams.get("lang");
+  if (lang === "en" || lang === "zh") cookies.push(langCookie(lang));
+  return redirect(lineAuthorizeUrl(lineConfig(env), state, nonce, challenge), cookies);
+}
+
+async function lineCallback(req: Request, env: Env, url: URL): Promise<Response> {
+  const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
+  const code = url.searchParams.get("code");
+  const state = url.searchParams.get("state");
+  const oauthError = url.searchParams.get("error");
+  if (oauthError) return redirectDone(env, "err", `line_${oauthError}`);
+  if (!session?.listate || session.listate !== state || !session.linonce || !session.liverifier || !code) {
+    return recoverLogin(env, session);
+  }
+  const cfg = lineConfig(env);
+  const idToken = await exchangeLineCode(cfg, code, session.liverifier);
+  const line = await verifyLineIdToken(cfg.channelId, idToken, session.linonce);
+  if (!session.nycu) {
+    const binding = await getBindingByLineSub(env.DB, line.sub);
+    if (!binding) return redirectDone(env, "err", "line_not_bound");
+    const appDest = await postLoginDestination(env, binding.nycu_id, session.app_return);
+    if (appDest) return appDest;
+    return redirect("/me", setCookie(await signSession(
+      { exp: Date.now() + TTL_MS, nycu: { id: binding.nycu_id, name: binding.nycu_name ?? binding.nycu_id } },
+      env.SESSION_SECRET,
+    )));
+  }
+  try {
+    await upsertLineBinding(env.DB, {
+      nycu_id: session.nycu.id,
+      nycu_name: session.nycu.name,
+      line_sub: line.sub,
+      line_name: line.name,
+      now: new Date(Date.now()).toISOString(),
+    });
+  } catch (error) {
+    if (error instanceof LineConflictError) return redirect("/me?error=line_already_bound");
+    throw error;
+  }
+  return redirect("/me?lbound=1");
 }
 
 // ── relying-app SSO (B1): GET /auth/app/start?app=&return= ────────────────
@@ -719,6 +792,7 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
   const flash = {
     bound: url.searchParams.get("bound") === "1",
     gbound: url.searchParams.get("gbound") === "1",
+    lbound: url.searchParams.get("lbound") === "1",
     error: url.searchParams.get("error"),
   };
   // Join link(s) for the org(s) of the student's enrolled courses (deduped;
@@ -808,7 +882,7 @@ async function meCourse(req: Request, env: Env, url: URL, courseId: string): Pro
     listCourseForms(env.DB, courseId),
   ]);
   const preForms = forms.filter((f) => f.pre_enroll).map((f) => ({ title: f.title, url: f.url }));
-  const flash = { bound: url.searchParams.get("bound") === "1", gbound: url.searchParams.get("gbound") === "1" };
+  const flash = { bound: url.searchParams.get("bound") === "1", gbound: url.searchParams.get("gbound") === "1", lbound: url.searchParams.get("lbound") === "1" };
   const html = coursePrejoinPage(lang, courseId, course.name, session.nycu, binding, preForms, flash);
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },

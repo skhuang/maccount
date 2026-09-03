@@ -27,6 +27,9 @@ GOOGLE_LOGIN_CLIENT_ID = ""
 # OAuth scope at consent. Empty → identity + drive.file. Staff "connect Drive"
 # (/auth/google/start?drive=1) additionally requests full drive + forms.body.
 GOOGLE_SCOPE = "openid email https://www.googleapis.com/auth/drive.file"
+# LINE Login channel ID. Add <worker>/auth/line/callback as its callback URL.
+# Store the channel secret with: npx wrangler secret put LINE_CHANNEL_SECRET
+LINE_CHANNEL_ID = ""
 NYCU_CLIENT_ID = ""
 ADMIN_IDS = ""
 COURSE_ORG = "nycu-cs-course-ds"

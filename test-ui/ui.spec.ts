@@ -52,8 +52,9 @@ test("landing page remains accessible and usable on mobile", async ({ page }) =>
 test("post-logout chooser is accessible and exposes all sign-in methods", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.setContent(accountLoginChooserPage("zh"), { waitUntil: "load" });
-  await expect(page.locator('a[href^="/auth/"]')).toHaveCount(3);
+  await expect(page.locator('a[href^="/auth/"]')).toHaveCount(4);
   await expect(page.locator('a[href^="/auth/nycu/start"]')).toHaveAttribute("href", "/auth/nycu/start?prompt=login&lang=zh");
+  await expect(page.locator('a[href^="/auth/line/login"]')).toHaveAttribute("href", "/auth/line/login?lang=zh");
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
