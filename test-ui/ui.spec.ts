@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { adminHomePage, adminPage, dashboardPage } from "../src/html";
 import type { BindingRow } from "../src/csv";
 import type { GradeRow } from "../src/db/grades";
+import { accountLoginChooserPage } from "../src/ui/app_login";
 
 const course = { course_id: "ds-2026", name: "資料結構 2026", term: "2026", status: "active" };
 
@@ -46,6 +47,17 @@ test("landing page remains accessible and usable on mobile", async ({ page }) =>
   expect(buttonBox?.width).toBe(panelBox ? panelBox.width - 34 : 0);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
+});
+
+test("post-logout chooser is accessible and exposes all sign-in methods", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setContent(accountLoginChooserPage("zh"), { waitUntil: "load" });
+  await expect(page.locator('a[href^="/auth/"]')).toHaveCount(3);
+  await expect(page.locator('a[href^="/auth/nycu/start"]')).toHaveAttribute("href", "/auth/nycu/start?prompt=login&lang=zh");
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(results.violations).toEqual([]);
 });
 
 const bindings: BindingRow[] = [

@@ -285,6 +285,7 @@ export interface Strings {
   appLoginGithub: string;
   appLoginGoogle: string;
   appLoginNote: string;
+  accountLoginSubtitle: string;
 }
 
 export const T: Record<Lang, Strings> = {
@@ -602,6 +603,7 @@ export const T: Record<Lang, Strings> = {
     appLoginGithub: "用 GitHub 登入",
     appLoginGoogle: "用 Google 登入",
     appLoginNote: "GitHub / Google 需為已在 maccount 綁定過的帳號。",
+    accountLoginSubtitle: "選擇登入方式以返回你的帳號與課程。",
   },
   en: {
     acct_title: "My Account",
@@ -917,6 +919,7 @@ export const T: Record<Lang, Strings> = {
     appLoginGithub: "Sign in with GitHub",
     appLoginGoogle: "Sign in with Google",
     appLoginNote: "GitHub / Google must be an account already linked in maccount.",
+    accountLoginSubtitle: "Choose a sign-in method to return to your account and courses.",
   },
 };
 
