@@ -61,6 +61,7 @@ body>p[style*="#fff3cd"]{background:var(--warning-soft)!important;border-color:#
 .alert{padding:.8rem 1rem;border:1px solid var(--line);border-radius:9px}.alert--success{border-color:#b8e4ce;background:var(--success-soft)}.alert--warning{border-color:#eedc93;background:var(--warning-soft)}.alert--danger{border-color:#f1b6b6;background:var(--danger-soft)}
 .confirm-dialog{width:min(32rem,calc(100% - 2rem));padding:0;border:1px solid var(--line);border-radius:14px;background:#fff;color:var(--text);box-shadow:0 24px 70px rgba(20,45,34,.24)}.confirm-dialog::backdrop{background:rgba(14,25,20,.56)}.confirm-dialog__body{padding:1.35rem}.confirm-dialog h2{margin:0 0 .65rem;padding:0;border:0}.confirm-dialog p{margin:.5rem 0 1.25rem;color:var(--muted)}.confirm-dialog__actions{display:flex;justify-content:flex-end;gap:.65rem}.button--danger{background:var(--danger)}.button--danger:hover{background:#a61e1e}
 .course-list{display:grid;gap:1rem}.course-card{padding:1.1rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.course-card__head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:.85rem}.course-card__head h3{margin:0}.course-card__head-status{display:grid;justify-items:end;gap:.35rem}.course-card__meta{margin:.2rem 0 0;color:var(--muted);font-size:.84rem}.course-card__section{margin-top:1rem;padding-top:.85rem;border-top:1px solid var(--line)}.course-card__section-title{margin:0 0 .45rem;font-size:.92rem;font-weight:750}.course-card>p:last-child{margin-bottom:0}.course-card table{margin-top:.45rem}
+.course-picker{display:grid;gap:.75rem;margin:1rem 0}.course-picker__item{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff;color:var(--text);text-decoration:none}.course-picker__item:hover{border-color:#9db2a7;background:var(--surface-soft);color:var(--text)}.course-picker__name{font-weight:750}.course-picker__meta{display:flex;align-items:center;justify-content:flex-end;gap:.45rem;flex-wrap:wrap}.course-detail-back{margin:.25rem 0 1rem}.course-detail>.course-card{border-color:#b9d7ca;box-shadow:0 8px 24px rgba(20,45,34,.06)}
 .section-nav{position:sticky;top:0;z-index:2;display:flex;gap:.5rem;margin:0 -1rem 1.25rem;padding:.7rem 1rem;overflow-x:auto;border-block:1px solid var(--line);background:rgba(255,255,255,.96);box-shadow:0 5px 16px rgba(20,45,34,.05);white-space:nowrap}.section-nav a{padding:.3rem .55rem;border-radius:6px;text-decoration:none;font-size:.88rem;font-weight:650}.section-nav a:hover{background:var(--surface-soft)}
 .stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem;margin:1rem 0 1.5rem}.stat{padding:.85rem;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}.stat__value{display:block;font-size:1.45rem;font-weight:750;line-height:1.2}.stat__label{display:block;margin-top:.25rem;color:var(--muted);font-size:.82rem}
 .course-summary{margin:.25rem 0 1rem}.course-summary .stat{padding:.7rem}.course-summary .stat__value{font-size:1.1rem}.course-summary progress{display:block;width:100%;height:.45rem;margin-top:.45rem;accent-color:var(--brand)}
@@ -851,6 +852,7 @@ export function dashboardPage(
   // Exam windows keyed `${course_id}/${assignment_id}` — shown next to each exam
   // in the list so a student sees the deadline without opening the exam.
   examWindows: Record<string, ExamWindow> = {},
+  selectedCourseId: string | null = null,
 ): string {
   const t = T[lang];
   const accountCards = `<div class="account-grid${binding?.github_login && binding?.google_email ? " account-grid--complete" : ""}" aria-label="${t.acct_heading}">
@@ -963,9 +965,7 @@ ${courseTable(labRows)}</section>`
     return `<section class="course-card__section"><h4 class="course-card__section-title">${t.forms_student_heading}</h4>
 <ul>${fs.map((f) => `<li>${linkOrText(f.url, f.title)}</li>`).join("")}</ul></section>`;
   };
-  const table = courseOrder.length
-    ? `<div class="course-list">${courseOrder
-        .map((cid) => {
+  const courseView = (cid: string, details: boolean) => {
           const rs = gradesByCourse.get(cid) ?? [];
           const completed = rs.filter((g) => g.verdict != null || g.score != null).length;
           const dueDates = rs
@@ -982,10 +982,18 @@ ${courseTable(labRows)}</section>`
           const fhtml = formsFor(cid);
           if (fhtml) parts.push(fhtml);
           const inner = parts.length ? parts.join("") : `<p class="empty-state">${t.course_no_data}</p>`;
-          return `<article class="course-card"><header class="course-card__head"><div><h3>${h(courseName(cid))}${rs.length ? helpHint(t.help_grade_summary, t.help_label) : ""}</h3>${courseMeta ? `<p class="course-card__meta">${courseMeta}</p>` : ""}</div><div class="course-card__head-status">${deadline ? `<span class="badge badge--${deadline.tone}">${deadline.label}</span>` : ""}${rs.length ? `<span class="badge badge--${completed === rs.length ? "success" : "warning"}">${completed} / ${rs.length}</span>` : ""}</div></header>\n${inner}</article>`;
-        })
-        .join("\n")}</div>`
-    : `<p class="empty-state">${t.no_grades}</p>`;
+          const status = `${deadline ? `<span class="badge badge--${deadline.tone}">${deadline.label}</span>` : ""}${rs.length ? `<span class="badge badge--${completed === rs.length ? "success" : "warning"}">${completed} / ${rs.length}</span>` : ""}`;
+          if (!details) {
+            return `<a class="course-picker__item" href="/me?course=${encodeURIComponent(cid)}"><span><span class="course-picker__name">${h(courseName(cid))}</span>${courseMeta ? `<span class="course-card__meta">${courseMeta}</span>` : ""}</span><span class="course-picker__meta">${status}<span aria-hidden="true">→</span></span></a>`;
+          }
+          return `<div class="course-detail"><p class="course-detail-back"><a href="/me">← ${t.course_back}</a></p><article class="course-card"><header class="course-card__head"><div><h3>${h(courseName(cid))}${rs.length ? helpHint(t.help_grade_summary, t.help_label) : ""}</h3>${courseMeta ? `<p class="course-card__meta">${courseMeta}</p>` : ""}</div><div class="course-card__head-status">${status}</div></header>\n${inner}</article></div>`;
+  };
+  const selectedCourse = selectedCourseId && courseOrder.includes(selectedCourseId) ? selectedCourseId : null;
+  const table = !courseOrder.length
+    ? `<p class="empty-state">${t.no_grades}</p>`
+    : selectedCourse
+      ? courseView(selectedCourse, true)
+      : `<p class="muted">${t.course_select_hint}</p><nav class="course-picker" aria-label="${t.my_courses_heading}">${courseOrder.map((cid) => courseView(cid, false)).join("\n")}</nav>`;
 
   const okFlash = flash.bound ? t.flash_bound_ok : flash.gbound ? t.flash_gbound_ok : "";
   const flashHtml = okFlash
