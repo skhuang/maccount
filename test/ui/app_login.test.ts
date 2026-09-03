@@ -7,6 +7,7 @@ describe("appLoginChooserPage", () => {
     expect(html).toContain('href="/auth/nycu/start?lang=en"');
     expect(html).toContain('href="/auth/github/login?lang=en"');
     expect(html).toContain('href="/auth/google/login?lang=en"');
+    expect(html).toContain('href="/auth/line/login?lang=en"');
     expect(html).toContain("dsvisual");
   });
   it("html-escapes a hostile appId", () => {
@@ -26,6 +27,7 @@ describe("accountLoginChooserPage", () => {
     expect(html).toContain('href="/auth/nycu/start?prompt=login&amp;lang=zh"');
     expect(html).toContain('href="/auth/github/login?lang=zh"');
     expect(html).toContain('href="/auth/google/login?lang=zh"');
+    expect(html).toContain('href="/auth/line/login?lang=zh"');
     expect(html).toContain("選擇登入方式");
   });
 

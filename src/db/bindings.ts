@@ -14,6 +14,13 @@ export class GoogleConflictError extends Error {
   }
 }
 
+export class LineConflictError extends Error {
+  constructor(public existingNycuId: string) {
+    super("line account already bound to another nycu account");
+    this.name = "LineConflictError";
+  }
+}
+
 export interface UpsertInput {
   nycu_id: string;
   nycu_name: string;
@@ -26,7 +33,23 @@ export interface UpsertInput {
 }
 
 const BINDING_COLS =
-  "nycu_id, nycu_name, github_id, github_login, google_sub, google_email, source, created_at, updated_at";
+  "nycu_id, nycu_name, github_id, github_login, google_sub, google_email, line_sub, line_name, source, created_at, updated_at";
+
+export async function upsertLineBinding(
+  db: D1Database,
+  b: { nycu_id: string; nycu_name: string; line_sub: string; line_name: string; now: string },
+): Promise<void> {
+  const existing = await db.prepare("SELECT nycu_id FROM bindings WHERE line_sub = ?")
+    .bind(b.line_sub).first<{ nycu_id: string }>();
+  if (existing && existing.nycu_id !== b.nycu_id) throw new LineConflictError(existing.nycu_id);
+  await db.prepare(
+    `INSERT INTO bindings (nycu_id, nycu_name, line_sub, line_name, source, created_at, updated_at)
+     VALUES (?1, ?2, ?3, ?4, 'nycu', ?5, ?5)
+     ON CONFLICT(nycu_id) DO UPDATE SET
+       nycu_name = ?2, line_sub = ?3, line_name = ?4,
+       source = COALESCE(bindings.source, 'nycu'), updated_at = ?5`,
+  ).bind(b.nycu_id, b.nycu_name, b.line_sub, b.line_name, b.now).run();
+}
 
 export async function upsertBinding(db: D1Database, b: UpsertInput): Promise<void> {
   // Best-effort conflict guard for the common (sequential) case. Two concurrent
@@ -281,6 +304,11 @@ export async function getBindingByGoogleSub(
     .prepare(`SELECT ${BINDING_COLS} FROM bindings WHERE google_sub = ?`)
     .bind(google_sub)
     .first<BindingRow>();
+}
+
+export async function getBindingByLineSub(db: D1Database, line_sub: string): Promise<BindingRow | null> {
+  return await db.prepare(`SELECT ${BINDING_COLS} FROM bindings WHERE line_sub = ?`)
+    .bind(line_sub).first<BindingRow>();
 }
 
 // Email fallback for the reverse lookup (prefer google_sub, which is stable

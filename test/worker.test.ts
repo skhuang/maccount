@@ -26,6 +26,8 @@ const testEnv: Env = {
   GOOGLE_LOGIN_CLIENT_SECRET: "g_login_secret",
   GOOGLE_SCOPE: "openid email https://www.googleapis.com/auth/drive.file",
   GOOGLE_TOKEN_KEY: "test-token-key",
+  LINE_CHANNEL_ID: "line_id",
+  LINE_CHANNEL_SECRET: "line_secret",
   NYCU_AUTHORIZE_URL: "https://id.nycu.edu.tw/o/authorize/",
   NYCU_TOKEN_URL: "https://id.nycu.edu.tw/o/token/",
   NYCU_USERINFO_URL: "https://id.nycu.edu.tw/o/userinfo/",
@@ -88,6 +90,57 @@ describe("/auth/nycu/start", () => {
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toContain("id.nycu.edu.tw/o/authorize/");
     expect(res.headers.get("Set-Cookie")).toContain(SESSION_COOKIE);
+  });
+});
+
+describe("LINE Login binding and sign-in", () => {
+  it("starts LINE Login with state, nonce, and PKCE", async () => {
+    const nycu = await signSession({ exp: Date.now() + 60000, nycu: { id: "S1", name: "Student" } }, SECRET);
+    const res = await call("/auth/line/start", { headers: cookie(nycu) });
+    expect(res.status).toBe(302);
+    const url = new URL(res.headers.get("Location")!);
+    expect(url.origin + url.pathname).toBe("https://access.line.me/oauth2/v2.1/authorize");
+    expect(url.searchParams.get("state")).toBeTruthy();
+    expect(url.searchParams.get("nonce")).toBeTruthy();
+    expect(url.searchParams.get("code_challenge_method")).toBe("S256");
+  });
+
+  it("binds LINE and then allows sign-in by its stable subject", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      return url.endsWith("/token")
+        ? new Response(JSON.stringify({ id_token: "line-jwt" }))
+        : new Response(JSON.stringify({ sub: "U-line-1", name: "LINE Student" }));
+    }));
+    const bindSession = await signSession({
+      exp: Date.now() + 60000, nycu: { id: "S1", name: "Student" },
+      listate: "LS", linonce: "LN", liverifier: "v".repeat(64),
+    }, SECRET);
+    const bound = await call("/auth/line/callback?code=abc&state=LS", { headers: cookie(bindSession) });
+    expect(bound.headers.get("Location")).toBe("/me?lbound=1");
+    const row = await env.DB.prepare("SELECT line_sub, line_name FROM bindings WHERE nycu_id = 'S1'").first();
+    expect(row).toEqual({ line_sub: "U-line-1", line_name: "LINE Student" });
+
+    const loginSession = await signSession({
+      exp: Date.now() + 60000, listate: "LS2", linonce: "LN2", liverifier: "v".repeat(64),
+    }, SECRET);
+    const loggedIn = await call("/auth/line/callback?code=def&state=LS2", { headers: cookie(loginSession) });
+    expect(loggedIn.headers.get("Location")).toBe("/me");
+    expect(loggedIn.headers.get("Set-Cookie")).toContain(SESSION_COOKIE);
+  });
+
+  it("rejects sign-in when the LINE account has not been bound", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      return url.endsWith("/token")
+        ? new Response(JSON.stringify({ id_token: "line-jwt" }))
+        : new Response(JSON.stringify({ sub: "U-unbound", name: "Nobody" }));
+    }));
+    const session = await signSession({
+      exp: Date.now() + 60000, listate: "LS", linonce: "LN", liverifier: "v".repeat(64),
+    }, SECRET);
+    const res = await call("/auth/line/callback?code=abc&state=LS", { headers: cookie(session) });
+    expect(res.headers.get("Location")).toContain("reason=line_not_bound");
   });
 });
 

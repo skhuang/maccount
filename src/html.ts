@@ -843,7 +843,7 @@ export function dashboardPage(
   binding: BindingRow | null,
   grades: GradeRow[],
   admin: boolean,
-  flash: { bound?: boolean; gbound?: boolean; error?: string | null },
+  flash: { bound?: boolean; gbound?: boolean; lbound?: boolean; error?: string | null },
   orgJoins: { org: string; url: string }[] = [],
   courseNames: Record<string, string> = {},
   enrolledCourses: { course_id: string; name: string }[] = [],
@@ -858,6 +858,7 @@ export function dashboardPage(
   const accountCards = `<div class="account-grid${binding?.github_login && binding?.google_email ? " account-grid--complete" : ""}" aria-label="${t.acct_heading}">
   ${accountStatusCard(t, t.github, binding?.github_login, "/auth/github/start", t.bind_action, t.help_account_binding)}
   ${accountStatusCard(t, t.google, binding?.google_email, "/auth/google/start", t.bind_google_action, t.help_account_binding)}
+  ${accountStatusCard(t, t.line, binding?.line_name, "/auth/line/start", t.bind_line_action, t.help_account_binding)}
 </div>`;
 
   // The student's own repo for the problem; link to it when present. A bare
@@ -995,7 +996,7 @@ ${courseTable(labRows)}</section>`
       ? courseView(selectedCourse, true)
       : `<p class="muted">${t.course_select_hint}</p><nav class="course-picker" aria-label="${t.my_courses_heading}">${courseOrder.map((cid) => courseView(cid, false)).join("\n")}</nav>`;
 
-  const okFlash = flash.bound ? t.flash_bound_ok : flash.gbound ? t.flash_gbound_ok : "";
+  const okFlash = flash.bound ? t.flash_bound_ok : flash.gbound ? t.flash_gbound_ok : flash.lbound ? t.flash_lbound_ok : "";
   const flashHtml = okFlash
     ? `<p class="alert alert--success" role="status">${okFlash}</p>`
     : flash.error
@@ -1293,10 +1294,10 @@ export function coursePrejoinPage(
   nycu: { id: string; name: string },
   binding: BindingRow | null,
   forms: { title: string; url: string }[],
-  flash: { bound?: boolean; gbound?: boolean } = {},
+  flash: { bound?: boolean; gbound?: boolean; lbound?: boolean } = {},
 ): string {
   const t = T[lang];
-  const okFlash = flash.bound ? t.flash_bound_ok : flash.gbound ? t.flash_gbound_ok : "";
+  const okFlash = flash.bound ? t.flash_bound_ok : flash.gbound ? t.flash_gbound_ok : flash.lbound ? t.flash_lbound_ok : "";
   const flashHtml = okFlash
     ? `<p class="alert alert--success" role="status">${okFlash}</p>`
     : "";
@@ -1312,6 +1313,7 @@ ${flashHtml}
 <div class="account-grid" aria-label="${t.acct_heading}">
 ${accountStatusCard(t, t.github, binding?.github_login, "/auth/github/start", t.bind_action, t.help_account_binding)}
 ${accountStatusCard(t, t.google, binding?.google_email, "/auth/google/start", t.bind_google_action, t.help_account_binding)}
+${accountStatusCard(t, t.line, binding?.line_name, "/auth/line/start", t.bind_line_action, t.help_account_binding)}
 </div>
 <h2 class="with-help">${t.forms_student_heading}${helpHint(t.help_forms, t.help_label)}</h2>
 ${formsHtml}

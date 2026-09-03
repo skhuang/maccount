@@ -6,6 +6,7 @@ import {
 } from "../src/oauth/google";
 import { nycuAuthorizeUrl, exchangeNycuCode, fetchNycuUser, type NycuConfig } from "../src/oauth/nycu";
 import { isAdmin } from "../src/env";
+import { lineAuthorizeUrl, linePkceChallenge, exchangeLineCode, verifyLineIdToken } from "../src/oauth/line";
 
 const nycuCfg: NycuConfig = {
   authorizeUrl: "https://id.nycu.edu.tw/o/authorize/",
@@ -44,6 +45,27 @@ describe("github oauth", () => {
   it("fetches github user id + login", async () => {
     const user = await fetchGithubUser("gh_tok", jsonFetcher({ id: 42, login: "octo" }));
     expect(user).toEqual({ id: 42, login: "octo" });
+  });
+});
+
+describe("line oauth", () => {
+  const config = { channelId: "line-id", channelSecret: "line-secret", redirectUri: "https://api.example/auth/line/callback" };
+
+  it("builds an OIDC authorization URL with state, nonce, and PKCE", async () => {
+    const challenge = await linePkceChallenge("v".repeat(64));
+    const url = new URL(lineAuthorizeUrl(config, "state", "nonce", challenge));
+    expect(url.origin + url.pathname).toBe("https://access.line.me/oauth2/v2.1/authorize");
+    expect(url.searchParams.get("scope")).toBe("openid profile");
+    expect(url.searchParams.get("state")).toBe("state");
+    expect(url.searchParams.get("nonce")).toBe("nonce");
+    expect(url.searchParams.get("code_challenge_method")).toBe("S256");
+  });
+
+  it("exchanges a code and verifies the ID token", async () => {
+    const token = await exchangeLineCode(config, "code", "verifier", jsonFetcher({ id_token: "jwt" }));
+    expect(token).toBe("jwt");
+    await expect(verifyLineIdToken("line-id", token, "nonce", jsonFetcher({ sub: "U123", name: "Lin" })))
+      .resolves.toEqual({ sub: "U123", name: "Lin" });
   });
 });
 

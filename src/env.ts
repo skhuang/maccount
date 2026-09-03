@@ -22,6 +22,8 @@ export interface Env {
   // Symmetric key used to encrypt Google refresh tokens at rest in D1 (AES-GCM,
   // see crypto.ts). Any long random string. `wrangler secret put GOOGLE_TOKEN_KEY`.
   GOOGLE_TOKEN_KEY: string;
+  LINE_CHANNEL_ID?: string;
+  LINE_CHANNEL_SECRET?: string;
   NYCU_AUTHORIZE_URL: string;
   NYCU_TOKEN_URL: string;
   NYCU_USERINFO_URL: string;
