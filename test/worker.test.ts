@@ -1380,11 +1380,22 @@ describe("/me dashboard", () => {
     expect(body).toContain('href="/logout"'); // logout link
   });
 
-  it("logout clears the session cookie and forces a re-prompted NYCU login", async () => {
+  it("logout clears the session cookie and redirects to the multi-login chooser", async () => {
     const res = await call("/logout");
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start?prompt=login");
+    expect(res.headers.get("Location")).toBe("/login?lang=zh");
     expect(res.headers.get("Set-Cookie")).toContain("Max-Age=0"); // cleared
+  });
+
+  it("the login chooser offers NYCU, GitHub, and Google without requiring a session", async () => {
+    const res = await call("/login?lang=en");
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("Choose a sign-in method");
+    expect(body).toContain('/auth/nycu/start?prompt=login&amp;lang=en');
+    expect(body).toContain('/auth/github/login?lang=en');
+    expect(body).toContain('/auth/google/login?lang=en');
+    expect(res.headers.get("Set-Cookie")).toContain("lang=en");
   });
 
   it("/auth/nycu/start?prompt=login adds prompt=login to the NYCU authorize URL", async () => {

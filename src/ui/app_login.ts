@@ -1,5 +1,6 @@
 import type { Lang } from "../i18n";
 import { T } from "../i18n";
+import { langToggle } from "../i18n";
 import { documentStart } from "./layout";
 import { h } from "./components";
 import { UI_CSS } from "../html";
@@ -31,6 +32,28 @@ export function appLoginChooserPage(lang: Lang, appId: string): string {
 ${link(`/auth/nycu/start${q}`, t.appLoginNycu)}
 ${link(`/auth/github/login${q}`, t.appLoginGithub)}
 ${link(`/auth/google/login${q}`, t.appLoginGoogle)}
+<p class="muted text-small">${h(t.appLoginNote)}</p>
+</body></html>`
+  );
+}
+
+// General account chooser shown after logout. NYCU keeps prompt=login so the
+// university IdP asks for credentials again instead of silently reusing the
+// account that just signed out of maccount.
+export function accountLoginChooserPage(lang: Lang): string {
+  const t = T[lang];
+  const q = `lang=${lang}`;
+  const link = (href: string, label: string, primary = false) =>
+    `<p><a class="button${primary ? " button--primary" : ""}" href="${h(href)}" style="width:100%">${h(label)}</a></p>`;
+  return (
+    documentStart(lang, t.appLoginTitle, UI_CSS) +
+    `<body>
+<header class="topbar"><div>${langToggle("/login", lang)}</div></header>
+<h1>${h(t.appLoginTitle)}</h1>
+<p>${h(t.accountLoginSubtitle)}</p>
+${link(`/auth/nycu/start?prompt=login&${q}`, t.appLoginNycu, true)}
+${link(`/auth/github/login?${q}`, t.appLoginGithub)}
+${link(`/auth/google/login?${q}`, t.appLoginGoogle)}
 <p class="muted text-small">${h(t.appLoginNote)}</p>
 </body></html>`
   );

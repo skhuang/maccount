@@ -71,7 +71,7 @@ import {
   privacyPage, termsPage, scoreboardPage, provisionPage, studentScoreboardPage,
 } from "./html";
 import { pickLang, langCookie } from "./i18n";
-import { appLoginChooserPage } from "./ui/app_login";
+import { accountLoginChooserPage, appLoginChooserPage } from "./ui/app_login";
 
 const TTL_MS = 15 * 60 * 1000;
 
@@ -93,7 +93,13 @@ export default {
       if (p === "/api/app/verify" && req.method === "POST") return await verifyApp(req, env);
       if (p === "/privacy" && req.method === "GET") return publicPage(privacyPage(pickLang(url, req.headers.get("Cookie"))));
       if (p === "/terms" && req.method === "GET") return publicPage(termsPage(pickLang(url, req.headers.get("Cookie"))));
-      if (p === "/logout") return logout(env);
+      if (p === "/login" && req.method === "GET") {
+        const lang = pickLang(url, req.headers.get("Cookie"));
+        return new Response(accountLoginChooserPage(lang), {
+          headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
+        });
+      }
+      if (p === "/logout") return logout(req, url);
       if (p === "/me" && req.method === "GET") return await mePage(req, env, url);
       const esb = p.match(/^\/me\/exam\/([A-Za-z0-9._-]+)\/scoreboard$/);
       if (esb && req.method === "GET") return await meExamScoreboard(req, env, url, esb[1]);
@@ -601,15 +607,12 @@ async function googleCallback(req: Request, env: Env, url: URL): Promise<Respons
   return redirect("/me?gbound=1");
 }
 
-// Clear the maccount session and bounce to the landing page so the user can log
-// in as a different account. (NYCU/GitHub SSO may still auto-reuse their own
-// session — switching those needs their logout / an incognito window.)
-function logout(_env: Env): Response {
-  // Clear the maccount session AND start a fresh NYCU login that forces a
-  // re-prompt (prompt=login) — otherwise NYCU's SSO would silently log the same
-  // user straight back in, defeating "switch account". (GitHub-account switching
-  // still needs an incognito window; GitHub OAuth has no reliable re-prompt.)
-  return redirect("/auth/nycu/start?prompt=login", clearCookie());
+// Clear the maccount session and show all supported sign-in methods. The NYCU
+// button on that page requests a fresh credential prompt; GitHub account
+// switching may still require signing out of GitHub or using a private window.
+function logout(req: Request, url: URL): Response {
+  const lang = pickLang(url, req.headers.get("Cookie"));
+  return redirect(`/login?lang=${lang}`, clearCookie());
 }
 
 // A course's effective GitHub org: its own github_org, else the shared
