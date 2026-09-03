@@ -266,7 +266,7 @@ export function bindingsPage(
   const trs = rows
     .map(
       (r) => `<tr data-row><td>${h(r.nycu_id)}</td><td>${h(r.nycu_name)}</td>
-  <td>${h(r.github_login)}</td><td class="mobile-secondary">${h(r.github_id)}</td><td class="mobile-secondary">${h(r.google_email)}</td><td class="mobile-secondary">${h(srcLabel(r.source))}</td><td class="mobile-secondary">${h(fmtTime(r.updated_at))}</td><td class="mobile-only"><details class="mobile-row-details"><summary>${lang === "en" ? "Full details" : "查看完整資料"}</summary><dl><dt>${t.th_github_id}</dt><dd>${h(r.github_id) || "-"}</dd><dt>Google</dt><dd>${h(r.google_email) || "-"}</dd><dt>${t.source_label}</dt><dd>${h(srcLabel(r.source))}</dd><dt>${t.th_updated}</dt><dd>${h(fmtTime(r.updated_at)) || "-"}</dd></dl></details></td>${isOwner ? actions(r) : ""}</tr>`,
+  <td>${h(r.github_login)}</td><td class="mobile-secondary">${h(r.github_id)}</td><td class="mobile-secondary">${h(r.google_email)}</td><td>${h(r.line_name)}</td><td class="mobile-secondary">${h(srcLabel(r.source))}</td><td class="mobile-secondary">${h(fmtTime(r.updated_at))}</td><td class="mobile-only"><details class="mobile-row-details"><summary>${lang === "en" ? "Full details" : "查看完整資料"}</summary><dl><dt>${t.th_github_id}</dt><dd>${h(r.github_id) || "-"}</dd><dt>Google</dt><dd>${h(r.google_email) || "-"}</dd><dt>LINE</dt><dd>${h(r.line_name) || "-"}</dd><dt>${t.source_label}</dt><dd>${h(srcLabel(r.source))}</dd><dt>${t.th_updated}</dt><dd>${h(fmtTime(r.updated_at)) || "-"}</dd></dl></details></td>${isOwner ? actions(r) : ""}</tr>`,
     )
     .join("\n");
   const orgLinks = orgs
@@ -280,7 +280,7 @@ export function bindingsPage(
         : opts.notice === "err"
           ? `<p style="color:#c92a2a">${opts.noticeReason === "email_taken" ? t.manual_bind_err_taken : t.manual_bind_err_input}</p>`
           : "";
-  const cols = isOwner ? 9 : 8; // +1 for the mobile-only details column
+  const cols = isOwner ? 10 : 9; // +1 for the mobile-only details column
   return `${documentStart(lang, t.admin_title, UI_CSS)}
 <body style="font-family:system-ui;max-width:900px;margin:2rem auto;padding:0 1rem">
 ${langToggle("/admin/bindings", lang)}
@@ -290,7 +290,7 @@ ${notice}
 ${orgs.length ? `<p>${t.bindings_query_heading}：${orgLinks}</p>` : ""}
 ${rows.length ? tableTools(t, "bindings-table", rows.length) : ""}
 <table id="bindings-table" class="mobile-compact" border="1" cellpadding="6" cellspacing="0">
-<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("GitHub", 2)}${sortableTh(t.th_github_id, 3, "number", "mobile-secondary")}<th>Google</th>${sortableTh(t.source_label, 5, "text", "mobile-secondary")}${sortableTh(t.th_updated, 6, "text", "mobile-secondary")}<th class="mobile-only">${lang === "en" ? "Details" : "詳細資料"}</th>${isOwner ? `<th>${t.actions_label}</th>` : ""}</tr></thead>
+<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("GitHub", 2)}${sortableTh(t.th_github_id, 3, "number", "mobile-secondary")}<th>Google</th>${sortableTh("LINE", 5)}${sortableTh(t.source_label, 6, "text", "mobile-secondary")}${sortableTh(t.th_updated, 7, "text", "mobile-secondary")}<th class="mobile-only">${lang === "en" ? "Details" : "詳細資料"}</th>${isOwner ? `<th>${t.actions_label}</th>` : ""}</tr></thead>
 <tbody>
 ${trs || `<tr><td colspan="${cols}" class="empty-cell">${t.no_bindings}</td></tr>`}
 </tbody></table>
@@ -356,6 +356,7 @@ interface EnrolledLite {
   nycu_name?: string | null;
   github_login: string | null;
   google_email?: string | null;
+  line_name?: string | null;
 }
 
 interface FormLite {
@@ -450,9 +451,10 @@ export function adminPage(
   <td>${h(r.nycu_id)}</td><td>${h(r.nycu_name)}</td>
   <td>${h(r.github_login)}</td><td class="mobile-secondary">${h(r.github_id)}</td>
   <td class="mobile-secondary">${h(r.google_email)}</td>
+  <td>${h(r.line_name)}</td>
   <td class="mobile-secondary">${h(fmtTime(r.updated_at))}</td>
   <td class="mobile-only"><details class="mobile-row-details"><summary>${lang === "en" ? "Full details" : "查看完整資料"}</summary><dl>
-    <dt>GitHub id</dt><dd>${h(r.github_id)}</dd><dt>Google</dt><dd>${h(r.google_email) || "-"}</dd><dt>${t.th_updated}</dt><dd>${h(fmtTime(r.updated_at))}</dd>
+    <dt>GitHub id</dt><dd>${h(r.github_id)}</dd><dt>Google</dt><dd>${h(r.google_email) || "-"}</dd><dt>LINE</dt><dd>${h(r.line_name) || "-"}</dd><dt>${t.th_updated}</dt><dd>${h(fmtTime(r.updated_at))}</dd>
   </dl></details></td>${
     isOwner
       ? `
@@ -496,11 +498,12 @@ export function adminPage(
   // still need to bind. Import is owner-only.
   const bound = enrolled.filter((e) => e.github_login).length;
   const gbound = enrolled.filter((e) => e.google_email).length;
+  const lbound = enrolled.filter((e) => e.line_name).length;
   const enrolledRows = enrolled
     .map(
       (e) => {
         const displayName = e.name || e.nycu_name || "";
-        return `<tr data-row data-status="${e.github_login && e.google_email ? "complete" : "missing"}"><td>${h(e.student_id)}</td><td>${
+        return `<tr data-row data-status="${e.github_login && e.google_email && e.line_name ? "complete" : "missing"}"><td>${h(e.student_id)}</td><td>${
           displayName ? h(displayName) : ""
         }</td><td class="mobile-secondary">${
         e.email ? h(e.email) : ""
@@ -508,8 +511,10 @@ export function adminPage(
         e.github_login ? h(e.github_login) : `<span class="badge badge--danger">${t.enroll_unbound}</span>`
       }</td><td class="mobile-secondary">${
         e.google_email ? h(e.google_email) : `<span class="badge badge--danger">${t.enroll_unbound}</span>`
+      }</td><td>${
+        e.line_name ? h(e.line_name) : `<span class="badge badge--danger">${t.enroll_unbound}</span>`
       }</td><td class="mobile-only"><details class="mobile-row-details"><summary>${lang === "en" ? "Full details" : "查看完整資料"}</summary><dl>
-        <dt>Moodle email</dt><dd>${h(e.email) || "-"}</dd><dt>Google</dt><dd>${h(e.google_email) || "-"}</dd>
+        <dt>Moodle email</dt><dd>${h(e.email) || "-"}</dd><dt>Google</dt><dd>${h(e.google_email) || "-"}</dd><dt>LINE</dt><dd>${h(e.line_name) || "-"}</dd>
       </dl></details></td></tr>`;
       },
     )
@@ -527,13 +532,13 @@ export function adminPage(
 </form>`
     : "";
   const enrollSection = `<section class="admin-section" id="enrollment"><h2 class="with-help">${t.enroll_heading.replace("{n}", String(enrolled.length))}${helpHint(t.help_enrollment, t.help_label)}</h2>
-<p class="muted text-small">${t.enroll_note.replace("{bound}", String(bound)).replace("{gbound}", String(gbound))}</p>${
+<p class="muted text-small">${t.enroll_note.replace("{bound}", String(bound)).replace("{gbound}", String(gbound)).replace("{lbound}", String(lbound))}</p>${
     enrolled.length
       ? `
 <details><summary>${t.enroll_show_list}</summary>
 ${tableTools(t, "enrollment-table", enrolled.length, [{ value: "missing", label: t.table_filter_unbound }])}
 <table id="enrollment-table" class="mobile-compact" border="1" cellpadding="6" cellspacing="0">
-<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("Moodle email", 2, "text", "mobile-secondary")}${sortableTh("GitHub", 3)}<th class="mobile-secondary">Google</th><th class="mobile-only">${lang === "en" ? "Details" : "詳細資料"}</th></tr></thead>
+<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("Moodle email", 2, "text", "mobile-secondary")}${sortableTh("GitHub", 3)}<th class="mobile-secondary">Google</th><th>LINE</th><th class="mobile-only">${lang === "en" ? "Details" : "詳細資料"}</th></tr></thead>
 <tbody>${enrolledRows}</tbody></table></details>`
       : ""
   }
@@ -787,6 +792,7 @@ ${
   <div class="stat"><span class="stat__value">${enrolled.length}</span><span class="stat__label">${t.enroll_heading.replace("{n}", String(enrolled.length))}</span></div>
   <div class="stat"><span class="stat__value">${bound}</span><span class="stat__label">${t.github} ${t.bound}</span></div>
   <div class="stat"><span class="stat__value">${gbound}</span><span class="stat__label">${t.google} ${t.bound}</span></div>
+  <div class="stat"><span class="stat__value">${lbound}</span><span class="stat__label">${t.line} ${t.bound}</span></div>
 </div>`;
 
   const groups = lang === "en"

@@ -62,7 +62,7 @@ describe("adminPage", () => {
       isOwner: true,
       staff: [],
       enrolled: [
-        { student_id: "a01", github_login: "alice", google_email: "a@example.com" },
+        { student_id: "a01", github_login: "alice", google_email: "a@example.com", line_name: "Alice LINE" },
         { student_id: "b02", github_login: null, google_email: null },
       ],
     });
@@ -267,7 +267,7 @@ describe("adminPage", () => {
     const html = adminPage("zh", course, [{ ...rows[0], nycu_id: "O'Brien" }], { isOwner: true, staff: [] });
     expect(html).not.toContain("confirm(");
     expect(html).toContain('data-confirm-title="刪除帳號綁定？"');
-    expect(html).toContain("將刪除 O&#39;Brien 的全域 GitHub／Google 帳號綁定");
+    expect(html).toContain("將刪除 O&#39;Brien 的全域 GitHub／Google／LINE 帳號綁定");
     expect(html).toContain('class="confirm-dialog"');
     expect(html).toContain('value="O&#39;Brien"');
   });

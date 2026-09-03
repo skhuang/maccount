@@ -4,7 +4,7 @@ const TOKEN_TTL_MS = 5 * 60 * 1000;
 
 export interface AppClaims {
   sub: string;
-  providers: { github: boolean; google: boolean };
+  providers: { github: boolean; google: boolean; line?: boolean };
   aud: string;
 }
 
@@ -56,7 +56,7 @@ export async function mintAppToken(env: Env, claims: AppClaims & { _iat?: number
   return `${payload}.${b64urlEncode(sig)}`;
 }
 
-export async function verifyAppToken(env: Env, token: string): Promise<{ sub: string; providers: { github: boolean; google: boolean }; aud: string } | null> {
+export async function verifyAppToken(env: Env, token: string): Promise<{ sub: string; providers: { github: boolean; google: boolean; line: boolean }; aud: string } | null> {
   if (typeof token !== "string" || !token.includes(".")) return null;
   const [payload, sigPart] = token.split(".");
   const enc = new TextEncoder();
@@ -68,5 +68,5 @@ export async function verifyAppToken(env: Env, token: string): Promise<{ sub: st
   try { body = JSON.parse(new TextDecoder().decode(b64urlDecode(payload))); } catch { return null; }
   if (!body || typeof body.exp !== "number" || Date.now() > body.exp) return null;
   if (!appAllowlist(env).has(body.aud)) return null;
-  return { sub: String(body.sub), providers: { github: !!body.providers?.github, google: !!body.providers?.google }, aud: String(body.aud) };
+  return { sub: String(body.sub), providers: { github: !!body.providers?.github, google: !!body.providers?.google, line: !!body.providers?.line }, aud: String(body.aud) };
 }

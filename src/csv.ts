@@ -21,12 +21,12 @@ function esc(v: unknown): string {
 
 export function toCsv(rows: BindingRow[]): string {
   const header = [
-    "nycu_id", "nycu_name", "github_id", "github_login", "google_email", "created_at", "updated_at",
+    "nycu_id", "nycu_name", "github_id", "github_login", "google_email", "line_name", "created_at", "updated_at",
   ];
   const lines = [header.join(",")];
   for (const r of rows) {
     lines.push(
-      [r.nycu_id, r.nycu_name, r.github_id, r.github_login, r.google_email, r.created_at, r.updated_at]
+      [r.nycu_id, r.nycu_name, r.github_id, r.github_login, r.google_email, r.line_name, r.created_at, r.updated_at]
         .map(esc)
         .join(","),
     );

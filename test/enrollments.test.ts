@@ -52,15 +52,15 @@ describe("enrollments db", () => {
     expect(await enrollmentCount(env.DB, "ds-2027")).toBe(1);
   });
 
-  it("listEnrolledWithBinding shows bound vs unbound (github + google)", async () => {
+  it("listEnrolledWithBinding shows bound vs unbound (github + google + LINE)", async () => {
     await env.DB.prepare(
-      "INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, google_email, created_at, updated_at) VALUES ('a','甲',1,'alice','alice@gmail.com','t','t')",
+      "INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, google_email, line_name, created_at, updated_at) VALUES ('a','甲',1,'alice','alice@gmail.com','Alice LINE','t','t')",
     ).run();
     await bulkEnroll(env.DB, C, ["a", "b"], now);
     const rows = await listEnrolledWithBinding(env.DB, C);
     expect(rows).toEqual([
-      { student_id: "a", name: null, email: null, nycu_name: "甲", github_login: "alice", github_id: 1, google_email: "alice@gmail.com" },
-      { student_id: "b", name: null, email: null, nycu_name: null, github_login: null, github_id: null, google_email: null },
+      { student_id: "a", name: null, email: null, nycu_name: "甲", github_login: "alice", github_id: 1, google_email: "alice@gmail.com", line_name: "Alice LINE" },
+      { student_id: "b", name: null, email: null, nycu_name: null, github_login: null, github_id: null, google_email: null, line_name: null },
     ]);
   });
 
