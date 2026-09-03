@@ -201,6 +201,7 @@ test("student and admin pages have no automated WCAG A/AA violations", async ({ 
     [],
     { "ds-2026": "資料結構 2026" },
     [{ course_id: "ds-2026", name: "資料結構 2026" }],
+    {}, {}, {}, "ds-2026",
   );
 
   for (const html of [student, adminFixture()]) {
@@ -216,7 +217,7 @@ test("student course card exposes a grade summary", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.setContent(dashboardPage(
     "en", { id: "a01", name: "Alice" }, bindings[1], [grade], false, {},
-    [], { "ds-2026": "Data Structures 2026" },
+    [], { "ds-2026": "Data Structures 2026" }, [], {}, {}, {}, "ds-2026",
   ));
   const summary = page.locator('.course-summary[aria-label="Course grade summary"]');
   await expect(summary).toBeVisible();
@@ -225,6 +226,21 @@ test("student course card exposes a grade summary", async ({ page }) => {
   const columns = await summary.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length);
   expect(columns).toBe(2);
   await expect(page.locator(".mobile-card-table td").first()).toHaveCSS("display", "grid");
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
+test("student dashboard lists courses before showing course details", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setContent(dashboardPage(
+    "zh", { id: "a01", name: "Alice" }, bindings[1], [grade], false, {}, [],
+    { "ds-2026": "資料結構 2026", "algo-2026": "演算法 2026" },
+    [{ course_id: "ds-2026", name: "資料結構 2026" }, { course_id: "algo-2026", name: "演算法 2026" }],
+  ));
+  await expect(page.locator(".course-picker__item")).toHaveCount(2);
+  await expect(page.locator(".course-picker__item").first()).toHaveAttribute("href", "/me?course=ds-2026");
+  await expect(page.locator(".course-detail")).toHaveCount(0);
+  await expect(page.locator(".mobile-card-table")).toHaveCount(0);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 });
@@ -244,6 +260,7 @@ test("student dashboard prioritizes course progress and deadlines", async ({ pag
     "zh", { id: "a01", name: "Alice" }, { ...bindings[0], github_login: "alice" }, [grade, exam], false, {},
     [], { "ds-2026": "資料結構 2026" }, [], {}, {},
     { "ds-2026/midterm": { open_at: "2026-10-01T01:00:00Z", due_at: "2026-10-01T03:00:00Z" } },
+    "ds-2026",
   ));
   await expect(page.locator(".account-grid")).toHaveClass(/account-grid--complete/);
   await expect(page.locator(".course-card__head-status .badge").last()).toHaveText("1 / 2");

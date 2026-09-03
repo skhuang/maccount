@@ -727,7 +727,7 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
   // Show the admin link to owners AND staff-table members (of any course).
   const staff = isAdmin(env, studentId) || (await isStaffAnywhere(env.DB, studentId));
   const html = dashboardPage(lang, s.nycu!, binding, grades, staff, flash, orgJoins, courseNames,
-    enrolledCourses, formsByCourse, meetByCourse, examWindows);
+    enrolledCourses, formsByCourse, meetByCourse, examWindows, url.searchParams.get("course"));
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
   });

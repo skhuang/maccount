@@ -27,6 +27,8 @@ export interface Strings {
   bind_google_action: string;
   grades_heading: string;
   my_courses_heading: string;
+  course_select_hint: string;
+  course_back: string;
   assignments_heading: string;
   course_no_data: string;
   grade_summary_label: string;
@@ -299,6 +301,8 @@ export const T: Record<Lang, Strings> = {
     bind_google_action: "綁定 Google →",
     grades_heading: "我的成績",
     my_courses_heading: "我的課程",
+    course_select_hint: "選擇一門課程以查看作業、考試與進行中的活動。",
+    course_back: "返回課程清單",
     assignments_heading: "作業",
     course_no_data: "此課程目前沒有作業或成績。",
     grade_summary_label: "課程成績摘要",
@@ -612,6 +616,8 @@ export const T: Record<Lang, Strings> = {
     bind_google_action: "Bind Google →",
     grades_heading: "My Grades",
     my_courses_heading: "My Courses",
+    course_select_hint: "Choose a course to view assignments, exams, and current activities.",
+    course_back: "Back to course list",
     assignments_heading: "Assignments",
     course_no_data: "No assignments or grades in this course yet.",
     grade_summary_label: "Course grade summary",

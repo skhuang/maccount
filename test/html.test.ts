@@ -352,6 +352,30 @@ describe("dashboardPage", () => {
     points: null,
   };
 
+  it("lists courses first and renders details only after a valid selection", () => {
+    const courses = [
+      { course_id: "ds-2026", name: "資料結構 2026" },
+      { course_id: "algo-2026", name: "演算法 2026" },
+    ];
+    const names = Object.fromEntries(courses.map((course) => [course.course_id, course.name]));
+    const list = dashboardPage("zh", { id: "0856001", name: "學生" }, null, [grade], false, {}, [], names, courses);
+    expect(list).toContain('class="course-picker"');
+    expect(list).toContain('href="/me?course=ds-2026"');
+    expect(list).toContain('href="/me?course=algo-2026"');
+    expect(list).not.toContain('class="course-summary');
+    expect(list).not.toContain('data-label="題目"');
+
+    const detail = dashboardPage("zh", { id: "0856001", name: "學生" }, null, [grade], false, {}, [], names, courses, {}, {}, {}, "ds-2026");
+    expect(detail).toContain('class="course-detail"');
+    expect(detail).toContain("返回課程清單");
+    expect(detail).toContain('data-label="題目"');
+    expect(detail).not.toContain('href="/me?course=algo-2026"');
+
+    const invalid = dashboardPage("zh", { id: "0856001", name: "學生" }, null, [grade], false, {}, [], names, courses, {}, {}, {}, "not-mine");
+    expect(invalid).toContain('class="course-picker"');
+    expect(invalid).not.toContain('class="course-detail"');
+  });
+
   it("renders account status cards, course cards, and accessible verdict badges", () => {
     const html = dashboardPage(
       "zh",
@@ -363,6 +387,7 @@ describe("dashboardPage", () => {
       [],
       { "ds-2026": "資料結構 2026" },
       [{ course_id: "ds-2026", name: "資料結構 2026" }],
+      {}, {}, {}, "ds-2026",
     );
     expect(html).toContain('class="account-grid account-grid--complete"');
     expect(html).toContain('class="course-card"');
@@ -382,7 +407,7 @@ describe("dashboardPage", () => {
         { ...grade, problem_id: "lab02", verdict: "WA", score: 30, max_score: 50, updated_at: "2026-06-24T02:00:00Z" },
         { ...grade, problem_id: "lab03", verdict: null, score: null, max_score: 50, updated_at: "2026-06-24T01:00:00Z" },
       ],
-      false, {},
+      false, {}, [], {}, [], {}, {}, {}, "ds-2026",
     );
     expect(html).toContain('class="stats-grid course-summary"');
     expect(html).toContain('<span class="stat__value">2 / 3</span>');
@@ -395,7 +420,7 @@ describe("dashboardPage", () => {
   it("keeps unknown verdict text escaped and uses a warning badge", () => {
     const html = dashboardPage(
       "en", { id: "0856001", name: "Student" }, null,
-      [{ ...grade, verdict: "<pending>" }], false, {},
+      [{ ...grade, verdict: "<pending>" }], false, {}, [], {}, [], {}, {}, {}, "ds-2026",
     );
     expect(html).toContain('class="badge badge--warning">&lt;pending&gt;</span>');
     expect(html).not.toContain("<pending>");
@@ -635,7 +660,7 @@ describe("dashboard exam list window", () => {
   const dash = (examWindows = {}, grades: GradeRow[] = [examGrade]) =>
     dashboardPage("zh", { id: "0856001", name: "學生" }, null, grades, false, {}, [],
       { "ds-2026": "資料結構 2026" }, [{ course_id: "ds-2026", name: "資料結構 2026" }],
-      {}, {}, examWindows);
+      {}, {}, examWindows, "ds-2026");
 
   it("shows the deadline next to the exam link", () => {
     const html = dash({ "ds-2026/ds2026-lab9": { open_at: "2026-07-29T13:40:00+08:00", due_at: "2026-07-29T16:30:00+08:00" } });

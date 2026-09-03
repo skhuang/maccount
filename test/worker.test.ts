@@ -1015,10 +1015,15 @@ describe("exam list on /me + /me/exam/<id>", () => {
       "INSERT INTO grades (course_id, student_id, problem_id, verdict, score, max_score, updated_at, repo, assignment_id, assignment_type, assignment_title) VALUES ('ds-2026','S9',?,?,?,100,'t',?,?,?,?)",
     ).bind(pid, score ? "AC" : null, score || null, repo, aid, type, title).run();
 
-  it("/me lists exams (link to /me/exam/<id>) and keeps labs flat", async () => {
+  it("lists the course first, then shows its exams and labs after selection", async () => {
     await ins("lab01-stack", "lab", "ds2026-lab01", "Lab 1", "org/lab01-stack-S9", "100");
     await ins("mid-p1", "exam", "mid", "期中考", "org/mid-p1-S9", "");   // not solved yet
-    const body = await (await call("/me", { headers: cookie(await sess()) })).text();
+    const list = await (await call("/me", { headers: cookie(await sess()) })).text();
+    expect(list).toContain('href="/me?course=ds-2026"');
+    expect(list).not.toContain('href="/me/exam/mid"');
+    expect(list).not.toContain("lab01-stack ↗");
+
+    const body = await (await call("/me?course=ds-2026", { headers: cookie(await sess()) })).text();
     expect(body).toContain('href="/me/exam/mid"'); // exam → list link
     expect(body).toContain("期中考");
     expect(body).toContain("lab01-stack ↗");        // lab → flat row with repo link
@@ -1362,7 +1367,7 @@ describe("/me dashboard", () => {
       { exp: Date.now() + 60000, nycu: { id: "314561004", name: "甲" } },
       SECRET,
     );
-    const res = await call("/me", { headers: cookie(session) });
+    const res = await call("/me?course=ds-2026", { headers: cookie(session) });
     expect(res.status).toBe(200);
     const body = await res.text();
     expect(body).toContain("/auth/github/start"); // bind action
@@ -1417,7 +1422,7 @@ describe("/me dashboard", () => {
       "INSERT INTO enrollments (course_id, student_id, role, created_at) VALUES ('ds-2026','314561004','student','t')",
     ).run();
     const session = await signSession({ exp: Date.now() + 60000, nycu: { id: "314561004", name: "甲" } }, SECRET);
-    const body = await (await call("/me", { headers: cookie(session) })).text();
+    const body = await (await call("/me?course=ds-2026", { headers: cookie(session) })).text();
     expect(body).toContain("https://github.com/orgs/nycu-cs-course-ds/invitation");
   });
 
@@ -1434,7 +1439,7 @@ describe("/me dashboard", () => {
       { exp: Date.now() + 60000, nycu: { id: "admin1", name: "Admin" } },
       SECRET,
     );
-    const res = await call("/me", { headers: cookie(session) });
+    const res = await call("/me?course=ds-2026", { headers: cookie(session) });
     expect(res.status).toBe(200);
     const body = await res.text();
     expect(body).toContain("lab01-stack");
@@ -1449,7 +1454,7 @@ describe("/me dashboard", () => {
       "INSERT INTO enrollments (course_id, student_id, role, created_at) VALUES ('ds-2026','314561004','student','t')",
     ).run();
     const session = await signSession({ exp: Date.now() + 60000, nycu: { id: "314561004", name: "甲" } }, SECRET);
-    const body = await (await call("/me", { headers: cookie(session) })).text();
+    const body = await (await call("/me?course=ds-2026", { headers: cookie(session) })).text();
     expect(body).toContain("我的課程");                    // course-list heading
     expect(body).toContain("資料結構 2026");                // enrolled course name (seeded)
     expect(body).toContain("此課程目前沒有作業或成績");        // empty-course note
@@ -1461,7 +1466,7 @@ describe("/me dashboard", () => {
       "INSERT INTO enrollments (course_id, student_id, role, created_at) VALUES ('ds-2026','314561004','student','t')",
     ).run();
     const session = await signSession({ exp: Date.now() + 60000, nycu: { id: "314561004", name: "甲" } }, SECRET);
-    const body = await (await call("/me", { headers: cookie(session) })).text();
+    const body = await (await call("/me?course=ds-2026", { headers: cookie(session) })).text();
     expect(body).toContain("加入 Google Meet");
     expect(body).toContain('href="https://meet.google.com/abc-defg-hij"');
     await env.DB.prepare("UPDATE courses SET google_meet_url=NULL WHERE course_id='ds-2026'").run(); // restore
@@ -1481,7 +1486,13 @@ describe("/me dashboard", () => {
     const body = await (await call("/me", { headers: cookie(session) })).text();
     expect(body).toContain("資料結構 2026"); // seeded ds-2026 name
     expect(body.indexOf("資料結構 2026")).toBeLessThan(body.indexOf("ds-2027")); // ordered by course_id
-    expect(body).toContain("lab09-x");
+    expect(body).toContain('href="/me?course=ds-2026"');
+    expect(body).toContain('href="/me?course=ds-2027"');
+    expect(body).not.toContain("lab09-x"); // details are deferred until a course is selected
+
+    const detail = await (await call("/me?course=ds-2027", { headers: cookie(session) })).text();
+    expect(detail).toContain("lab09-x");
+    expect(detail).not.toContain("lab01-stack");
   });
 
   it("shows a success flash after binding (?bound=1)", async () => {
@@ -1672,7 +1683,7 @@ describe("/api/grades/ingest", () => {
     const row = await env.DB.prepare("SELECT repo FROM grades WHERE student_id='admin1'").first<{ repo: string }>();
     expect(row?.repo).toBe("nycu-cs-course-ds/lab01-stack-skhuang");
     const session = await signSession({ exp: Date.now() + 60000, nycu: { id: "admin1", name: "A" } }, SECRET);
-    const body = await (await call("/me", { headers: cookie(session) })).text();
+    const body = await (await call("/me?course=ds-2026", { headers: cookie(session) })).text();
     expect(body).toContain('href="https://github.com/nycu-cs-course-ds/lab01-stack-skhuang"');
   });
 });
@@ -1778,7 +1789,7 @@ describe("course Google Forms", () => {
       "INSERT INTO course_forms (course_id, title, url, created_at) VALUES ('ds-2026','期末回饋','https://forms.gle/feedback','t')",
     ).run();
     const session = await signSession({ exp: Date.now() + 60000, nycu: { id: "314561004", name: "甲" } }, SECRET);
-    const body = await (await call("/me", { headers: cookie(session) })).text();
+    const body = await (await call("/me?course=ds-2026", { headers: cookie(session) })).text();
     expect(body).toContain("期末回饋");
     expect(body).toContain('href="https://forms.gle/feedback"');
   });
