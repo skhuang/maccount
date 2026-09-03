@@ -127,6 +127,8 @@ export default {
         return await apiResolveGoogle(req, env, url);
       if (p === "/api/resolve-github" && req.method === "GET")
         return await apiResolveGithub(req, env, url);
+      if (p === "/api/resolve-line" && req.method === "GET")
+        return await apiResolveLine(req, env, url);
       if (p === "/api/grades" && req.method === "GET") return await apiGrades(req, env, url);
       if (p === "/api/scoreboard" && req.method === "GET") return await apiScoreboard(req, env, url);
       if (p === "/api/enrollments/ingest" && req.method === "POST")
@@ -334,9 +336,9 @@ async function lineCallback(req: Request, env: Env, url: URL): Promise<Response>
 }
 
 // ── relying-app SSO (B1): GET /auth/app/start?app=&return= ────────────────
-async function providersFor(env: Env, nycu_id: string): Promise<{ github: boolean; google: boolean }> {
+async function providersFor(env: Env, nycu_id: string): Promise<{ github: boolean; google: boolean; line: boolean }> {
   const b = await getBinding(env.DB, nycu_id);
-  return { github: !!b?.github_id, google: !!b?.google_sub };
+  return { github: !!b?.github_id, google: !!b?.google_sub, line: !!b?.line_sub };
 }
 
 async function appTokenRedirect(env: Env, nycu_id: string, app: string, ret: string): Promise<Response> {
@@ -956,6 +958,7 @@ async function apiEnrolled(req: Request, env: Env, url: URL): Promise<Response> 
     name: s.name,
     github_login: s.github_login,
     google_email: s.google_email,
+    line_name: s.line_name,
   }));
   return json({ course_id: courseId, students }, 200);
 }
@@ -1007,6 +1010,19 @@ async function apiResolveGithub(req: Request, env: Env, url: URL): Promise<Respo
   } else {
     row = await getBindingByGithubLogin(env.DB, login!);
   }
+  if (!row) return json({ student_id: null }, 404);
+  return json({ student_id: row.nycu_id }, 200);
+}
+
+// Resolve a LINE subject verified by a trusted relying service to its NYCU id.
+// The stable subject is accepted as input but never returned in the response.
+async function apiResolveLine(req: Request, env: Env, url: URL): Promise<Response> {
+  if (!bearerOk(req, env)) return new Response("Unauthorized", { status: 401 });
+  const sub = url.searchParams.get("sub");
+  const json = (body: unknown, status: number) =>
+    new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  if (!sub) return json({ error: "need sub" }, 400);
+  const row = await getBindingByLineSub(env.DB, sub);
   if (!row) return json({ student_id: null }, 404);
   return json({ student_id: row.nycu_id }, 200);
 }

@@ -1156,6 +1156,16 @@ describe("binding queries (總表 + by GitHub org)", () => {
     expect(body).toContain("chen@gmail.com");
   });
 
+  it("/admin/bindings shows and searches a bound student's LINE display name", async () => {
+    await env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, line_sub, line_name, created_at, updated_at) VALUES ('0856010','林','U10','林同學 LINE','t','t')",
+    ).run();
+    const body = await (await call("/admin/bindings", { headers: cookie(await owner()) })).text();
+    expect(body).toContain('data-sort-type="text">LINE</th>');
+    expect(body).toContain("林同學 LINE");
+    expect(body).toContain("GitHub、Google 或 LINE");
+  });
+
   it("/admin/bindings is auth-gated", async () => {
     const res = await call("/admin/bindings");
     expect(res.headers.get("Location")).toBe("/auth/nycu/start");
@@ -2312,7 +2322,7 @@ describe("GET /api/enrolled (token API: full roster incl. google-only)", () => {
     await env.DB.batch([
       env.DB.prepare("INSERT OR IGNORE INTO courses (course_id, name, status, created_at) VALUES ('mk-2026','行銷 2026','active','t')"),
       // AT9336: has GitHub + Google
-      env.DB.prepare("INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, google_email, created_at, updated_at) VALUES ('AT9336','黃老師',111,'skhuang','kun@gmail.com','t','t')"),
+      env.DB.prepare("INSERT INTO bindings (nycu_id, nycu_name, github_id, github_login, google_email, line_sub, line_name, created_at, updated_at) VALUES ('AT9336','黃老師',111,'skhuang','kun@gmail.com','U9336','老師 LINE','t','t')"),
       // AT9337: manual, google-only (no github)
       env.DB.prepare("INSERT INTO bindings (nycu_id, nycu_name, google_email, source, created_at, updated_at) VALUES ('AT9337','黃測試','ext@corp.edu','manual','t','t')"),
       env.DB.prepare("INSERT INTO enrollments (course_id, student_id, name, role, created_at) VALUES ('mk-2026','AT9336','黃老師','student','t')"),
@@ -2326,14 +2336,36 @@ describe("GET /api/enrolled (token API: full roster incl. google-only)", () => {
     const body = (await r.json()) as { course_id: string; students: Array<Record<string, unknown>> };
     expect(body.course_id).toBe("mk-2026");
     const byId = Object.fromEntries(body.students.map((s) => [s.student_id, s]));
-    expect(byId["AT9336"]).toEqual({ student_id: "AT9336", name: "黃老師", github_login: "skhuang", google_email: "kun@gmail.com" });
-    expect(byId["AT9337"]).toEqual({ student_id: "AT9337", name: "黃測試", github_login: null, google_email: "ext@corp.edu" });
+    expect(byId["AT9336"]).toEqual({ student_id: "AT9336", name: "黃老師", github_login: "skhuang", google_email: "kun@gmail.com", line_name: "老師 LINE" });
+    expect(byId["AT9337"]).toEqual({ student_id: "AT9337", name: "黃測試", github_login: null, google_email: "ext@corp.edu", line_name: null });
   });
 
   it("404s an unknown course, 400s a missing param, 401s a missing token", async () => {
     expect((await get("course_id=nope")).status).toBe(404);
     expect((await get("")).status).toBe(400);
     expect((await call("/api/enrolled?course_id=mk-2026")).status).toBe(401);
+  });
+});
+
+describe("GET /api/resolve-line", () => {
+  it("maps a bound LINE subject to only its student id", async () => {
+    await env.DB.prepare(
+      "INSERT INTO bindings (nycu_id, nycu_name, line_sub, line_name, created_at, updated_at) VALUES ('LINE01','林同學','U-resolve','Lin','t','t')",
+    ).run();
+    const res = await call("/api/resolve-line?sub=U-resolve", {
+      headers: { Authorization: "Bearer ingest-secret" },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ student_id: "LINE01" });
+  });
+
+  it("requires authentication and returns null for an unbound subject", async () => {
+    expect((await call("/api/resolve-line?sub=U-none")).status).toBe(401);
+    const res = await call("/api/resolve-line?sub=U-none", {
+      headers: { Authorization: "Bearer ingest-secret" },
+    });
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ student_id: null });
   });
 });
 

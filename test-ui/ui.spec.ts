@@ -102,7 +102,7 @@ function adminFixture(): string {
     staff: [],
     enrolled: [
       { student_id: "a01", github_login: "alice", google_email: null },
-      { student_id: "z99", github_login: "zoe", google_email: "zoe@example.com" },
+      { student_id: "z99", github_login: "zoe", google_email: "zoe@example.com", line_name: "Zoe LINE" },
     ],
     forms: [{ id: 1, title: "課程回饋", url: "https://forms.example.test/feedback" }],
   });
