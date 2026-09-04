@@ -119,6 +119,7 @@ repo Settings → Pages → 由 `main` 分支根目錄發佈 → 服務在 `http
 - **尚未選課學生報到（`/me/<course_id>`）**：把此連結發給還沒選課的學生。他們用 NYCU 登入後（會自動回到此頁），可在頁面綁定 GitHub/Google 並填寫報到問卷；老師據此把他們加入課程。後台「Google 問卷」區會顯示該課的報到連結。
 - **邀請學生加入 Google Classroom**：先在「課程設定」填 `google_classroom_id`，再到課程後台「Google Classroom」區按「邀請學生加入 Classroom」。系統用你連結的 Google（須先「連結我的 Google Drive（完整權限）」一次，且你本人是該 Classroom 老師）把「選課∩已綁 Google」學生以 email 邀請加入；已在班者計為「已在班」、未綁 Google 者略過。需在專案啟用 **Google Classroom API**。
 - **課程 Google Meet 連結**：Classroom API 不提供班級 Meet link，因此在「課程設定」另填選填欄位 `google_meet_url`；學生在 `/me` 對應課程下會看到「加入 Google Meet」連結。
+- **課程 LINE 群組邀請**：可在「課程設定」填入 `https://line.me/ti/g/...` 邀請網址；學生選擇該課程後會看到加入群組按鈕。
 
 ## OJ 成績整合（與 dsjudge）
 - **roster**：`maccount` 是 `github_login ↔ 學號` 的權威來源（兩邊都驗證過）。`/admin/roster.csv` 直接產生 dsjudge `app/roster.py` 讀的 `roster.csv`，取代原本的 GitHub Classroom 匯出。
