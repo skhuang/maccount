@@ -39,5 +39,6 @@ STAFF_TEAM = "staff"
 # ingests without an explicit course_id fall back to this). Code default: ds-2026.
 DEFAULT_COURSE_ID = "ds-2026"
 # Relying-app SSO (B1): "app_id=return_prefix" pairs, ';'-separated (non-secret).
-APP_ALLOWLIST = ""   # e.g. "dsvisual=https://skhuang.github.io/dsvisual"
+APP_ALLOWLIST = ""   # relying-app SSO; "app_id=return_prefix" pairs, ';'-separated.
+                     # e.g. "dsvisual=https://skhuang.github.io/dsvisual;stvisual2=https://skhuang.github.io/stvisual2"
 # APP_TOKEN_SECRET via `wrangler secret put APP_TOKEN_SECRET` (separate from SESSION_SECRET).
