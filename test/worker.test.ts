@@ -1237,6 +1237,27 @@ describe("course edit + enrollment", () => {
     await post("/admin/courses", { course_id: "ds-2026", name: "資料結構 2026" }, await owner()); // restore
   });
 
+  it("owner sets a valid LINE group invitation URL (persists + prefills the form)", async () => {
+    const invite = "https://line.me/ti/g/TpmHc2ewUP";
+    const res = await post("/admin/courses", { course_id: "ds-2026", name: "資料結構 2026", line_group_invite_url: invite }, await owner());
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin");
+    const row = await env.DB.prepare("SELECT line_group_invite_url FROM courses WHERE course_id='ds-2026'").first();
+    expect(row).toMatchObject({ line_group_invite_url: invite });
+    const body = await (await call("/c/ds-2026/admin", { headers: cookie(await owner()) })).text();
+    expect(body).toContain(`name="line_group_invite_url" type="url" value="${invite}"`);
+    await post("/admin/courses", { course_id: "ds-2026", name: "資料結構 2026" }, await owner()); // restore
+  });
+
+  it("rejects a non-LINE group invitation URL", async () => {
+    const res = await post("/admin/courses", {
+      course_id: "ds-2026",
+      name: "資料結構 2026",
+      line_group_invite_url: "https://example.com/not-a-line-group",
+    }, await owner());
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Invalid LINE group invitation URL");
+  });
+
   it("owner sets an optional google_group_email (persists + prefills the form)", async () => {
     const group = "maccount-ds-2026@example.edu";
     const res = await post("/admin/courses", { course_id: "ds-2026", name: "資料結構 2026", google_group_email: group }, await owner());
@@ -1554,6 +1575,23 @@ describe("/me dashboard", () => {
     expect(body).toContain("加入 Google Meet");
     expect(body).toContain('href="https://meet.google.com/abc-defg-hij"');
     await env.DB.prepare("UPDATE courses SET google_meet_url=NULL WHERE course_id='ds-2026'").run(); // restore
+  });
+
+  it("shows the LINE group invitation only after an enrolled course is selected", async () => {
+    const invite = "https://line.me/ti/g/TpmHc2ewUP";
+    await env.DB.prepare("UPDATE courses SET line_group_invite_url=?1 WHERE course_id='ds-2026'").bind(invite).run();
+    await env.DB.prepare(
+      "INSERT INTO enrollments (course_id, student_id, role, created_at) VALUES ('ds-2026','314561004','student','t')",
+    ).run();
+    const session = await signSession({ exp: Date.now() + 60000, nycu: { id: "314561004", name: "甲" } }, SECRET);
+    const list = await (await call("/me", { headers: cookie(session) })).text();
+    expect(list).not.toContain(invite);
+
+    const detail = await (await call("/me?course=ds-2026", { headers: cookie(session) })).text();
+    expect(detail).toContain("加入課程 LINE 群組");
+    expect(detail).toContain(`href="${invite}"`);
+    expect(detail).toContain('target="_blank" rel="noopener"');
+    await env.DB.prepare("UPDATE courses SET line_group_invite_url=NULL WHERE course_id='ds-2026'").run(); // restore
   });
 
   it("groups a student's grades by course on /me", async () => {

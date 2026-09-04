@@ -217,6 +217,7 @@ export function adminHomePage(
   <label>${t.ph_course_repos}<input name="github_repos" placeholder="ds2026, dsvisual" autocomplete="off"></label>
   <label>${t.ph_course_classroom}<input name="google_classroom_id" placeholder="${t.ph_course_classroom}" autocomplete="off"></label>
   <label>${t.ph_course_meet}<input name="google_meet_url" type="url" placeholder="https://meet.google.com/…"></label>
+  <label>${t.ph_course_line_group}<input name="line_group_invite_url" type="url" placeholder="https://line.me/ti/g/…"></label>
   <label>${t.ph_course_group}<input name="google_group_email" type="email" placeholder="maccount-ds-2026@example.edu" autocomplete="off"></label>
   <button type="submit">${t.course_create}</button>
 </form>
@@ -416,6 +417,7 @@ export function adminPage(
     google_classroom_id?: string | null;
     google_meet_url?: string | null;
     google_group_email?: string | null;
+    line_group_invite_url?: string | null;
     status?: string;
   },
   rows: BindingRow[],
@@ -769,6 +771,7 @@ ${
   <label>${t.ph_course_repos}<input name="github_repos" value="${h(course.github_repos ?? "")}"></label>
   <label>${t.ph_course_classroom}<input name="google_classroom_id" value="${h(course.google_classroom_id ?? "")}"></label>
   <label>${t.ph_course_meet}<input name="google_meet_url" value="${h(course.google_meet_url ?? "")}"></label>
+  <label>${t.ph_course_line_group}<input name="line_group_invite_url" type="url" value="${h(course.line_group_invite_url ?? "")}" placeholder="https://line.me/ti/g/…"></label>
   <label>${t.ph_course_group}<input name="google_group_email" type="email" value="${h(course.google_group_email ?? "")}"></label>
   <label>${t.course_status}
     <select name="status">
@@ -859,6 +862,7 @@ export function dashboardPage(
   // in the list so a student sees the deadline without opening the exam.
   examWindows: Record<string, ExamWindow> = {},
   selectedCourseId: string | null = null,
+  lineGroupByCourse: Record<string, string> = {},
 ): string {
   const t = T[lang];
   const accountCards = `<div class="account-grid${binding?.github_login && binding?.google_email ? " account-grid--complete" : ""}" aria-label="${t.acct_heading}">
@@ -985,6 +989,8 @@ ${courseTable(labRows)}</section>`
           const parts: string[] = [];
           const meet = meetByCourse[cid];
           if (meet) parts.push(`<p>${linkOrText(meet, t.meet_join)}</p>`);
+          const lineGroup = lineGroupByCourse[cid];
+          if (lineGroup) parts.push(`<p><a class="button button--secondary" href="${h(lineGroup)}" target="_blank" rel="noopener">${t.line_group_join}</a></p>`);
           if (rs.length) parts.push(courseSummary(rs), courseBlock(rs));
           const fhtml = formsFor(cid);
           if (fhtml) parts.push(fhtml);

@@ -803,6 +803,8 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
   // Per-course Google Meet link (manually set in course settings).
   const meetByCourse: Record<string, string> = {};
   for (const c of courses) if (c.google_meet_url) meetByCourse[c.course_id] = c.google_meet_url;
+  const lineGroupByCourse: Record<string, string> = {};
+  for (const c of courses) if (c.line_group_invite_url) lineGroupByCourse[c.course_id] = c.line_group_invite_url;
   // Exam windows for the courses shown, in one read — the exam list puts each
   // exam's deadline next to it so a student needn't open the exam to see it.
   const examWindows: Record<string, { open_at: string | null; due_at: string | null }> = {};
@@ -824,7 +826,7 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
   // Show the admin link to owners AND staff-table members (of any course).
   const staff = isAdmin(env, studentId) || (await isStaffAnywhere(env.DB, studentId));
   const html = dashboardPage(lang, s.nycu!, binding, grades, staff, flash, orgJoins, courseNames,
-    enrolledCourses, formsByCourse, meetByCourse, examWindows, url.searchParams.get("course"));
+    enrolledCourses, formsByCourse, meetByCourse, examWindows, url.searchParams.get("course"), lineGroupByCourse);
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
   });
@@ -1347,6 +1349,10 @@ async function courseUpsert(req: Request, env: Env): Promise<Response> {
   const name = String(form.get("name") ?? "").trim();
   if (!course_id || !/^[A-Za-z0-9_-]+$/.test(course_id) || !name) return redirect("/admin");
   const statusIn = String(form.get("status") ?? "").trim();
+  const lineGroupInviteUrl = String(form.get("line_group_invite_url") ?? "").trim();
+  if (lineGroupInviteUrl && !/^https:\/\/line\.me\/ti\/g\/[A-Za-z0-9_-]+$/.test(lineGroupInviteUrl)) {
+    return new Response("Invalid LINE group invitation URL", { status: 400 });
+  }
   await upsertCourse(
     env.DB,
     {
@@ -1360,6 +1366,7 @@ async function courseUpsert(req: Request, env: Env): Promise<Response> {
       google_classroom_id: String(form.get("google_classroom_id") ?? "").trim() || null,
       google_meet_url: String(form.get("google_meet_url") ?? "").trim() || null,
       google_group_email: String(form.get("google_group_email") ?? "").trim() || null,
+      line_group_invite_url: lineGroupInviteUrl || null,
       status: statusIn === "archived" ? "archived" : "active",
     },
     new Date(Date.now()).toISOString(),

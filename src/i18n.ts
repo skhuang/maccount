@@ -117,8 +117,10 @@ export interface Strings {
   ph_course_repos: string;
   ph_course_classroom: string;
   ph_course_meet: string;
+  ph_course_line_group: string;
   ph_course_group: string;
   meet_join: string;
+  line_group_join: string;
   bindings_query_heading: string;
   bindings_all_link: string;
   manual_bind_heading: string;
@@ -434,8 +436,10 @@ export const T: Record<Lang, Strings> = {
     ph_course_repos: "github_repos（選填，如 ds2026；多個可用空白或逗號分隔）",
     ph_course_classroom: "google_classroom_id（選填，可貼課程連結）",
     ph_course_meet: "google_meet_url（選填，課程的 Meet 連結）",
+    ph_course_line_group: "LINE 群組邀請網址（選填）",
     ph_course_group: "google_group_email（選填，課程問卷 Google Group）",
     meet_join: "加入 Google Meet",
+    line_group_join: "加入課程 LINE 群組 →",
     bindings_query_heading: "查詢綁定（依 GitHub org）",
     bindings_all_link: "所有綁定",
     manual_bind_heading: "手動綁定學生（無 NYCU／無 Moodle）",
@@ -754,8 +758,10 @@ export const T: Record<Lang, Strings> = {
     ph_course_repos: "github_repos (optional, e.g. ds2026; separate multiple with spaces or commas)",
     ph_course_classroom: "google_classroom_id (optional; a class link works too)",
     ph_course_meet: "google_meet_url (optional, the course's Meet link)",
+    ph_course_line_group: "LINE group invitation URL (optional)",
     ph_course_group: "google_group_email (optional, course Forms Google Group)",
     meet_join: "Join Google Meet",
+    line_group_join: "Join the course LINE group →",
     bindings_query_heading: "Query bindings (by GitHub org)",
     bindings_all_link: "All bindings",
     manual_bind_heading: "Manual student binding (no NYCU / no Moodle)",
