@@ -41,9 +41,11 @@ ${link(`/auth/line/login${q}`, t.appLoginLine)}
 // General account chooser shown after logout. NYCU keeps prompt=login so the
 // university IdP asks for credentials again instead of silently reusing the
 // account that just signed out of maccount.
-export function accountLoginChooserPage(lang: Lang): string {
+export function accountLoginChooserPage(lang: Lang, next = ""): string {
   const t = T[lang];
-  const q = `lang=${lang}`;
+  const params = new URLSearchParams({ lang });
+  if (next) params.set("next", next);
+  const q = params.toString();
   const link = (href: string, label: string, primary = false) =>
     `<p><a class="button${primary ? " button--primary" : ""}" href="${h(href)}" style="width:100%">${h(label)}</a></p>`;
   return (

@@ -36,4 +36,12 @@ describe("accountLoginChooserPage", () => {
     expect(html).toContain("Choose a sign-in method");
     expect(html).toContain('href="/login?lang=zh"');
   });
+
+  it("carries a safe post-login destination through every provider", () => {
+    const html = accountLoginChooserPage("zh", "/me?course=ds-2026");
+    expect(html).toContain("/auth/nycu/start?prompt=login&amp;lang=zh&amp;next=%2Fme%3Fcourse%3Dds-2026");
+    expect(html).toContain("/auth/github/login?lang=zh&amp;next=%2Fme%3Fcourse%3Dds-2026");
+    expect(html).toContain("/auth/google/login?lang=zh&amp;next=%2Fme%3Fcourse%3Dds-2026");
+    expect(html).toContain("/auth/line/login?lang=zh&amp;next=%2Fme%3Fcourse%3Dds-2026");
+  });
 });

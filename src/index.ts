@@ -102,7 +102,8 @@ export default {
       if (p === "/terms" && req.method === "GET") return publicPage(termsPage(pickLang(url, req.headers.get("Cookie"))));
       if (p === "/login" && req.method === "GET") {
         const lang = pickLang(url, req.headers.get("Cookie"));
-        return new Response(accountLoginChooserPage(lang), {
+        const next = safeNext(url.searchParams.get("next")) ?? "";
+        return new Response(accountLoginChooserPage(lang, next), {
           headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
         });
       }
@@ -167,10 +168,23 @@ function redirect(location: string, cookie?: string | string[]): Response {
   return new Response(null, { status: 302, headers });
 }
 
-// A safe post-login redirect target: only our own per-course landing path, so
+// A safe post-login redirect target: only our own protected GET pages, so
 // `?next=` can't be used as an open redirect.
 function safeNext(next: string | null | undefined): string | null {
-  return next && /^\/me\/[A-Za-z0-9_-]+$/.test(next) ? next : null;
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return null;
+  let url: URL;
+  try { url = new URL(next, "https://maccount.invalid"); } catch { return null; }
+  const allowed = url.pathname === "/me" || url.pathname === "/admin" ||
+    /^\/me\/[A-Za-z0-9._/-]+$/.test(url.pathname) ||
+    /^\/admin\/[A-Za-z0-9._/-]+$/.test(url.pathname) ||
+    /^\/c\/[A-Za-z0-9_-]+\/admin(?:\/[A-Za-z0-9._/-]+)?$/.test(url.pathname);
+  return allowed ? url.pathname + url.search : null;
+}
+
+function loginChooserRedirect(req: Request): Response {
+  const url = new URL(req.url);
+  const next = req.method === "GET" ? safeNext(url.pathname + url.search) : null;
+  return redirect(next ? `/login?next=${encodeURIComponent(next)}` : "/login", clearCookie());
 }
 
 // Single entry point: log in with NYCU. The landing dashboard (/me) is where a
@@ -249,6 +263,8 @@ async function startOAuthLogin(
     provider === "github"
       ? { exp: Date.now() + TTL_MS, gstate: state }
       : { exp: Date.now() + TTL_MS, gostate: state, googleMode: "login" };
+  const next = safeNext(url.searchParams.get("next"));
+  if (next) session.next = next;
   // Carry a pending relying-app SSO return through this alternate-login leg too
   // (see startNycu) — so github/google login also returns to the app.
   const prev = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
@@ -289,6 +305,8 @@ async function startLine(req: Request, env: Env, url: URL, mode: "bind" | "login
     liverifier: verifier,
     ...(existing ? { nycu: existing.nycu } : {}),
   };
+  const next = safeNext(url.searchParams.get("next"));
+  if (mode === "login" && next) session.next = next;
   const prev = mode === "login" ? await verifySession(readCookie(req), env.SESSION_SECRET, Date.now()) : null;
   if (prev?.app_return) session.app_return = prev.app_return;
   const challenge = await linePkceChallenge(verifier);
@@ -315,7 +333,7 @@ async function lineCallback(req: Request, env: Env, url: URL): Promise<Response>
     if (!binding) return redirectDone(env, "err", "line_not_bound");
     const appDest = await postLoginDestination(env, binding.nycu_id, session.app_return);
     if (appDest) return appDest;
-    return redirect("/me", setCookie(await signSession(
+    return redirect(safeNext(session.next) ?? "/me", setCookie(await signSession(
       { exp: Date.now() + TTL_MS, nycu: { id: binding.nycu_id, name: binding.nycu_name ?? binding.nycu_id } },
       env.SESSION_SECRET,
     )));
@@ -472,7 +490,7 @@ async function githubCallback(req: Request, env: Env, url: URL): Promise<Respons
     const appDest = await postLoginDestination(env, b.nycu_id, session.app_return);
     if (appDest) return appDest;
     return redirect(
-      "/me",
+      safeNext(session.next) ?? "/me",
       setCookie(await signSession(
         { exp: Date.now() + TTL_MS, nycu: { id: b.nycu_id, name: b.nycu_name ?? b.nycu_id } },
         env.SESSION_SECRET,
@@ -612,7 +630,7 @@ async function googleCallback(req: Request, env: Env, url: URL): Promise<Respons
         const dest = await postLoginDestination(env, manual.nycu_id, session.app_return);
         if (dest) return dest;
         return redirect(
-          "/me",
+          safeNext(session.next) ?? "/me",
           setCookie(await signSession(
             { exp: Date.now() + TTL_MS, nycu: { id: manual.nycu_id, name: manual.nycu_name ?? manual.nycu_id } },
             env.SESSION_SECRET,
@@ -638,7 +656,7 @@ async function googleCallback(req: Request, env: Env, url: URL): Promise<Respons
       const appDestNew = await postLoginDestination(env, ids[0], session.app_return);
       if (appDestNew) return appDestNew;
       return redirect(
-        "/me",
+        safeNext(session.next) ?? "/me",
         setCookie(await signSession(
           { exp: Date.now() + TTL_MS, nycu: { id: ids[0], name: ids[0] } },
           env.SESSION_SECRET,
@@ -648,7 +666,7 @@ async function googleCallback(req: Request, env: Env, url: URL): Promise<Respons
     const appDest = await postLoginDestination(env, b.nycu_id, session.app_return);
     if (appDest) return appDest;
     return redirect(
-      "/me",
+      safeNext(session.next) ?? "/me",
       setCookie(await signSession(
         { exp: Date.now() + TTL_MS, nycu: { id: b.nycu_id, name: b.nycu_name ?? b.nycu_id } },
         env.SESSION_SECRET,
@@ -753,7 +771,7 @@ export async function syncStudentTeamsOnBind(
 // ── dashboard (/me) ───────────────────────────────────────────────────────
 async function requireLogin(req: Request, env: Env): Promise<SessionData | Response> {
   const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
-  if (!session || !session.nycu) return redirect("/auth/nycu/start");
+  if (!session || !session.nycu) return loginChooserRedirect(req);
   return session;
 }
 
@@ -874,7 +892,7 @@ async function meExamScoreboard(req: Request, env: Env, url: URL, assignmentId: 
 async function meCourse(req: Request, env: Env, url: URL, courseId: string): Promise<Response> {
   const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
   if (!session || !session.nycu) {
-    return redirect(`/auth/nycu/start?next=${encodeURIComponent(`/me/${courseId}`)}`);
+    return loginChooserRedirect(req);
   }
   const course = await getCourse(env.DB, courseId);
   if (!course) return new Response("Not found", { status: 404 });
@@ -1152,7 +1170,7 @@ async function assignmentVisibility(req: Request, env: Env): Promise<Response> {
 // Owner = a bootstrap admin in ADMIN_IDS (manages staff + destructive ops).
 async function requireAdmin(req: Request, env: Env): Promise<SessionData | Response> {
   const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
-  if (!session || !session.nycu) return redirect("/auth/nycu/start");
+  if (!session || !session.nycu) return loginChooserRedirect(req);
   if (!isAdmin(env, session.nycu.id)) {
     return new Response("Not authorized as admin", { status: 403 });
   }
@@ -1162,7 +1180,7 @@ async function requireAdmin(req: Request, env: Env): Promise<SessionData | Respo
 // Staff = an owner OR a member of the D1 staff table. May view /admin + export.
 async function requireStaff(req: Request, env: Env): Promise<SessionData | Response> {
   const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
-  if (!session || !session.nycu) return redirect("/auth/nycu/start");
+  if (!session || !session.nycu) return loginChooserRedirect(req);
   if (!isAdmin(env, session.nycu.id) && !(await isStaffAnywhere(env.DB, session.nycu.id))) {
     return new Response("Not authorized", { status: 403 });
   }
@@ -1175,7 +1193,7 @@ async function requireCourseStaff(
   req: Request, env: Env, courseId: string,
 ): Promise<SessionData | Response> {
   const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
-  if (!session || !session.nycu) return redirect("/auth/nycu/start");
+  if (!session || !session.nycu) return loginChooserRedirect(req);
   if (!isAdmin(env, session.nycu.id) && !(await isStaffMember(env.DB, courseId, session.nycu.id))) {
     return new Response("Not authorized", { status: 403 });
   }

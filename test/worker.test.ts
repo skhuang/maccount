@@ -316,7 +316,7 @@ describe("/auth/google/start (bind from the dashboard)", () => {
   it("redirects an anonymous user to NYCU login first", async () => {
     const res = await call("/auth/google/start");
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
+    expect(res.headers.get("Location")).toBe("/login");
   });
 
   it("?drive=1 requests the full drive scope (staff connect)", async () => {
@@ -423,7 +423,7 @@ describe("/c/<id>/admin/drive/share", () => {
   it("redirects an anonymous request to NYCU login", async () => {
     const res = await post({ file_id: "FILE1" }, "");
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
+    expect(res.headers.get("Location")).toBe("/login");
   });
 });
 
@@ -559,9 +559,9 @@ describe("sign in with GitHub / Google (login via an existing binding)", () => {
         return new Response(JSON.stringify({ access_token: "t" }), { headers: { "Content-Type": "application/json" } });
       return new Response(JSON.stringify({ id: 999, login: "octo" }), { headers: { "Content-Type": "application/json" } });
     }));
-    const session = await signSession({ exp: Date.now() + 60000, gstate: "GS" }, SECRET); // NO nycu
+    const session = await signSession({ exp: Date.now() + 60000, gstate: "GS", next: "/me?course=ds-2026" }, SECRET); // NO nycu
     const res = await call("/auth/github/callback?code=abc&state=GS", { headers: cookie(session) });
-    expect(res.headers.get("Location")).toBe("/me");
+    expect(res.headers.get("Location")).toBe("/me?course=ds-2026");
     // the issued session is logged in as the bound NYCU account
     const me = await call("/me", { headers: cookie(sessionToken(res)) });
     expect(me.status).toBe(200);
@@ -744,7 +744,7 @@ describe("/admin auth gate", () => {
   it("redirects anonymous users to NYCU login", async () => {
     const res = await call("/admin");
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
+    expect(res.headers.get("Location")).toBe("/login?next=%2Fadmin");
   });
 
   it("serves the course picker to an admin session", async () => {
@@ -773,7 +773,7 @@ describe("/admin auth gate", () => {
   it("denies CSV export to an anonymous request", async () => {
     const res = await call("/c/ds-2026/admin/export.csv");
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
+    expect(res.headers.get("Location")).toBe("/login?next=%2Fc%2Fds-2026%2Fadmin%2Fexport.csv");
   });
 
   it("forbids CSV export to a logged-in non-staff (403)", async () => {
@@ -796,7 +796,7 @@ describe("/admin auth gate", () => {
       body: body.toString(),
     });
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
+    expect(res.headers.get("Location")).toBe("/login");
     expect(await listBindings(env.DB)).toHaveLength(1);
   });
 });
@@ -841,7 +841,7 @@ describe("admin manual binding (學號 + Google email)", () => {
   it("redirects an anonymous request to login and does not create", async () => {
     const res = await post({ student_id: "0857004", google_email: "y@corp.edu" });
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
+    expect(res.headers.get("Location")).toBe("/login");
     expect(await listBindings(env.DB)).toHaveLength(0);
   });
 });
@@ -903,7 +903,7 @@ describe("admin binding management (owner edit/delete on /admin/bindings)", () =
     await seed();
     const res = await post("/admin/bindings/delete", { nycu_id: "0857001" });
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
+    expect(res.headers.get("Location")).toBe("/login");
     expect(await listBindings(env.DB)).toHaveLength(1);
   });
 });
@@ -1125,7 +1125,7 @@ describe("exam list on /me + /me/exam/<id>", () => {
 
   it("/me/exam/<id> requires login", async () => {
     const res = await call("/me/exam/mid");
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
+    expect(res.headers.get("Location")).toBe("/login?next=%2Fme%2Fexam%2Fmid");
   });
 });
 
@@ -1168,7 +1168,7 @@ describe("binding queries (總表 + by GitHub org)", () => {
 
   it("/admin/bindings is auth-gated", async () => {
     const res = await call("/admin/bindings");
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
+    expect(res.headers.get("Location")).toBe("/login?next=%2Fadmin%2Fbindings");
   });
 
   it("/admin/org/<org> joins org members/pending to bindings", async () => {
@@ -1422,7 +1422,17 @@ describe("/me dashboard", () => {
   it("redirects anonymous users to NYCU login", async () => {
     const res = await call("/me");
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
+    expect(res.headers.get("Location")).toBe("/login?next=%2Fme");
+  });
+
+  it("redirects an expired session to the multi-provider chooser and clears it", async () => {
+    const expired = await signSession(
+      { exp: Date.now() - 1000, nycu: { id: "314561004", name: "甲" } },
+      SECRET,
+    );
+    const res = await call("/me?course=ds-2026", { headers: cookie(expired) });
+    expect(res.headers.get("Location")).toBe("/login?next=%2Fme%3Fcourse%3Dds-2026");
+    expect(res.headers.get("Set-Cookie")).toContain("Max-Age=0");
   });
 
   it("shows the bind-GitHub action when not yet bound, and no admin link for a normal user", async () => {
@@ -1630,7 +1640,7 @@ describe("/auth/github/start (bind from the dashboard)", () => {
   it("redirects an anonymous user to NYCU login first", async () => {
     const res = await call("/auth/github/start");
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
+    expect(res.headers.get("Location")).toBe("/login");
   });
 });
 
@@ -1766,7 +1776,7 @@ describe("pre-enrollment landing /me/<course_id>", () => {
   it("anonymous visitor is sent to NYCU login carrying next", async () => {
     const res = await call("/me/ds-2026");
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start?next=%2Fme%2Fds-2026");
+    expect(res.headers.get("Location")).toBe("/login?next=%2Fme%2Fds-2026");
   });
 
   it("logged-in: shows binding + pre-enroll form, hides regular form; unknown course → 404", async () => {
@@ -2132,7 +2142,7 @@ describe("/c/<id>/admin/roster.csv", () => {
   it("denies roster export to anonymous", async () => {
     const res = await call("/c/ds-2026/admin/roster.csv");
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/auth/nycu/start");
+    expect(res.headers.get("Location")).toBe("/login?next=%2Fc%2Fds-2026%2Fadmin%2Froster.csv");
   });
 });
 
