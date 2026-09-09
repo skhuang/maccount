@@ -1,4 +1,5 @@
 import type { NycuConfig } from "./oauth/nycu";
+import type { CsConfig } from "./oauth/cs";
 
 export interface Env {
   DB: D1Database;
@@ -30,6 +31,12 @@ export interface Env {
   NYCU_SCOPE: string;
   NYCU_CLIENT_ID: string;
   NYCU_CLIENT_SECRET: string;
+  CS_AUTHORIZE_URL: string;
+  CS_TOKEN_URL: string;
+  CS_USERINFO_URL: string;
+  CS_SCOPE: string;
+  CS_CLIENT_ID: string;
+  CS_CLIENT_SECRET: string;
   // Shared secret the trusted OJ runner presents to POST /api/grades/ingest.
   // Set via `wrangler secret put GRADES_INGEST_TOKEN` (never in wrangler.toml).
   GRADES_INGEST_TOKEN: string;
@@ -63,6 +70,17 @@ export function nycuConfig(env: Env): NycuConfig {
     clientId: env.NYCU_CLIENT_ID,
     clientSecret: env.NYCU_CLIENT_SECRET,
     scope: env.NYCU_SCOPE,
+  };
+}
+
+export function csConfig(env: Env): CsConfig {
+  return {
+    authorizeUrl: env.CS_AUTHORIZE_URL,
+    tokenUrl: env.CS_TOKEN_URL,
+    userinfoUrl: env.CS_USERINFO_URL,
+    clientId: env.CS_CLIENT_ID,
+    clientSecret: env.CS_CLIENT_SECRET,
+    scope: env.CS_SCOPE,
   };
 }
 
