@@ -8,6 +8,8 @@ export interface BindingRow {
   google_email?: string | null;
   line_sub?: string | null;
   line_name?: string | null;
+  cs_sub?: string | null;
+  cs_account?: string | null;
   // How the row was first provisioned: "nycu" | "moodle" | "manual" | null.
   source?: string | null;
   created_at: string;

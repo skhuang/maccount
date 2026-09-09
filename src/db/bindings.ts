@@ -21,6 +21,13 @@ export class LineConflictError extends Error {
   }
 }
 
+export class CsConflictError extends Error {
+  constructor(public existingNycuId: string) {
+    super("cs account already bound to another nycu account");
+    this.name = "CsConflictError";
+  }
+}
+
 export interface UpsertInput {
   nycu_id: string;
   nycu_name: string;
@@ -33,7 +40,7 @@ export interface UpsertInput {
 }
 
 const BINDING_COLS =
-  "nycu_id, nycu_name, github_id, github_login, google_sub, google_email, line_sub, line_name, source, created_at, updated_at";
+  "nycu_id, nycu_name, github_id, github_login, google_sub, google_email, line_sub, line_name, cs_sub, cs_account, source, created_at, updated_at";
 
 export async function upsertLineBinding(
   db: D1Database,
@@ -49,6 +56,22 @@ export async function upsertLineBinding(
        nycu_name = ?2, line_sub = ?3, line_name = ?4,
        source = COALESCE(bindings.source, 'nycu'), updated_at = ?5`,
   ).bind(b.nycu_id, b.nycu_name, b.line_sub, b.line_name, b.now).run();
+}
+
+export async function upsertCsBinding(
+  db: D1Database,
+  b: { nycu_id: string; nycu_name: string; cs_sub: string; cs_account: string; now: string },
+): Promise<void> {
+  const existing = await db.prepare("SELECT nycu_id FROM bindings WHERE cs_sub = ?")
+    .bind(b.cs_sub).first<{ nycu_id: string }>();
+  if (existing && existing.nycu_id !== b.nycu_id) throw new CsConflictError(existing.nycu_id);
+  await db.prepare(
+    `INSERT INTO bindings (nycu_id, nycu_name, cs_sub, cs_account, source, created_at, updated_at)
+     VALUES (?1, ?2, ?3, ?4, 'nycu', ?5, ?5)
+     ON CONFLICT(nycu_id) DO UPDATE SET
+       nycu_name = ?2, cs_sub = ?3, cs_account = ?4,
+       source = COALESCE(bindings.source, 'nycu'), updated_at = ?5`,
+  ).bind(b.nycu_id, b.nycu_name, b.cs_sub, b.cs_account, b.now).run();
 }
 
 export async function upsertBinding(db: D1Database, b: UpsertInput): Promise<void> {
@@ -309,6 +332,11 @@ export async function getBindingByGoogleSub(
 export async function getBindingByLineSub(db: D1Database, line_sub: string): Promise<BindingRow | null> {
   return await db.prepare(`SELECT ${BINDING_COLS} FROM bindings WHERE line_sub = ?`)
     .bind(line_sub).first<BindingRow>();
+}
+
+export async function getBindingByCsSub(db: D1Database, cs_sub: string): Promise<BindingRow | null> {
+  return await db.prepare(`SELECT ${BINDING_COLS} FROM bindings WHERE cs_sub = ?`)
+    .bind(cs_sub).first<BindingRow>();
 }
 
 // Email fallback for the reverse lookup (prefer google_sub, which is stable

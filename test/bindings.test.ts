@@ -15,6 +15,9 @@ import {
   orgBindingView,
   GithubConflictError,
   GoogleConflictError,
+  upsertCsBinding,
+  getBindingByCsSub,
+  CsConflictError,
 } from "../src/db/bindings";
 import { toCsv } from "../src/csv";
 import type { BindingRow } from "../src/csv";
@@ -137,6 +140,49 @@ describe("google binding", () => {
     const rows = await listBindings(env.DB);
     expect(JSON.stringify(rows)).not.toContain("enc-blob");
     expect(toCsv(rows)).not.toContain("enc-blob");
+  });
+});
+
+describe("cs binding", () => {
+  const c = {
+    nycu_id: "0856001",
+    nycu_name: "王小明",
+    cs_sub: "cssub1",
+    cs_account: "ming",
+    now: "2026-06-16T00:00:00.000Z",
+  };
+
+  it("binds cs on a fresh row", async () => {
+    await upsertCsBinding(env.DB, c);
+    const row = await getBinding(env.DB, "0856001");
+    expect(row).toMatchObject({ cs_sub: "cssub1", cs_account: "ming" });
+  });
+
+  it("binding cs does not clobber an existing github binding (and vice versa)", async () => {
+    await upsertBinding(env.DB, base); // github first
+    await upsertCsBinding(env.DB, c); // then cs, same nycu
+    const row = await getBinding(env.DB, "0856001");
+    expect(row).toMatchObject({ github_login: "ming", cs_account: "ming" });
+  });
+
+  it("re-binding the same nycu_id updates cs fields", async () => {
+    await upsertCsBinding(env.DB, c);
+    await upsertCsBinding(env.DB, { ...c, cs_sub: "cssub2", cs_account: "ming2", now: "2026-06-17T00:00:00.000Z" });
+    const row = await getBinding(env.DB, "0856001");
+    expect(row).toMatchObject({ cs_sub: "cssub2", cs_account: "ming2", updated_at: "2026-06-17T00:00:00.000Z" });
+  });
+
+  it("throws CsConflictError when cs_sub belongs to another nycu_id", async () => {
+    await upsertCsBinding(env.DB, c);
+    await expect(
+      upsertCsBinding(env.DB, { ...c, nycu_id: "0856002", nycu_name: "李小華" }),
+    ).rejects.toBeInstanceOf(CsConflictError);
+  });
+
+  it("reverse-looks-up a binding by cs_sub (sign-in with CS)", async () => {
+    await upsertCsBinding(env.DB, c);
+    expect((await getBindingByCsSub(env.DB, "cssub1"))?.nycu_id).toBe("0856001");
+    expect(await getBindingByCsSub(env.DB, "nope")).toBe(null);
   });
 });
 
