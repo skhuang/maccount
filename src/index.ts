@@ -1,4 +1,4 @@
-import { Env, isAdmin, nycuConfig } from "./env";
+import { Env, isAdmin, nycuConfig, csConfig } from "./env";
 import {
   SessionData,
   signSession,
@@ -19,6 +19,7 @@ import {
   DEFAULT_GOOGLE_SCOPE,
 } from "./oauth/google";
 import { lineAuthorizeUrl, linePkceChallenge, exchangeLineCode, verifyLineIdToken } from "./oauth/line";
+import { csAuthorizeUrl, exchangeCsCode, fetchCsUser } from "./oauth/cs";
 import {
   shareFileWithUser, asDriveRole, scopeHasFullDrive, scopeHasGroupMember,
   parseDriveFileId, STAFF_GOOGLE_SCOPE,
@@ -46,6 +47,8 @@ import {
   upsertLineBinding,
   getBindingByLineSub,
   LineConflictError,
+  upsertCsBinding,
+  CsConflictError,
 } from "./db/bindings";
 import { allowedReturn, allowedOrigin, mintAppToken, verifyAppToken } from "./app_sso";
 import {
@@ -95,6 +98,9 @@ export default {
       if (p === "/auth/line/start") return await startLine(req, env, url, "bind");
       if (p === "/auth/line/login") return await startLine(req, env, url, "login");
       if (p === "/auth/line/callback") return await lineCallback(req, env, url);
+      if (p === "/auth/cs/start") return await startCs(req, env, url, "bind");
+      if (p === "/auth/cs/login") return await startCs(req, env, url, "login");
+      if (p === "/auth/cs/callback") return await csCallback(req, env, url);
       if (p === "/auth/app/start") return await startApp(req, env, url);
       if (p === "/api/app/verify" && req.method === "OPTIONS") return appVerifyPreflight(req, env);
       if (p === "/api/app/verify" && req.method === "POST") return await verifyApp(req, env);
@@ -351,6 +357,74 @@ async function lineCallback(req: Request, env: Env, url: URL): Promise<Response>
     throw error;
   }
   return redirect("/me?lbound=1");
+}
+
+async function startCs(req: Request, env: Env, url: URL, mode: "bind" | "login"): Promise<Response> {
+  const existing = mode === "bind" ? await requireLogin(req, env) : null;
+  if (existing instanceof Response) return existing;
+  const state = randomState();
+  const session: SessionData = {
+    exp: Date.now() + TTL_MS,
+    csstate: state,
+    ...(existing ? { nycu: existing.nycu } : {}),
+  };
+  const next = safeNext(url.searchParams.get("next"));
+  if (mode === "login" && next) session.next = next;
+  const prev = mode === "login" ? await verifySession(readCookie(req), env.SESSION_SECRET, Date.now()) : null;
+  if (prev?.app_return) session.app_return = prev.app_return;
+  const cookies = [setCookie(await signSession(session, env.SESSION_SECRET))];
+  const lang = url.searchParams.get("lang");
+  if (lang === "en" || lang === "zh") cookies.push(langCookie(lang));
+  const redirectUri = `${env.PUBLIC_BASE_URL}/auth/cs/callback`;
+  return redirect(csAuthorizeUrl(csConfig(env), redirectUri, state), cookies);
+}
+
+async function csCallback(req: Request, env: Env, url: URL): Promise<Response> {
+  const session = await verifySession(readCookie(req), env.SESSION_SECRET, Date.now());
+  const code = url.searchParams.get("code");
+  const state = url.searchParams.get("state");
+  const oauthError = url.searchParams.get("error");
+  if (oauthError) return redirectDone(env, "err", `cs_${oauthError}`);
+  if (!session?.csstate || session.csstate !== state || !code) {
+    return recoverLogin(env, session);
+  }
+  const cfg = csConfig(env);
+  const redirectUri = `${env.PUBLIC_BASE_URL}/auth/cs/callback`;
+  const accessToken = await exchangeCsCode(cfg, code, redirectUri);
+  const cs = await fetchCsUser(cfg, accessToken);
+  const now = new Date(Date.now()).toISOString();
+
+  if (!session.nycu) {
+    // LOGIN mode: CS OIDC carries the 學號 → open a session directly (like NYCU)
+    // AND record the cs binding. source stays 'nycu' by design — CS is an
+    // NYCU-family authoritative SSO (the source marker is SSO vs manual vs moodle).
+    try {
+      await upsertCsBinding(env.DB, {
+        nycu_id: cs.student_id, nycu_name: cs.name, cs_sub: cs.sub, cs_account: cs.account, now,
+      });
+    } catch (error) {
+      if (error instanceof CsConflictError) return redirectDone(env, "err", "cs_already_bound");
+      throw error;
+    }
+    const appDest = await postLoginDestination(env, cs.student_id, session.app_return);
+    if (appDest) return appDest;
+    return redirect(safeNext(session.next) ?? "/me", setCookie(await signSession(
+      { exp: Date.now() + TTL_MS, nycu: { id: cs.student_id, name: cs.name } },
+      env.SESSION_SECRET,
+    )));
+  }
+  // BIND mode: attach CS to the current logged-in student. Reject if the CS
+  // account's 學號 differs from the session's (avoid binding someone else's).
+  if (cs.student_id !== session.nycu.id) return redirect("/me?error=cs_id_mismatch");
+  try {
+    await upsertCsBinding(env.DB, {
+      nycu_id: session.nycu.id, nycu_name: session.nycu.name, cs_sub: cs.sub, cs_account: cs.account, now,
+    });
+  } catch (error) {
+    if (error instanceof CsConflictError) return redirect("/me?error=cs_already_bound");
+    throw error;
+  }
+  return redirect("/me?csbound=1");
 }
 
 // ── relying-app SSO (B1): GET /auth/app/start?app=&return= ────────────────

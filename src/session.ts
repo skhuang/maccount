@@ -7,6 +7,7 @@ export interface SessionData {
   listate?: string; // CSRF state for LINE Login
   linonce?: string; // OIDC replay protection for LINE Login
   liverifier?: string; // PKCE verifier for LINE Login
+  csstate?: string; // CSRF state for CS OIDC
   next?: string; // post-login redirect target (validated relative path, e.g. /me/<course>)
   nycu?: { id: string; name: string }; // present once logged in; admin is derived via isAdmin()
   app_return?: { app: string; return: string }; // relying-app SSO: where to send the identity token after login

@@ -150,6 +150,64 @@ describe("LINE Login binding and sign-in", () => {
   });
 });
 
+describe("CS OIDC (login + bind)", () => {
+  // stub CS token + userinfo endpoints
+  const stubCs = (userinfo: Record<string, unknown>) =>
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.includes("oauth.cs.nycu.edu.tw/oauth/token"))
+        return new Response(JSON.stringify({ access_token: "cs_tok" }), { headers: { "Content-Type": "application/json" } });
+      if (url.includes("oauth.cs.nycu.edu.tw/oauth/userinfo"))
+        return new Response(JSON.stringify(userinfo), { headers: { "Content-Type": "application/json" } });
+      throw new Error("unexpected fetch " + url);
+    }));
+
+  it("/auth/cs/login redirects to the CS authorize endpoint with a state cookie", async () => {
+    const res = await call("/auth/cs/login");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toContain("oauth.cs.nycu.edu.tw/oauth/authorize");
+    expect(res.headers.get("Location")).toContain("response_type=code");
+    expect(res.headers.get("Set-Cookie")).toContain(SESSION_COOKIE);
+  });
+
+  it("CS login opens a session as the 學號 from userinfo and records the binding", async () => {
+    stubCs({ sub: "cssub-1", studentId: "0856001", csid: "ming", name: "王小明" });
+    const session = await signSession({ exp: Date.now() + 60000, csstate: "CS" }, SECRET); // NO nycu
+    const res = await call("/auth/cs/callback?code=abc&state=CS", { headers: cookie(session) });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/me");
+    // a binding row now exists for 0856001 with cs_sub recorded
+    const row = await env.DB.prepare("SELECT nycu_id, cs_sub, cs_account FROM bindings WHERE nycu_id='0856001'").first();
+    expect(row).toMatchObject({ nycu_id: "0856001", cs_sub: "cssub-1", cs_account: "ming" });
+  });
+
+  it("CS bind (logged-in, matching 學號) records the binding → /me?csbound=1", async () => {
+    stubCs({ sub: "cssub-2", studentId: "0856002", csid: "hua", name: "李" });
+    const session = await signSession({ exp: Date.now() + 60000, csstate: "CS", nycu: { id: "0856002", name: "李" } }, SECRET);
+    const res = await call("/auth/cs/callback?code=abc&state=CS", { headers: cookie(session) });
+    expect(res.headers.get("Location")).toBe("/me?csbound=1");
+    const row = await env.DB.prepare("SELECT cs_sub FROM bindings WHERE nycu_id='0856002'").first();
+    expect(row).toMatchObject({ cs_sub: "cssub-2" });
+  });
+
+  it("CS bind rejects when the CS 學號 differs from the session's 學號 (no mislink)", async () => {
+    stubCs({ sub: "cssub-3", studentId: "9999999", csid: "x", name: "X" });
+    const session = await signSession({ exp: Date.now() + 60000, csstate: "CS", nycu: { id: "0856002", name: "李" } }, SECRET);
+    const res = await call("/auth/cs/callback?code=abc&state=CS", { headers: cookie(session) });
+    expect(res.headers.get("Location")).toBe("/me?error=cs_id_mismatch");
+    // nothing bound to the session student
+    const row = await env.DB.prepare("SELECT cs_sub FROM bindings WHERE nycu_id='0856002'").first();
+    expect(row).toBe(null);
+  });
+
+  it("CS callback with a state mismatch does not open a session", async () => {
+    const session = await signSession({ exp: Date.now() + 60000, csstate: "CS" }, SECRET);
+    const res = await call("/auth/cs/callback?code=abc&state=WRONG", { headers: cookie(session) });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).not.toBe("/me"); // recoverLogin, not a login
+  });
+});
+
 describe("/auth/nycu/callback (login → dashboard)", () => {
   it("sets a logged-in session and redirects to /me", async () => {
     vi.stubGlobal(
