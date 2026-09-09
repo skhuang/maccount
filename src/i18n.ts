@@ -21,12 +21,14 @@ export interface Strings {
   github: string;
   google: string;
   line: string;
+  cs: string;
   bound: string;
   rebind: string;
   not_bound: string;
   bind_action: string;
   bind_google_action: string;
   bind_line_action: string;
+  bind_cs_action: string;
   grades_heading: string;
   my_courses_heading: string;
   course_select_hint: string;
@@ -84,7 +86,9 @@ export interface Strings {
   flash_bound_ok: string;
   flash_gbound_ok: string;
   flash_lbound_ok: string;
+  flash_csbound_ok: string;
   flash_error_prefix: string;
+  cs_id_mismatch: string;
   admin_title: string;
   admin_bindings: string; // "{n}" placeholder
   export_full: string;
@@ -290,6 +294,7 @@ export interface Strings {
   appLoginGithub: string;
   appLoginGoogle: string;
   appLoginLine: string;
+  appLoginCs: string;
   appLoginNote: string;
   accountLoginSubtitle: string;
 }
@@ -302,12 +307,14 @@ export const T: Record<Lang, Strings> = {
     github: "GitHub",
     google: "Google",
     line: "LINE",
+    cs: "CS 帳號",
     bound: "已綁定",
     rebind: "重新綁定",
     not_bound: "尚未綁定",
     bind_action: "綁定 GitHub →",
     bind_google_action: "綁定 Google →",
     bind_line_action: "綁定 LINE →",
+    bind_cs_action: "綁定 CS 帳號 →",
     grades_heading: "我的成績",
     my_courses_heading: "我的課程",
     course_select_hint: "選擇一門課程以查看作業、考試與進行中的活動。",
@@ -407,7 +414,9 @@ export const T: Record<Lang, Strings> = {
     flash_bound_ok: "GitHub 綁定成功。",
     flash_gbound_ok: "Google 綁定成功。",
     flash_lbound_ok: "LINE 綁定成功。",
+    flash_csbound_ok: "CS 帳號綁定成功。",
     flash_error_prefix: "操作未完成：",
+    cs_id_mismatch: "CS 學號與目前帳號不符，請確認登入的是同一位學生。",
     admin_title: "maccount 管理",
     admin_bindings: "綁定名單 ({n})",
     admin_courses_heading: "課程列表",
@@ -614,6 +623,7 @@ export const T: Record<Lang, Strings> = {
     appLoginGithub: "用 GitHub 登入",
     appLoginGoogle: "用 Google 登入",
     appLoginLine: "用 LINE 登入",
+    appLoginCs: "用 CS 帳號登入",
     appLoginNote: "GitHub / Google 需為已在 maccount 綁定過的帳號。",
     accountLoginSubtitle: "選擇登入方式以返回你的帳號與課程。",
   },
@@ -624,12 +634,14 @@ export const T: Record<Lang, Strings> = {
     github: "GitHub",
     google: "Google",
     line: "LINE",
+    cs: "CS account",
     bound: "Bound",
     rebind: "Re-bind",
     not_bound: "Not bound yet",
     bind_action: "Bind GitHub →",
     bind_google_action: "Bind Google →",
     bind_line_action: "Bind LINE →",
+    bind_cs_action: "Bind CS account →",
     grades_heading: "My Grades",
     my_courses_heading: "My Courses",
     course_select_hint: "Choose a course to view assignments, exams, and current activities.",
@@ -729,7 +741,9 @@ export const T: Record<Lang, Strings> = {
     flash_bound_ok: "GitHub bound successfully.",
     flash_gbound_ok: "Google bound successfully.",
     flash_lbound_ok: "LINE bound successfully.",
+    flash_csbound_ok: "CS account bound successfully.",
     flash_error_prefix: "Action not completed: ",
+    cs_id_mismatch: "The CS account's student ID doesn't match your current account. Make sure you're signing in as the same student.",
     admin_title: "maccount Admin",
     admin_bindings: "Bindings ({n})",
     admin_courses_heading: "Courses",
@@ -936,6 +950,7 @@ export const T: Record<Lang, Strings> = {
     appLoginGithub: "Sign in with GitHub",
     appLoginGoogle: "Sign in with Google",
     appLoginLine: "Sign in with LINE",
+    appLoginCs: "Sign in with CS account",
     appLoginNote: "GitHub / Google must be an account already linked in maccount.",
     accountLoginSubtitle: "Choose a sign-in method to return to your account and courses.",
   },

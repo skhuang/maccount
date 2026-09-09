@@ -889,6 +889,7 @@ async function mePage(req: Request, env: Env, url: URL): Promise<Response> {
     bound: url.searchParams.get("bound") === "1",
     gbound: url.searchParams.get("gbound") === "1",
     lbound: url.searchParams.get("lbound") === "1",
+    csbound: url.searchParams.get("csbound") === "1",
     error: url.searchParams.get("error"),
   };
   // Join link(s) for the org(s) of the student's enrolled courses (deduped;
@@ -978,7 +979,12 @@ async function meCourse(req: Request, env: Env, url: URL, courseId: string): Pro
     listCourseForms(env.DB, courseId),
   ]);
   const preForms = forms.filter((f) => f.pre_enroll).map((f) => ({ title: f.title, url: f.url }));
-  const flash = { bound: url.searchParams.get("bound") === "1", gbound: url.searchParams.get("gbound") === "1", lbound: url.searchParams.get("lbound") === "1" };
+  const flash = {
+    bound: url.searchParams.get("bound") === "1",
+    gbound: url.searchParams.get("gbound") === "1",
+    lbound: url.searchParams.get("lbound") === "1",
+    csbound: url.searchParams.get("csbound") === "1",
+  };
   const html = coursePrejoinPage(lang, courseId, course.name, session.nycu, binding, preForms, flash);
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },

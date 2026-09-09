@@ -31,6 +31,7 @@
       <a id="login-github" class="button"><span class="provider-mark" aria-hidden="true">GH</span><span data-label></span></a>
       <a id="login-google" class="button"><span class="provider-mark provider-mark--google" aria-hidden="true">G</span><span data-label></span></a>
       <a id="login-line" class="button"><span class="provider-mark" aria-hidden="true">LINE</span><span data-label></span></a>
+      <a id="login-cs" class="button"><span class="provider-mark" aria-hidden="true">CS</span><span data-label></span></a>
     </div>
   </section>
   <script>
@@ -48,10 +49,11 @@
         first_note: "請先用 NYCU 帳號登入並完成帳號綁定。",
         btn: "用 NYCU 帳號登入",
         alt: "已完成帳號綁定？",
-        alt_note: "可直接使用已綁定的 GitHub、Google 或 LINE 帳號返回平台。",
+        alt_note: "可直接使用已綁定的 GitHub、Google、LINE 或 CS 帳號返回平台。",
         btn_github: "使用 GitHub 登入",
         btn_google: "使用 Google 登入",
         btn_line: "使用 LINE 登入",
+        btn_cs: "使用 CS 帳號登入",
       },
       en: {
         title: "Course Account / Grades",
@@ -64,10 +66,11 @@
         first_note: "Sign in with NYCU first to connect your course accounts.",
         btn: "Sign in with NYCU",
         alt: "Already connected?",
-        alt_note: "Return with your connected GitHub, Google, or LINE account.",
+        alt_note: "Return with your connected GitHub, Google, LINE, or CS account.",
         btn_github: "Sign in with GitHub",
         btn_google: "Sign in with Google",
         btn_line: "Sign in with LINE",
+        btn_cs: "Sign in with CS account",
       },
     };
     function getLang() {
@@ -103,6 +106,9 @@
       const line = document.getElementById("login-line");
       line.querySelector("[data-label]").textContent = s.btn_line;
       line.href = WORKER_BASE + "/auth/line/login?lang=" + lang;
+      const cs = document.getElementById("login-cs");
+      cs.querySelector("[data-label]").textContent = s.btn_cs;
+      cs.href = WORKER_BASE + "/auth/cs/login?lang=" + lang;
     }
     function setLang(l) { localStorage.setItem("lang", l); render(l); }
     document.getElementById("lang-zh").onclick = (e) => { e.preventDefault(); setLang("zh"); };

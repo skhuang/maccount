@@ -33,6 +33,7 @@ ${link(`/auth/nycu/start${q}`, t.appLoginNycu)}
 ${link(`/auth/github/login${q}`, t.appLoginGithub)}
 ${link(`/auth/google/login${q}`, t.appLoginGoogle)}
 ${link(`/auth/line/login${q}`, t.appLoginLine)}
+${link(`/auth/cs/login${q}`, t.appLoginCs)}
 <p class="muted text-small">${h(t.appLoginNote)}</p>
 </body></html>`
   );
@@ -58,6 +59,7 @@ ${link(`/auth/nycu/start?prompt=login&${q}`, t.appLoginNycu, true)}
 ${link(`/auth/github/login?${q}`, t.appLoginGithub)}
 ${link(`/auth/google/login?${q}`, t.appLoginGoogle)}
 ${link(`/auth/line/login?${q}`, t.appLoginLine)}
+${link(`/auth/cs/login?${q}`, t.appLoginCs)}
 <p class="muted text-small">${h(t.appLoginNote)}</p>
 </body></html>`
   );

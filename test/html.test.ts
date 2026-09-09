@@ -425,6 +425,35 @@ describe("dashboardPage", () => {
     expect(html).toContain('class="badge badge--warning">&lt;pending&gt;</span>');
     expect(html).not.toContain("<pending>");
   });
+
+  it("shows the CS account bind link when unbound, and the escaped account when bound", () => {
+    const unbound = dashboardPage("zh", { id: "0856001", name: "學生" }, null, [], false, {});
+    expect(unbound).toContain('href="/auth/cs/start"');
+    expect(unbound).toContain("綁定 CS 帳號 →");
+
+    const bound = dashboardPage(
+      "zh", { id: "0856001", name: "學生" },
+      { ...rows[0], cs_account: "<script>cs</script>" },
+      [], false, {},
+    );
+    expect(bound).toContain('href="/auth/cs/start"');
+    expect(bound).toContain("&lt;script&gt;cs&lt;/script&gt;");
+    expect(bound).not.toContain("<script>cs</script>");
+  });
+
+  it("shows a CS-bound success flash and a friendly id-mismatch error", () => {
+    const ok = dashboardPage("zh", { id: "0856001", name: "學生" }, null, [], false, { csbound: true });
+    expect(ok).toContain("CS 帳號綁定成功");
+
+    const err = dashboardPage("zh", { id: "0856001", name: "學生" }, null, [], false, { error: "cs_id_mismatch" });
+    expect(err).toContain("CS 學號與目前帳號不符");
+    expect(err).not.toContain("cs_id_mismatch");
+  });
+
+  it("shows the generic error flash (with raw code) for cs_already_bound, mirroring line_already_bound", () => {
+    const err = dashboardPage("zh", { id: "0856001", name: "學生" }, null, [], false, { error: "cs_already_bound" });
+    expect(err).toContain("操作未完成：cs_already_bound");
+  });
 });
 
 describe("courseDeadlineStatus", () => {
