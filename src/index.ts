@@ -80,7 +80,7 @@ import {
 import { pickLang, langCookie } from "./i18n";
 import { accountLoginChooserPage, appLoginChooserPage } from "./ui/app_login";
 
-const TTL_MS = 15 * 60 * 1000;
+const TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {

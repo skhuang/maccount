@@ -14,7 +14,7 @@ export interface SessionData {
 }
 
 export const SESSION_COOKIE = "maccount_session";
-const TTL_SECONDS = 900;
+const TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 const enc = new TextEncoder();
 
 function b64urlEncode(bytes: Uint8Array): string {
