@@ -43,19 +43,17 @@ export async function fetchCsUser(
   });
   if (!res.ok) throw new Error(`cs userinfo failed: ${res.status}`);
   const data = (await res.json()) as Record<string, unknown>;
-  // CS OIDC claim names — confirm against a real token at integration; change
-  // ONLY these lines if different. `sub` is the OIDC stable subject (→ cs_sub);
-  // the 學號 is carried by the CS directory (try the likely claim names).
-  // IMPORTANT: do NOT fall back to `username`/`csid` for the 學號 — those are the
-  // CS login handle, not the 學號. This feeds the LOGIN path (opens a session as
-  // this id), so if none of the student-id claims are present we FAIL CLOSED
-  // (throw below) rather than mislabel the handle as the 學號. `account` is the
-  // handle and may use `username`/`csid`.
+  // Confirmed against real CS OIDC tokens. `sub` = OIDC stable subject (→ cs_sub).
+  // `csid` = the authoritative NYCU id — the 學號 for students, the 工號 for staff
+  // (the same value id.nycu.edu.tw returns) — so it maps to our nycu_id.
+  // `preferred_username` = the CS login handle (display only). Name is carried by
+  // chinese_name/english_name. Fail closed (throw) if sub or csid is missing,
+  // rather than mislabel any other field as the id.
   const sub = String(data.sub ?? "");
-  const student_id = String(data.studentId ?? data.student_id ?? data.studentid ?? "");
-  const account = String(data.csid ?? data.preferred_username ?? data.username ?? sub);
-  const name = String(data.name ?? data.displayName ?? account);
+  const student_id = String(data.csid ?? "");
+  const account = String(data.preferred_username ?? data.csid ?? sub);
+  const name = String(data.chinese_name ?? data.english_name ?? account);
   if (!sub) throw new Error("cs userinfo: missing sub");
-  if (!student_id) throw new Error("cs userinfo: missing student id claim");
+  if (!student_id) throw new Error("cs userinfo: missing csid claim");
   return { sub, student_id, account, name };
 }

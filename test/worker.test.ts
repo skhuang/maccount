@@ -171,7 +171,7 @@ describe("CS OIDC (login + bind)", () => {
   });
 
   it("CS login opens a session as the 學號 from userinfo and records the binding", async () => {
-    stubCs({ sub: "cssub-1", studentId: "0856001", csid: "ming", name: "王小明" });
+    stubCs({ sub: "cssub-1", csid: "0856001", preferred_username: "ming", chinese_name: "王小明" });
     const session = await signSession({ exp: Date.now() + 60000, csstate: "CS" }, SECRET); // NO nycu
     const res = await call("/auth/cs/callback?code=abc&state=CS", { headers: cookie(session) });
     expect(res.status).toBe(302);
@@ -182,7 +182,7 @@ describe("CS OIDC (login + bind)", () => {
   });
 
   it("CS bind (logged-in, matching 學號) records the binding → /me?csbound=1", async () => {
-    stubCs({ sub: "cssub-2", studentId: "0856002", csid: "hua", name: "李" });
+    stubCs({ sub: "cssub-2", csid: "0856002", preferred_username: "hua", chinese_name: "李" });
     const session = await signSession({ exp: Date.now() + 60000, csstate: "CS", nycu: { id: "0856002", name: "李" } }, SECRET);
     const res = await call("/auth/cs/callback?code=abc&state=CS", { headers: cookie(session) });
     expect(res.headers.get("Location")).toBe("/me?csbound=1");
@@ -191,7 +191,7 @@ describe("CS OIDC (login + bind)", () => {
   });
 
   it("CS bind rejects when the CS 學號 differs from the session's 學號 (no mislink)", async () => {
-    stubCs({ sub: "cssub-3", studentId: "9999999", csid: "x", name: "X" });
+    stubCs({ sub: "cssub-3", csid: "9999999", preferred_username: "x", chinese_name: "X" });
     const session = await signSession({ exp: Date.now() + 60000, csstate: "CS", nycu: { id: "0856002", name: "李" } }, SECRET);
     const res = await call("/auth/cs/callback?code=abc&state=CS", { headers: cookie(session) });
     expect(res.headers.get("Location")).toBe("/me?error=cs_id_mismatch");

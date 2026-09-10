@@ -30,12 +30,19 @@ describe("cs oauth", () => {
     expect(tok).toBe("cs_tok");
   });
 
-  it("maps userinfo to sub + student_id + account + name", async () => {
-    const u = await fetchCsUser(cfg, "cs_tok", jsonFetcher({ sub: "oidc-sub-1", studentId: "0856001", csid: "alice", name: "王小明" }));
+  it("maps userinfo (csid=學號, preferred_username=handle, chinese_name) to sub + student_id + account + name", async () => {
+    const u = await fetchCsUser(cfg, "cs_tok", jsonFetcher({
+      sub: "oidc-sub-1", csid: "0856001", preferred_username: "alice", chinese_name: "王小明", english_name: "Alice",
+    }));
     expect(u).toEqual({ sub: "oidc-sub-1", student_id: "0856001", account: "alice", name: "王小明" });
   });
 
-  it("throws when the student id claim is missing", async () => {
-    await expect(fetchCsUser(cfg, "t", jsonFetcher({ sub: "s", csid: "a" }))).rejects.toThrow();
+  it("falls back to english_name when chinese_name is absent", async () => {
+    const u = await fetchCsUser(cfg, "cs_tok", jsonFetcher({ sub: "s", csid: "0856002", preferred_username: "bob", english_name: "Bob" }));
+    expect(u).toMatchObject({ student_id: "0856002", account: "bob", name: "Bob" });
+  });
+
+  it("throws when the csid (學號) claim is missing", async () => {
+    await expect(fetchCsUser(cfg, "t", jsonFetcher({ sub: "s", preferred_username: "a" }))).rejects.toThrow();
   });
 });
