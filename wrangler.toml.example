@@ -18,7 +18,9 @@ NYCU_SCOPE = "profile"
 CS_AUTHORIZE_URL = "https://oauth.cs.nycu.edu.tw/oauth/authorize"
 CS_TOKEN_URL = "https://oauth.cs.nycu.edu.tw/oauth/token"
 CS_USERINFO_URL = "https://oauth.cs.nycu.edu.tw/oauth/userinfo"
-CS_SCOPE = "openid profile csid email"
+# NOTE: the CS client rejects the `email` scope (invalid_scope); identity/學號
+# comes from profile/csid, so email is omitted.
+CS_SCOPE = "openid profile csid"
 CS_CLIENT_ID = ""
 GITHUB_CLIENT_ID = ""
 # Google OAuth client id for Google binding / staff Drive access
