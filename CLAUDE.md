@@ -69,6 +69,13 @@
 - **邀請學生加入 Google Classroom**：課程後台「Google Classroom」區，`POST /c/<id>/admin/classroom/invite`（`requireCourseStaff`）→ 以 staff 連結的 Google（須為該 Classroom 老師）對「選課∩已綁 Google」學生逐一 `invitations.create`（role=STUDENT）。需 `course.google_classroom_id`（經 `parseClassroomId` 正規化，可填數字 id／`/c/` token／URL；未設→`classroom_msg=no-classroom`）+ 已連結 Drive（`staffGoogleAccessToken` 共用那把 token；未連結→`no-drive`）。409=已在班（計入 already）。flash `done:invited:already:errors:skipped`。`STAFF_GOOGLE_SCOPE` 已含 `classroom.rosters`；GCP 需啟用 **Classroom API**。
 - **課程 Google Meet 連結**：因 Classroom API 不提供班級 Meet link，改用**選填欄位** `google_meet_url`（課程設定填，遷移 `0014_courses_meet`）。學生在 `/me` 對應課程下看到「加入 Google Meet」連結（只渲染 http(s)）。
 - **匯入選課名單（enrollment）**：真相來源 = Moodle。兩條路徑：(1) **手動**：課程後台「選課名單」貼上學號(逗號/空白/換行分隔)`POST /c/<id>/admin/enroll`，勾「取代整份名單」= `replaceEnrollments`(與 Moodle 同步、未列出者移除)，否則 `bulkEnroll`(累加、idempotent)。(2) **API**：`POST /api/enrollments/ingest`(`Authorization: Bearer <GRADES_INGEST_TOKEN>`，body `{course_id, student_ids:[…], replace?}`)供 seminar-moodle 自動把 Moodle 參與者推進來。**一旦某課有選課名單,該課的綁定名單表/`export.csv`/`roster.csv` 會縮到「選課∩已綁」**(空名單則 fall back 全域,向後相容)。選課名單會顯示每位學號的「已綁/未綁 **GitHub 與 Google**」狀態（`listEnrolledWithBinding` join 出 `github_login`+`google_email`）。綁定總表（`/admin/bindings`）與各課綁定名單也都多了 **Google** 欄（`google_email`）。
+- **邀請學生加入課程 GitHub org（三條路徑 + 自動邀請）**：學生要進 org 才能存取課程 repo。三條互補路徑：
+  1. **綁定時自動**：`/auth/github/callback` 綁定成功後，best-effort 把該生邀進其「已選課程」的 effective org（`inviteOrgMember`，用 `ORG_INVITE_TOKEN`；失敗只記 log、不影響綁定）。**只涵蓋綁定當下已選課者**。
+  2. **匯入後自動**：`POST /c/<id>/admin/enroll` 完成後導向 `…/admin?autoinvite=1`；管理頁的邀請區塊 JS 偵測到 flag 就**自動跑**分批邀請迴圈（等同按下按鈕，`if (AUTO) runSync()`）。用來補「先綁定、後選課」的學生（bind-time 沒邀到的）。只在帶 flag 時觸發，平常進管理頁不會亂邀。
+  3. **手動按鈕 / 一鍵補送**：課程後台邀請區塊按鈕 → `POST /c/<id>/admin/students/team/sync`（`requireCourseStaff`）→ `syncStudentsToTeam(env, courseId, {offset,limit:40})`。前端 JS 以 `offset` 迴圈分批呼叫直到 `done`，**每批 ≤40 次 GitHub 呼叫**避開 Workers 單次 subrequest 上限，因此能邀完整份名單（迴圈本身不受上限限制）。匯入的自動邀請走的就是這條，所以也是邀「全部」而非只前一批。
+  - **`syncStudentsToTeam`**：需要 effective org（`course.github_org` 或退回 `COURSE_ORG`）+ `ORG_INVITE_TOKEN`（**team 選填**）；名單 = 該課「選課∩已綁 GitHub」(`listEnrolledWithBinding` 過濾 `github_login`)。**有設 `github_team_slug`** → 逐生 `addTeamMembership`（加 team，順帶邀非成員進 org）；**沒設 team** → `inviteOrgMember`（純 org 邀請）。回 `{total,processed,added,failed,done,nextOffset,skipped?}`；缺 org/token → `skipped:"not-configured"`。逐生 try/catch 隔離失敗、**idempotent**（已成員/待接受 = no-op），可安全重跑。
+  - **顯示條件與文字**：課程有 effective org 就顯示邀請區塊（因 `COURSE_ORG` 有值，實務上每門課都顯示）；按鈕文字有 team 用「同步學生到課程 team」、無 team 用「邀請學生加入課程 GitHub org」（i18n `syncStudentsTeam`/`inviteStudentsOrg`；`adminPage` 的 `opts.inviteOrg`/`opts.autoInvite`）。
+  - **查核**：`/admin/org/<org>` 即時看每人 `已加入/待接受/未加入`（**org-wide、含非本課學生**，所以邀請一律 course-scoped，不要從這頁無差別邀全部）。**只有匯入當下已綁 GitHub 的學生**能被邀；匯入時還沒綁的，等他之後綁定由路徑 1 補上。
 - **課程 Google 問卷**：課程後台「Google 問卷」區，課程 staff（`requireCourseStaff`）可：
   - **貼連結**：`POST /c/<id>/admin/forms/add`（僅收 `http(s)`，非法→`?forms_msg=bad`）。
   - **直接建立**：`POST /c/<id>/admin/forms/create`（標題）→ 用 staff 連結的 Google 帳號呼叫 Forms API 建表（`createGoogleForm`），存 `responderUri`(學生填)+`form_id`(編輯連結 `…/forms/d/<form_id>/edit`)。需先「連結 Google Drive（完整權限）」(`staffGoogleAccessToken` 共用 Drive 分享那套 token；未連結→`forms_msg=no-drive`、權杖失敗→`token-error`、API 失敗→`create-error`)。GCP 需啟用 **Forms API**。
@@ -82,7 +89,7 @@
 
 ```bash
 npm install
-npm test            # vitest，全部測試（目前 383 passed）
+npm test            # vitest，全部測試（目前 432 passed）
 npx tsc --noEmit    # 型別檢查
 npm run dev         # wrangler dev（本機，預設埠 8787）
 npx wrangler deploy # 部署 Worker（vars 變更也要重新 deploy 才生效）
