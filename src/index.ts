@@ -1504,8 +1504,9 @@ async function courseAdmin(req: Request, env: Env, url: URL, courseId: string): 
   const formsMsg = url.searchParams.get("forms_msg") ?? "";
   const classroomMsg = url.searchParams.get("classroom_msg") ?? "";
   const boundCount = enrolled.filter((e) => e.github_login).length;
+  const autoInvite = url.searchParams.get("autoinvite") === "1";
   return new Response(
-    adminPage(lang, course, scoped, { isOwner, staff, staffMsg, boundCount, driveMsg, formsMsg, classroomMsg, enrolled, forms, inviteOrg: effectiveOrg(env, course) }),
+    adminPage(lang, course, scoped, { isOwner, staff, staffMsg, boundCount, driveMsg, formsMsg, classroomMsg, enrolled, forms, inviteOrg: effectiveOrg(env, course), autoInvite }),
     { headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) } },
   );
 }
@@ -1725,12 +1726,12 @@ async function courseEnroll(req: Request, env: Env, courseId: string): Promise<R
   const now = new Date(Date.now()).toISOString();
   if (replace) await replaceEnrollments(env.DB, courseId, ids, now);
   else await bulkEnroll(env.DB, courseId, ids, now);
-  // Best-effort: pull the first chunk of enrolled∩bound students into the course
-  // GitHub org right away (bind-time invites miss students enrolled AFTER they
-  // bound). Bounded to one chunk for the Workers subrequest cap; the owner's
-  // "invite students" admin button backfills the rest. Never blocks the import.
-  try { await syncStudentsToTeam(env, courseId, { offset: 0, limit: 30 }); } catch { /* non-fatal */ }
-  return redirect(`/c/${encodeURIComponent(courseId)}/admin`);
+  // Invite the whole enrolled∩bound roster into the course GitHub org right after
+  // import (bind-time invites miss students enrolled AFTER they bound). The invite
+  // itself can't run inline — inviting everyone would blow the Workers subrequest
+  // cap — so redirect with a flag and let the admin page auto-run the same bounded
+  // chunk loop as the manual button, which walks the ENTIRE roster. Idempotent.
+  return redirect(`/c/${encodeURIComponent(courseId)}/admin?autoinvite=1`);
 }
 
 function driveRedirect(courseId: string, msg: string): Response {

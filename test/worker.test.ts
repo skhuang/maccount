@@ -1336,7 +1336,8 @@ describe("course edit + enrollment", () => {
 
   it("owner imports enrollment by paste (additive)", async () => {
     const res = await post("/c/ds-2026/admin/enroll", { student_ids: "a01, a02\n a03" }, await owner());
-    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin");
+    // redirect carries the autoinvite flag so the admin page auto-runs the org invite.
+    expect(res.headers.get("Location")).toBe("/c/ds-2026/admin?autoinvite=1");
     const { results } = await env.DB.prepare("SELECT student_id FROM enrollments WHERE course_id='ds-2026' ORDER BY student_id").all();
     expect(results.map((r) => r.student_id)).toEqual(["a01", "a02", "a03"]);
   });

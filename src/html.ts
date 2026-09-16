@@ -432,6 +432,7 @@ export function adminPage(
     enrolled?: EnrolledLite[];
     forms?: FormLite[];
     inviteOrg?: string;
+    autoInvite?: boolean;
   } = { isOwner: false, staff: [] },
 ): string {
   const t = T[lang];
@@ -561,9 +562,16 @@ ${enrollImport}</section>`;
   var URL_ = ${JSON.stringify(`${base}/students/team/sync`)};
   var SYNCING = ${JSON.stringify(t.syncing)}, DONE = ${JSON.stringify(t.syncDone)}, ERR = ${JSON.stringify(t.syncError)};
   var NOTCONF = ${JSON.stringify(t.syncNotConfigured)};
+  var AUTO = ${opts.autoInvite ? "true" : "false"};
   var btn = document.getElementById('sync-students-team');
   var out = document.getElementById('sync-students-status');
-  btn.addEventListener('click', async function () {
+  var running = false;
+  // Drive the whole roster in bounded chunks (offset/limit) so no single request
+  // hits the Workers subrequest cap — the loop itself is unbounded, inviting ALL
+  // enrolled∩bound students, not just the first chunk.
+  async function runSync() {
+    if (running) return;
+    running = true;
     btn.disabled = true;
     var offset = 0, added = 0, failed = 0, total = 0;
     try {
@@ -581,7 +589,12 @@ ${enrollImport}</section>`;
       out.textContent = ERR + ': ' + e.message;
       btn.disabled = false;
     }
-  });
+    running = false;
+  }
+  btn.addEventListener('click', runSync);
+  // Auto-run once right after a roster import, so newly-added students are invited
+  // without a manual click (idempotent: already-member/pending students no-op).
+  if (AUTO) runSync();
 })();
 </script>
 </section>`
