@@ -194,6 +194,7 @@ export interface Strings {
   staff_sync_nobinding: string;
   staff_sync_error: string;
   syncStudentsTeam: string;
+  inviteStudentsOrg: string;
   enrolledBound: string;
   syncing: string;
   syncDone: string;
@@ -523,6 +524,7 @@ export const T: Record<Lang, Strings> = {
     staff_sync_nobinding: "此助教尚未綁定 GitHub；請他先到 /me 綁定，再加入一次以同步。",
     staff_sync_error: "GitHub org/team 同步失敗（請檢查 ORG_INVITE_TOKEN 權限與 STAFF_TEAM）。",
     syncStudentsTeam: "同步學生到課程 team",
+    inviteStudentsOrg: "邀請學生加入課程 GitHub org",
     enrolledBound: "位已選課且已綁定",
     syncing: "同步中…",
     syncDone: "完成",
@@ -850,6 +852,7 @@ export const T: Record<Lang, Strings> = {
     staff_sync_nobinding: "This TA hasn't bound GitHub yet; have them bind at /me, then add again to sync.",
     staff_sync_error: "GitHub org/team sync failed (check ORG_INVITE_TOKEN permissions and STAFF_TEAM).",
     syncStudentsTeam: "Sync students to team",
+    inviteStudentsOrg: "Invite students to the course GitHub org",
     enrolledBound: "enrolled & bound",
     syncing: "Syncing…",
     syncDone: "Done",

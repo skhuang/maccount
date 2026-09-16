@@ -12,8 +12,14 @@ describe("adminPage students-team section", () => {
     expect(html).toContain("<script");
     expect(html).toContain("/students/team/sync");
   });
-  it("renders nothing for the section when there is no team", () => {
-    const html = adminPage("en", { ...baseCourse, github_team_slug: null }, [], opts);
+  it("still renders the invite section (org-invite) when there is an org but no team", () => {
+    const html = adminPage("en", { ...baseCourse, github_team_slug: null }, [], { ...opts, inviteOrg: "org" });
+    expect(html).toContain('id="sync-students-team"');
+    expect(html).toContain('id="sync-students-status"');
+    expect(html).toContain("/students/team/sync");
+  });
+  it("renders nothing for the section when there is neither team nor org", () => {
+    const html = adminPage("en", { ...baseCourse, github_org: null, github_team_slug: null }, [], { ...opts, inviteOrg: "" });
     expect(html).not.toContain('id="sync-students-team"');
     // The admin page shell always ships a table-filtering <script>, so a bare
     // "<script" is present regardless; assert the *sync* script's unique marker

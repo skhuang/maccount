@@ -1505,7 +1505,7 @@ async function courseAdmin(req: Request, env: Env, url: URL, courseId: string): 
   const classroomMsg = url.searchParams.get("classroom_msg") ?? "";
   const boundCount = enrolled.filter((e) => e.github_login).length;
   return new Response(
-    adminPage(lang, course, scoped, { isOwner, staff, staffMsg, boundCount, driveMsg, formsMsg, classroomMsg, enrolled, forms }),
+    adminPage(lang, course, scoped, { isOwner, staff, staffMsg, boundCount, driveMsg, formsMsg, classroomMsg, enrolled, forms, inviteOrg: effectiveOrg(env, course) }),
     { headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) } },
   );
 }
@@ -1725,6 +1725,11 @@ async function courseEnroll(req: Request, env: Env, courseId: string): Promise<R
   const now = new Date(Date.now()).toISOString();
   if (replace) await replaceEnrollments(env.DB, courseId, ids, now);
   else await bulkEnroll(env.DB, courseId, ids, now);
+  // Best-effort: pull the first chunk of enrolled∩bound students into the course
+  // GitHub org right away (bind-time invites miss students enrolled AFTER they
+  // bound). Bounded to one chunk for the Workers subrequest cap; the owner's
+  // "invite students" admin button backfills the rest. Never blocks the import.
+  try { await syncStudentsToTeam(env, courseId, { offset: 0, limit: 30 }); } catch { /* non-fatal */ }
   return redirect(`/c/${encodeURIComponent(courseId)}/admin`);
 }
 
@@ -2069,7 +2074,10 @@ export async function syncStudentsToTeam(
   const course = await getCourse(env.DB, courseId);
   const org = course ? effectiveOrg(env, course) : "";
   const team = (course?.github_team_slug ?? "").trim();
-  if (!org || !team || !env.ORG_INVITE_TOKEN)
+  // An org is required; a team is optional. With a team we add membership (which
+  // also org-invites non-members); without one we send a plain org invite — so a
+  // teamless course can still pull its enrolled∩bound students into the org.
+  if (!org || !env.ORG_INVITE_TOKEN)
     return { total: 0, processed: 0, added: 0, failed: 0, done: true, nextOffset: 0, skipped: "not-configured" };
   // Each chunk re-queries the enrolled∩bound list (per-chunk snapshot): a roster
   // change mid-run could shift the window, but re-running is safe because
@@ -2082,11 +2090,12 @@ export async function syncStudentsToTeam(
   let added = 0, failed = 0;
   for (const s of slice) {
     try {
-      await addTeamMembership(org, team, s.github_login!, env.ORG_INVITE_TOKEN, fetcher);
+      if (team) await addTeamMembership(org, team, s.github_login!, env.ORG_INVITE_TOKEN, fetcher);
+      else await inviteOrgMember(org, s.github_login!, env.ORG_INVITE_TOKEN, fetcher);
       added++;
     } catch (e) {
       failed++;
-      console.error(`student team sync failed (${s.github_login}):`, (e as Error).message);
+      console.error(`student org/team sync failed (${s.github_login}):`, (e as Error).message);
     }
   }
   const nextOffset = offset + slice.length;

@@ -431,6 +431,7 @@ export function adminPage(
     classroomMsg?: string;
     enrolled?: EnrolledLite[];
     forms?: FormLite[];
+    inviteOrg?: string;
   } = { isOwner: false, staff: [] },
 ): string {
   const t = T[lang];
@@ -546,11 +547,14 @@ ${tableTools(t, "enrollment-table", enrolled.length, [{ value: "missing", label:
   }
 ${enrollImport}</section>`;
 
-  // Sync enrolled+bound students into the course GitHub team (owner/staff only).
+  // Invite enrolled+bound students into the course GitHub org (owner/staff only);
+  // if the course also defines a team, they're added to that team too. Shown
+  // whenever there's an effective org — a team is optional (org-invite only).
   const boundCount = opts.boundCount ?? 0;
-  const studentsTeamSection = course.github_team_slug
+  const inviteOrg = (opts.inviteOrg ?? "").trim();
+  const studentsTeamSection = course.github_team_slug || inviteOrg
     ? `<section class="admin-section" id="students-team">
-<button id="sync-students-team" type="button">${t.syncStudentsTeam}</button>
+<button id="sync-students-team" type="button">${course.github_team_slug ? t.syncStudentsTeam : t.inviteStudentsOrg}</button>
 <span class="muted" id="sync-students-status">${boundCount} ${t.enrolledBound}</span>
 <script>
 (function () {

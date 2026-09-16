@@ -31,11 +31,33 @@ describe("syncStudentsToTeam", () => {
     expect(calls.filter((u) => u.includes("/teams/team/memberships/")).length).toBe(2);
   });
 
-  it("skips a course with no team", async () => {
+  it("org-invites enrolled∩bound students when the course has an org but no team", async () => {
     await upsertCourse(env.DB, { course_id: "nt", name: "NT", github_org: "org", github_team_slug: null }, now);
-    const r = await syncStudentsToTeam(envTok(), "nt", { fetcher: (async () => new Response("{}")) as unknown as typeof fetch });
+    await bulkEnroll(env.DB, "nt", ["s1", "s2", "s3"], now);
+    await bind("s1", 1, "alice"); await bind("s2", 2, "bob"); // s3 unbound
+    const calls: string[] = [];
+    const fetcher = (async (u: RequestInfo | URL) => { calls.push(String(u)); return new Response("{}", { status: 200 }); }) as unknown as typeof fetch;
+    const r = await syncStudentsToTeam(envTok(), "nt", { fetcher });
+    expect(r).toMatchObject({ total: 2, processed: 2, added: 2, failed: 0, done: true, nextOffset: 2 });
+    // org invite (PUT /orgs/<org>/memberships/<login>), NOT a team membership.
+    expect(calls.filter((u) => /\/orgs\/org\/memberships\//.test(u)).length).toBe(2);
+    expect(calls.some((u) => u.includes("/teams/"))).toBe(false);
+  });
+
+  it("skips (not-configured) when no org is resolvable", async () => {
+    await upsertCourse(env.DB, { course_id: "no", name: "NO", github_org: null, github_team_slug: null }, now);
+    // github_org null AND COURSE_ORG empty → no effective org.
+    const r = await syncStudentsToTeam({ ...envTok(), COURSE_ORG: "" } as unknown as Env, "no",
+      { fetcher: (async () => new Response("{}")) as unknown as typeof fetch });
     expect(r.skipped).toBe("not-configured");
     expect(r.done).toBe(true);
+  });
+
+  it("skips (not-configured) when ORG_INVITE_TOKEN is unset", async () => {
+    await upsertCourse(env.DB, { course_id: "nt", name: "NT", github_org: "org", github_team_slug: null }, now);
+    const r = await syncStudentsToTeam({ ...env, ORG_INVITE_TOKEN: "" } as unknown as Env, "nt",
+      { fetcher: (async () => new Response("{}")) as unknown as typeof fetch });
+    expect(r.skipped).toBe("not-configured");
   });
 
   it("counts a failing student within the chunk", async () => {
