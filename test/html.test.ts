@@ -271,6 +271,33 @@ describe("adminPage", () => {
     expect(html).toContain('class="confirm-dialog"');
     expect(html).toContain('value="O&#39;Brien"');
   });
+
+  it("shows an org-status column on the roster when showOrgStatus is set", () => {
+    const html = adminPage("zh", course, [], {
+      isOwner: true,
+      staff: [],
+      showOrgStatus: true,
+      enrolled: [
+        { student_id: "a01", github_login: "alice", org_status: "member" },
+        { student_id: "a02", github_login: "bob", org_status: "pending" },
+        { student_id: "a03", github_login: "carol", org_status: "none" },
+        { student_id: "a04", github_login: null, org_status: null }, // unbound → —
+      ],
+    });
+    expect(html).toContain(">org 狀態</th>"); // sortable column header (server-rendered <th>)
+    expect(html).toContain("已加入");
+    expect(html).toContain("待接受");
+    expect(html).toContain("未加入");
+  });
+
+  it("omits the org-status column when showOrgStatus is not set", () => {
+    const html = adminPage("zh", course, [], {
+      isOwner: true,
+      staff: [],
+      enrolled: [{ student_id: "a01", github_login: "alice", org_status: "member" }],
+    });
+    expect(html).not.toContain("org 狀態");
+  });
 });
 
 describe("bindingsPage source column + owner management", () => {
@@ -333,6 +360,23 @@ describe("admin list tools", () => {
     expect(html).toContain('data-table-id="org-members-table"');
     expect(html).toContain('<option value="pending">待接受</option>');
     expect(html).toContain('data-status="pending"');
+  });
+
+  it("renders a course filter picker and marks the selected course", () => {
+    const html = orgMembersPage("zh", "example-org",
+      { rows: [{ student_id: "a01", nycu_name: "甲", github_login: "alice", status: "member" }], unbound: [] },
+      "",
+      { courses: [{ course_id: "st-2026-fall", name: "軟體測試" }, { course_id: "ds-2026", name: "資結" }], selectedCourse: "st-2026-fall" });
+    expect(html).toContain('name="course"');
+    expect(html).toContain("— 全部課程 —");
+    expect(html).toContain('<option value="st-2026-fall" selected>軟體測試</option>');
+  });
+
+  it("suppresses the unbound section when a course filter is active", () => {
+    const view = { rows: [], unbound: ["ghost"] };
+    expect(orgMembersPage("zh", "example-org", view, "")).toContain("ghost"); // no filter → shown
+    expect(orgMembersPage("zh", "example-org", view, "",
+      { courses: [{ course_id: "c1", name: "C1" }], selectedCourse: "c1" })).not.toContain("ghost");
   });
 });
 

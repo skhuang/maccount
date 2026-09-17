@@ -1254,6 +1254,44 @@ describe("binding queries (總表 + by GitHub org)", () => {
     expect(body).toContain("ghost"); // org member with no maccount binding (unbound section)
   });
 
+  it("/admin/org/<org>?course=<id> scopes rows to that course's roster", async () => {
+    await bind("0856001", "ming");   // member, enrolled in the filter course
+    await bind("0856002", "hua");    // pending, enrolled
+    await bind("0856003", "solo");   // bound but NOT enrolled in the filter course
+    await env.DB.prepare("INSERT INTO courses (course_id, name, github_org, status, created_at) VALUES ('flt','FLT','nycu-cs-course-ds','active','t')").run();
+    await bulkEnroll(env.DB, "flt", ["0856001", "0856002"], "t");
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const u = String(input instanceof Request ? input.url : input);
+      if (u.includes("/members")) return new Response(JSON.stringify([{ login: "ming" }]), { headers: { "Content-Type": "application/json" } });
+      if (u.includes("/invitations")) return new Response(JSON.stringify([{ login: "hua" }]), { headers: { "Content-Type": "application/json" } });
+      throw new Error("unexpected " + u);
+    }));
+    const res = await call("/admin/org/nycu-cs-course-ds?course=flt", { headers: cookie(await owner()) });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain('name="course"');  // course picker present
+    expect(body).toContain("0856001");         // enrolled → shown
+    expect(body).toContain("0856002");
+    expect(body).not.toContain("0856003");     // not enrolled in flt → filtered out
+  });
+
+  it("/c/<id>/admin shows an org-status column for enrolled students", async () => {
+    await bind("0856001", "ming");
+    await env.DB.prepare("INSERT INTO courses (course_id, name, github_org, status, created_at) VALUES ('oc','OC','nycu-cs-course-ds','active','t')").run();
+    await bulkEnroll(env.DB, "oc", ["0856001"], "t");
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const u = String(input instanceof Request ? input.url : input);
+      if (u.includes("/members")) return new Response(JSON.stringify([{ login: "ming" }]), { headers: { "Content-Type": "application/json" } });
+      if (u.includes("/invitations")) return new Response(JSON.stringify([]), { headers: { "Content-Type": "application/json" } });
+      throw new Error("unexpected " + u);
+    }));
+    const res = await call("/c/oc/admin", { headers: cookie(await owner()) });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).toContain("org 狀態"); // roster org-status column
+    expect(body).toContain("已加入");   // ming is a member
+  });
+
   it("/admin/org/<unknown> → 404", async () => {
     const res = await call("/admin/org/not-a-course-org", { headers: cookie(await owner()) });
     expect(res.status).toBe(404);

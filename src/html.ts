@@ -307,13 +307,26 @@ export function orgMembersPage(
   org: string,
   view: { rows: { student_id: string; nycu_name: string | null; github_login: string | null; status: string }[]; unbound: string[] },
   err = "",
+  opts: { courses?: { course_id: string; name: string }[]; selectedCourse?: string } = {},
 ): string {
   const t = T[lang];
   const badge: Record<string, string> = {
-    member: `<span class="badge badge--success">${t.org_status_member}</span>`,
-    pending: `<span class="badge badge--warning">${t.org_status_pending}</span>`,
-    none: `<span class="badge badge--neutral">${t.org_status_none}</span>`,
+    member: orgStatusBadge(t, "member"),
+    pending: orgStatusBadge(t, "pending"),
+    none: orgStatusBadge(t, "none"),
   };
+  // Optional course filter: scope the rows to one course's roster. When active,
+  // the "org members not in maccount" (unbound) list is suppressed — it would
+  // otherwise list every OTHER course's members relative to this narrow roster.
+  const courses = opts.courses ?? [];
+  const selectedCourse = opts.selectedCourse ?? "";
+  const coursePicker = courses.length
+    ? `<form method="GET" action="/admin/org/${encodeURIComponent(org)}" style="margin:.6rem 0">
+  <label>${t.org_course_filter} <select name="course" onchange="this.form.submit()">
+  <option value="">${t.org_course_filter_all}</option>${courses
+    .map((c) => `<option value="${h(c.course_id)}"${c.course_id === selectedCourse ? " selected" : ""}>${h(c.name || c.course_id)}</option>`)
+    .join("")}</select></label></form>`
+    : "";
   // Bound students sorted: in-org first (member, pending), then not-in-org.
   const order: Record<string, number> = { member: 0, pending: 1, none: 2 };
   const sorted = [...view.rows].sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
@@ -323,7 +336,7 @@ export function orgMembersPage(
   <td class="mobile-secondary">${h(r.nycu_name)}</td><td>${badge[r.status] ?? h(r.status)}</td></tr>`,
     )
     .join("\n");
-  const unbound = view.unbound.length
+  const unbound = view.unbound.length && !selectedCourse
     ? `<h2>${t.org_unbound_heading}（${view.unbound.length}）</h2>
 <p class="muted text-small">${t.org_unbound_note}</p>
 <p>${view.unbound.map((l) => h(l)).join("、")}</p>`
@@ -333,6 +346,7 @@ export function orgMembersPage(
 ${langToggle(`/admin/org/${encodeURIComponent(org)}`, lang)}
 <p style="font-size:.9em"><a href="/admin">← ${t.admin_courses_heading}</a>　|　<a href="/admin/bindings">${t.bindings_all_link}</a></p>
 <h1>GitHub org：${h(org)}</h1>
+${coursePicker}
 ${err ? `<p style="padding:8px;border:1px solid #c00;background:#fee">${t.org_fetch_error}：${h(err)}</p>` : ""}
 ${sorted.length ? tableTools(t, "org-members-table", sorted.length, [
     { value: "member", label: t.org_status_member },
@@ -358,6 +372,16 @@ interface EnrolledLite {
   github_login: string | null;
   google_email?: string | null;
   line_name?: string | null;
+  org_status?: "member" | "pending" | "none" | null;
+}
+
+// GitHub org membership badge, shared by the org view and the course roster.
+// null/undefined (student hasn't bound GitHub → can't be in the org) → "—".
+function orgStatusBadge(t: Strings, status: string | null | undefined): string {
+  if (status === "member") return `<span class="badge badge--success">${t.org_status_member}</span>`;
+  if (status === "pending") return `<span class="badge badge--warning">${t.org_status_pending}</span>`;
+  if (status === "none") return `<span class="badge badge--neutral">${t.org_status_none}</span>`;
+  return `<span class="muted">—</span>`;
 }
 
 interface FormLite {
@@ -433,6 +457,8 @@ export function adminPage(
     forms?: FormLite[];
     inviteOrg?: string;
     autoInvite?: boolean;
+    showOrgStatus?: boolean;
+    orgStatusErr?: string;
   } = { isOwner: false, staff: [] },
 ): string {
   const t = T[lang];
@@ -503,10 +529,13 @@ export function adminPage(
   const bound = enrolled.filter((e) => e.github_login).length;
   const gbound = enrolled.filter((e) => e.google_email).length;
   const lbound = enrolled.filter((e) => e.line_name).length;
+  const showOrgStatus = !!opts.showOrgStatus;
   const enrolledRows = enrolled
     .map(
       (e) => {
         const displayName = e.name || e.nycu_name || "";
+        const orgCell = showOrgStatus ? `<td>${orgStatusBadge(t, e.org_status)}</td>` : "";
+        const orgDetail = showOrgStatus ? `<dt>${t.org_status_col}</dt><dd>${orgStatusBadge(t, e.org_status)}</dd>` : "";
         return `<tr data-row data-status="${e.github_login && e.google_email && e.line_name ? "complete" : "missing"}"><td>${h(e.student_id)}</td><td>${
           displayName ? h(displayName) : ""
         }</td><td class="mobile-secondary">${
@@ -517,8 +546,8 @@ export function adminPage(
         e.google_email ? h(e.google_email) : `<span class="badge badge--danger">${t.enroll_unbound}</span>`
       }</td><td>${
         e.line_name ? h(e.line_name) : `<span class="badge badge--danger">${t.enroll_unbound}</span>`
-      }</td><td class="mobile-only"><details class="mobile-row-details"><summary>${lang === "en" ? "Full details" : "查看完整資料"}</summary><dl>
-        <dt>Moodle email</dt><dd>${h(e.email) || "-"}</dd><dt>Google</dt><dd>${h(e.google_email) || "-"}</dd><dt>LINE</dt><dd>${h(e.line_name) || "-"}</dd>
+      }</td>${orgCell}<td class="mobile-only"><details class="mobile-row-details"><summary>${lang === "en" ? "Full details" : "查看完整資料"}</summary><dl>
+        <dt>Moodle email</dt><dd>${h(e.email) || "-"}</dd><dt>Google</dt><dd>${h(e.google_email) || "-"}</dd><dt>LINE</dt><dd>${h(e.line_name) || "-"}</dd>${orgDetail}
       </dl></details></td></tr>`;
       },
     )
@@ -539,10 +568,12 @@ export function adminPage(
 <p class="muted text-small">${t.enroll_note.replace("{bound}", String(bound)).replace("{gbound}", String(gbound)).replace("{lbound}", String(lbound))}</p>${
     enrolled.length
       ? `
-<details><summary>${t.enroll_show_list}</summary>
+<details><summary>${t.enroll_show_list}</summary>${
+    showOrgStatus && opts.orgStatusErr ? `\n<p class="muted text-small">${t.org_fetch_error}：${h(opts.orgStatusErr)}</p>` : ""
+  }
 ${tableTools(t, "enrollment-table", enrolled.length, [{ value: "missing", label: t.table_filter_unbound }])}
 <table id="enrollment-table" class="mobile-compact" border="1" cellpadding="6" cellspacing="0">
-<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("Moodle email", 2, "text", "mobile-secondary")}${sortableTh("GitHub", 3)}<th class="mobile-secondary">Google</th><th>LINE</th><th class="mobile-only">${lang === "en" ? "Details" : "詳細資料"}</th></tr></thead>
+<thead><tr>${sortableTh("NYCU id", 0)}${sortableTh(t.th_name, 1)}${sortableTh("Moodle email", 2, "text", "mobile-secondary")}${sortableTh("GitHub", 3)}<th class="mobile-secondary">Google</th><th>LINE</th>${showOrgStatus ? sortableTh(t.org_status_col, 6) : ""}<th class="mobile-only">${lang === "en" ? "Details" : "詳細資料"}</th></tr></thead>
 <tbody>${enrolledRows}</tbody></table></details>`
       : ""
   }

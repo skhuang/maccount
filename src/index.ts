@@ -1367,29 +1367,53 @@ async function adminBindingDelete(req: Request, env: Env): Promise<Response> {
   return redirect("/admin/bindings?b=deleted");
 }
 
+// Live-fetch an org's members + pending invites (one paged call each). Never
+// throws: on failure returns empty lists + the error message, so callers degrade
+// to "membership unknown" instead of erroring. No-op ("" org / no token) → empty.
+async function fetchOrgMembership(
+  env: Env, org: string,
+): Promise<{ members: string[]; pending: string[]; err: string }> {
+  if (!org || !env.ORG_INVITE_TOKEN) return { members: [], pending: [], err: "" };
+  try {
+    const [members, pending] = await Promise.all([
+      listOrgMembers(org, env.ORG_INVITE_TOKEN),
+      listPendingOrgInvites(org, env.ORG_INVITE_TOKEN),
+    ]);
+    return { members, pending, err: "" };
+  } catch (e) {
+    return { members: [], pending: [], err: (e as Error).message };
+  }
+}
+
 // GET /admin/org/<org> — query bindings by GitHub org: live-fetch the org's
 // members + pending invites (once each) and join to the binding registry.
+// Optional ?course=<id> scopes the rows to that course's enrolled roster (so an
+// instructor can see, for one class, who is member/pending/not-in-org).
 async function adminOrgView(req: Request, env: Env, url: URL, org: string): Promise<Response> {
   const s = await requireStaff(req, env);
   if (s instanceof Response) return s;
   if (!(await effectiveOrgs(env)).includes(org)) return new Response("Unknown org", { status: 404 });
   if (!env.ORG_INVITE_TOKEN) return new Response("ORG_INVITE_TOKEN not set", { status: 400 });
   const lang = pickLang(url, req.headers.get("Cookie"));
-  let members: string[] = [];
-  let pending: string[] = [];
-  let err = "";
-  try {
-    [members, pending] = await Promise.all([
-      listOrgMembers(org, env.ORG_INVITE_TOKEN),
-      listPendingOrgInvites(org, env.ORG_INVITE_TOKEN),
-    ]);
-  } catch (e) {
-    err = (e as Error).message;
+  const { members, pending, err } = await fetchOrgMembership(env, org);
+  // Courses whose effective org is THIS org — the picker options + filter set.
+  const orgCourses = (await listCourses(env.DB)).filter((c) => effectiveOrg(env, c) === org);
+  const selectedCourse = orgCourses.some((c) => c.course_id === url.searchParams.get("course"))
+    ? url.searchParams.get("course")!
+    : "";
+  let bindings = await listBindings(env.DB);
+  if (selectedCourse) {
+    const enrolledIds = new Set((await listEnrollments(env.DB, selectedCourse)).map((r) => r.student_id));
+    bindings = bindings.filter((b) => enrolledIds.has(b.nycu_id));
   }
-  const view = orgBindingView(await listBindings(env.DB), members, pending);
-  return new Response(orgMembersPage(lang, org, view, err), {
-    headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) },
-  });
+  const view = orgBindingView(bindings, members, pending);
+  return new Response(
+    orgMembersPage(lang, org, view, err, {
+      courses: orgCourses.map((c) => ({ course_id: c.course_id, name: c.name })),
+      selectedCourse,
+    }),
+    { headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) } },
+  );
 }
 
 // POST /admin/courses — owner creates/updates a course-offering.
@@ -1505,8 +1529,18 @@ async function courseAdmin(req: Request, env: Env, url: URL, courseId: string): 
   const classroomMsg = url.searchParams.get("classroom_msg") ?? "";
   const boundCount = enrolled.filter((e) => e.github_login).length;
   const autoInvite = url.searchParams.get("autoinvite") === "1";
+  // Tag each enrolled student with their live org-membership state so the roster
+  // shows who has actually joined the course org (vs. only bound GitHub).
+  const org = effectiveOrg(env, course);
+  const { members, pending, err: orgStatusErr } = await fetchOrgMembership(env, org);
+  const mem = new Set(members.map((l) => l.toLowerCase()));
+  const pend = new Set(pending.map((l) => l.toLowerCase()));
+  const orgStatusOf = (login: string | null): "member" | "pending" | "none" | null =>
+    login ? (mem.has(login.toLowerCase()) ? "member" : pend.has(login.toLowerCase()) ? "pending" : "none") : null;
+  const enrolledWithOrg = enrolled.map((e) => ({ ...e, org_status: orgStatusOf(e.github_login) }));
+  const showOrgStatus = !!(org && env.ORG_INVITE_TOKEN);
   return new Response(
-    adminPage(lang, course, scoped, { isOwner, staff, staffMsg, boundCount, driveMsg, formsMsg, classroomMsg, enrolled, forms, inviteOrg: effectiveOrg(env, course), autoInvite }),
+    adminPage(lang, course, scoped, { isOwner, staff, staffMsg, boundCount, driveMsg, formsMsg, classroomMsg, enrolled: enrolledWithOrg, forms, inviteOrg: org, autoInvite, showOrgStatus, orgStatusErr }),
     { headers: { "Content-Type": "text/html; charset=utf-8", "Set-Cookie": langCookie(lang) } },
   );
 }

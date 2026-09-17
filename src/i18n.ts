@@ -146,6 +146,8 @@ export interface Strings {
   org_status_member: string;
   org_status_pending: string;
   org_status_none: string;
+  org_course_filter: string;
+  org_course_filter_all: string;
   org_unbound_heading: string;
   org_unbound_note: string;
   org_fetch_error: string;
@@ -472,6 +474,8 @@ export const T: Record<Lang, Strings> = {
     org_status_member: "已加入",
     org_status_pending: "待接受",
     org_status_none: "未加入",
+    org_course_filter: "只看課程",
+    org_course_filter_all: "— 全部課程 —",
     org_unbound_heading: "已在 org、未在 maccount 綁定",
     org_unbound_note: "這些 GitHub 帳號在 org 內，但沒有對應的 maccount 綁定（請其到 /me 綁定學號）。",
     org_fetch_error: "讀取 org 成員失敗",
@@ -800,6 +804,8 @@ export const T: Record<Lang, Strings> = {
     org_status_member: "member",
     org_status_pending: "pending",
     org_status_none: "not joined",
+    org_course_filter: "Filter by course",
+    org_course_filter_all: "— all courses —",
     org_unbound_heading: "In the org, not bound on maccount",
     org_unbound_note: "These GitHub accounts are in the org but have no maccount binding (ask them to bind at /me).",
     org_fetch_error: "failed to read org members",
