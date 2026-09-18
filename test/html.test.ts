@@ -711,6 +711,14 @@ describe("exam window banner", () => {
     expect(html).toContain("Exam window");
     expect(html).toContain("Opens");
   });
+
+  it("shows the problem title when present, falling back to the id", () => {
+    const withTitle = examPage("zh", "ds2026-lab9", [gradeRow({ problem_title: "字首樹前綴查詢" })], false, null);
+    expect(withTitle).toContain("字首樹前綴查詢");
+    expect(withTitle).not.toContain(">trie-prefix<"); // id no longer the visible label
+    const noTitle = examPage("zh", "ds2026-lab9", [gradeRow({ problem_title: null })], false, null);
+    expect(noTitle).toContain("trie-prefix"); // fallback to id
+  });
 });
 
 // The dashboard's exam LIST carries each exam's deadline, so a student sees it

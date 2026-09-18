@@ -923,7 +923,7 @@ export function dashboardPage(
   // The student's own repo for the problem; link to it when present. A bare
   // owner/name → github.com; a full http(s) URL is used as-is.
   const problemCell = (g: GradeRow) => {
-    const pid = h(g.problem_id);
+    const pid = h(g.problem_title || g.problem_id);
     const url = repoHref(g.repo);
     return url ? `<a href="${h(url)}" target="_blank" rel="noopener">${pid} ↗</a>` : pid;
   };
@@ -1146,7 +1146,7 @@ export function examPage(
       const repoCell = url
         ? `<a href="${h(url)}" target="_blank" rel="noopener">${t.exam_go_solve} ↗</a>${helpHint(t.help_exam_repo, t.help_label)}`
         : `<span class="muted">${t.exam_no_repo}</span>`;
-      return `<tr><td data-label="${h(t.col_problem)}">${h(g.problem_id)}</td><td data-label="repo">${repoCell}</td>
+      return `<tr><td data-label="${h(t.col_problem)}">${h(g.problem_title || g.problem_id)}</td><td data-label="repo">${repoCell}</td>
   <td data-label="${h(t.col_result)}">${verdictBadge(g.verdict)}</td>
   <td data-label="${h(t.col_score)}">${g.score == null ? "-" : h(g.score)} / ${g.max_score == null ? "-" : h(g.max_score)}</td></tr>`;
     })
@@ -1174,7 +1174,7 @@ ${uiEnhancements(t)}
 // 學號 masked, own row highlighted; score + rank only — no repo, no raw id
 // (iron rule 2). Points-weighted totals (matches the dsjudge board).
 export interface AnonBoard {
-  problems: { problem_id: string; max_score: number | null }[];
+  problems: { problem_id: string; max_score: number | null; title?: string | null }[];
   max_total: number;
   rows: { rank: number; student: string; you: boolean; total: number; cells: Record<string, number | null> }[];
 }
@@ -1184,7 +1184,7 @@ export function studentScoreboardPage(
 ): string {
   const t = T[lang];
   const thP = board.problems
-    .map((p) => `<th>${h(p.problem_id)}<br><span class="muted text-small">${p.max_score ?? "?"}</span></th>`)
+    .map((p) => `<th>${h(p.title || p.problem_id)}<br><span class="muted text-small">${p.max_score ?? "?"}</span></th>`)
     .join("");
   const trs = board.rows
     .map((r) => {
@@ -1236,7 +1236,7 @@ export function scoreboardPage(
       table = `<p class="muted">此作業尚無成績資料。 / No grades yet for this assignment.</p>`;
     } else {
       const thProblems = board.problems
-        .map((p) => `<th>${h(p.problem_id)}<br><span class="muted text-small">${p.max_score ?? "?"}</span></th>`)
+        .map((p) => `<th>${h(p.title || p.problem_id)}<br><span class="muted text-small">${p.max_score ?? "?"}</span></th>`)
         .join("");
       const trs = board.rows
         .map((r) => {

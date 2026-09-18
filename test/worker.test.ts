@@ -1840,8 +1840,26 @@ describe("/api/grades/ingest", () => {
     const cols = await env.DB.prepare("SELECT * FROM grades LIMIT 1").first();
     expect(Object.keys(cols ?? {})).toEqual([
       "course_id", "assignment_id", "student_id", "problem_id", "verdict", "score", "max_score",
-      "updated_at", "repo", "assignment_type", "assignment_title", "points",
+      "updated_at", "repo", "assignment_type", "assignment_title", "points", "problem_title",
     ]);
+  });
+
+  it("stores problem_title and COALESCE-preserves it across pushes", async () => {
+    const ingest = (b: unknown) =>
+      call("/api/grades/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer ingest-secret" },
+        body: JSON.stringify(b),
+      });
+    // provision-style push carries the title (no score yet)…
+    await ingest([{ course_id: "ds-2026", assignment_id: "A1", student_id: "S9", problem_id: "p9", problem_title: "堆疊 Stack", repo: "r" }]);
+    // …a later grade push omits the title — it must be preserved (COALESCE).
+    await ingest([{ course_id: "ds-2026", assignment_id: "A1", student_id: "S9", problem_id: "p9", verdict: "AC", score: 100, max_score: 100 }]);
+    const row = await env.DB.prepare(
+      "SELECT problem_title, verdict FROM grades WHERE course_id='ds-2026' AND assignment_id='A1' AND student_id='S9' AND problem_id='p9'",
+    ).first<{ problem_title: string; verdict: string }>();
+    expect(row?.problem_title).toBe("堆疊 Stack");
+    expect(row?.verdict).toBe("AC");
   });
 
   it("repo-only provisioning row keeps score null; a later grade fills it (COALESCE)", async () => {
@@ -2579,6 +2597,16 @@ describe("staff scoreboard", () => {
     expect(b.rows.map((r) => [r.student_id, r.total, r.rank])).toEqual([
       ["S2", 200, 1], ["S1", 180, 2], ["S3", 0, 3],
     ]);
+  });
+
+  it("buildScoreboard carries each problem's title (from any row that has it)", () => {
+    const b = buildScoreboard([
+      g({ student_id: "S1", problem_id: "p1", score: 100, problem_title: "Stack" }),
+      g({ student_id: "S2", problem_id: "p1", score: 50 }), // no title on this row
+      g({ student_id: "S1", problem_id: "p2", score: 10 }), // no title at all → null
+    ]);
+    expect(b.problems.find((p) => p.problem_id === "p1")?.title).toBe("Stack");
+    expect(b.problems.find((p) => p.problem_id === "p2")?.title).toBeNull();
   });
 
   it("ties share a rank (1,1,3)", () => {

@@ -18,7 +18,7 @@ export interface SbRow {
   cells: Record<string, SbCell>;
 }
 export interface Scoreboard {
-  problems: { problem_id: string; max_score: number | null }[];
+  problems: { problem_id: string; max_score: number | null; title: string | null }[];
   rows: SbRow[];
   max_total: number;
 }
@@ -27,6 +27,7 @@ export function buildScoreboard(rows: GradeRow[]): Scoreboard {
   const order: string[] = [];
   const maxByPid = new Map<string, number | null>();     // problem's own max_score
   const weightByPid = new Map<string, number | null>();  // this assignment's `points`
+  const titleByPid = new Map<string, string | null>();   // human-readable title
   const rawByStudent = new Map<string, Record<string, { score: number | null; verdict: string | null; repo: string | null }>>();
 
   const bump = (m: Map<string, number | null>, pid: string, v: number | null) => {
@@ -40,6 +41,7 @@ export function buildScoreboard(rows: GradeRow[]): Scoreboard {
     if (!maxByPid.has(r.problem_id)) maxByPid.set(r.problem_id, null);
     bump(maxByPid, r.problem_id, r.max_score);
     bump(weightByPid, r.problem_id, r.points);
+    if (r.problem_title && !titleByPid.get(r.problem_id)) titleByPid.set(r.problem_id, r.problem_title);
     let cells = rawByStudent.get(r.student_id);
     if (!cells) { cells = {}; rawByStudent.set(r.student_id, cells); }
     cells[r.problem_id] = { score: r.score, verdict: r.verdict, repo: r.repo };
@@ -81,7 +83,7 @@ export function buildScoreboard(rows: GradeRow[]): Scoreboard {
 
   // max_score here reports the cell's WORTH (points when set, else the problem
   // max), so max_total = Σ worth and the weighted cells sum to each row's total.
-  const problems = order.map((problem_id) => ({ problem_id, max_score: worthOf(problem_id) }));
+  const problems = order.map((problem_id) => ({ problem_id, max_score: worthOf(problem_id), title: titleByPid.get(problem_id) ?? null }));
   const max_total = problems.reduce((s, p) => s + (p.max_score ?? 0), 0);
   return { problems, rows: out, max_total };
 }

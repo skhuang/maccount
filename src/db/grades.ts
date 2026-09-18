@@ -17,6 +17,7 @@ export interface GradeRow {
   assignment_id: string | null;    // which assignment this problem belongs to
   assignment_type: string | null;  // lab | exam
   assignment_title: string | null;
+  problem_title?: string | null;   // human-readable problem title (from dsjudge)
   points: number | null;           // this assignment's weight for the problem
 }
 
@@ -33,12 +34,13 @@ export interface GradeInput {
   assignment_id?: string | null;
   assignment_type?: string | null;
   assignment_title?: string | null;
+  problem_title?: string | null;
   points?: number | null;
 }
 
 const COLS =
   "course_id, student_id, problem_id, verdict, score, max_score, updated_at, repo, " +
-  "assignment_id, assignment_type, assignment_title, points";
+  "assignment_id, assignment_type, assignment_title, problem_title, points";
 
 // Upsert a batch keyed by (course_id, assignment_id, student_id, problem_id) —
 // assignment_id is part of the key (migration 0021), so a problem reused across
@@ -52,8 +54,8 @@ export async function upsertGrades(db: D1Database, rows: GradeInput[]): Promise<
   const stmt = db.prepare(
     `INSERT INTO grades
        (course_id, assignment_id, student_id, problem_id, verdict, score, max_score,
-        updated_at, repo, assignment_type, assignment_title, points)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+        updated_at, repo, assignment_type, assignment_title, problem_title, points)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
      ON CONFLICT(course_id, assignment_id, student_id, problem_id) DO UPDATE SET
        verdict = COALESCE(?5, verdict),
        score = COALESCE(?6, score),
@@ -62,13 +64,14 @@ export async function upsertGrades(db: D1Database, rows: GradeInput[]): Promise<
        repo = COALESCE(?9, repo),
        assignment_type = COALESCE(?10, assignment_type),
        assignment_title = COALESCE(?11, assignment_title),
-       points = COALESCE(?12, points)`,
+       problem_title = COALESCE(?12, problem_title),
+       points = COALESCE(?13, points)`,
   );
   const batch = rows.map((r) =>
     stmt.bind(
       r.course_id, r.assignment_id ?? "", r.student_id, r.problem_id, r.verdict, r.score,
       r.max_score, r.updated_at, r.repo ?? null, r.assignment_type ?? null, r.assignment_title ?? null,
-      r.points ?? null,
+      r.problem_title ?? null, r.points ?? null,
     ),
   );
   await db.batch(batch);
