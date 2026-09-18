@@ -1143,7 +1143,7 @@ describe("exam list on /me + /me/exam/<id>", () => {
     const body = await (await call("/me?course=ds-2026", { headers: cookie(await sess()) })).text();
     expect(body).toContain('href="/me/exam/mid"'); // exam → list link
     expect(body).toContain("期中考");
-    expect(body).toContain("lab01-stack ↗");        // lab → flat row with repo link
+    expect(body).toContain("Lab 1 ↗");              // lab → flat row; label falls back to assignment_title (no problem_title)
     expect(body).not.toContain('href="/me/exam/ds2026-lab01"'); // lab is NOT in the exam list
   });
 

@@ -923,7 +923,7 @@ export function dashboardPage(
   // The student's own repo for the problem; link to it when present. A bare
   // owner/name → github.com; a full http(s) URL is used as-is.
   const problemCell = (g: GradeRow) => {
-    const pid = h(g.problem_title || g.problem_id);
+    const pid = h(g.problem_title || g.assignment_title || g.problem_id);
     const url = repoHref(g.repo);
     return url ? `<a href="${h(url)}" target="_blank" rel="noopener">${pid} ↗</a>` : pid;
   };
@@ -1146,7 +1146,7 @@ export function examPage(
       const repoCell = url
         ? `<a href="${h(url)}" target="_blank" rel="noopener">${t.exam_go_solve} ↗</a>${helpHint(t.help_exam_repo, t.help_label)}`
         : `<span class="muted">${t.exam_no_repo}</span>`;
-      return `<tr><td data-label="${h(t.col_problem)}">${h(g.problem_title || g.problem_id)}</td><td data-label="repo">${repoCell}</td>
+      return `<tr><td data-label="${h(t.col_problem)}">${h(g.problem_title || g.assignment_title || g.problem_id)}</td><td data-label="repo">${repoCell}</td>
   <td data-label="${h(t.col_result)}">${verdictBadge(g.verdict)}</td>
   <td data-label="${h(t.col_score)}">${g.score == null ? "-" : h(g.score)} / ${g.max_score == null ? "-" : h(g.max_score)}</td></tr>`;
     })

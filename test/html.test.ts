@@ -712,12 +712,17 @@ describe("exam window banner", () => {
     expect(html).toContain("Opens");
   });
 
-  it("shows the problem title when present, falling back to the id", () => {
+  it("shows problem_title, then assignment_title, then the id (3-level fallback)", () => {
+    // The problem cell is `<td data-label=…>VALUE</td>`; assert on that cell so the
+    // repo URL (which also contains the slug) doesn't confuse the check.
     const withTitle = examPage("zh", "ds2026-lab9", [gradeRow({ problem_title: "字首樹前綴查詢" })], false, null);
-    expect(withTitle).toContain("字首樹前綴查詢");
-    expect(withTitle).not.toContain(">trie-prefix<"); // id no longer the visible label
-    const noTitle = examPage("zh", "ds2026-lab9", [gradeRow({ problem_title: null })], false, null);
-    expect(noTitle).toContain("trie-prefix"); // fallback to id
+    expect(withTitle).toContain(">字首樹前綴查詢</td>");
+    // assignment_title fallback when the problem has no title of its own
+    const asgTitle = examPage("zh", "ds2026-lab9", [gradeRow({ problem_title: null, assignment_title: "Lab9 前綴樹" })], false, null);
+    expect(asgTitle).toContain(">Lab9 前綴樹</td>");
+    // id only when neither title is set
+    const idOnly = examPage("zh", "ds2026-lab9", [gradeRow({ problem_title: null, assignment_title: null })], false, null);
+    expect(idOnly).toContain(">trie-prefix</td>");
   });
 });
 
